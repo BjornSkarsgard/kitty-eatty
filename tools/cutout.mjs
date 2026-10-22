@@ -118,10 +118,12 @@ function encodePNG({ w, h, rgba }) {
 
 // «Зелёность»: насколько зелёный канал выше остальных (0..255).
 const greenness = (d, i) => d[i + 1] - Math.max(d[i], d[i + 2]);
-const isKey = (d, i) => d[i + 3] < 16 || greenness(d, i) > 90;
+let alphaOnly = false; // фон уже прозрачный — зелёное не трогаем (корм может быть зелёным)
+const isKey = (d, i) => d[i + 3] < 16 || (!alphaOnly && greenness(d, i) > 90);
 
 function cutout({ w, h, rgba }) {
   const d = rgba;
+  alphaOnly = [0, w - 1, (h - 1) * w, h * w - 1].every((p) => d[p * 4 + 3] < 16);
   const bg = new Uint8Array(w * h);
   // заливка фона от краёв
   const stack = [];
@@ -153,7 +155,7 @@ function cutout({ w, h, rgba }) {
     const p = y * w + x, i = p * 4;
     if (bg[p]) continue;
     const gr = greenness(d, i);
-    if (gr <= 10 || !near(x, y)) continue;
+    if (alphaOnly || gr <= 10 || !near(x, y)) continue;
     const a = Math.max(0, Math.min(1, 1 - gr / 255));
     d[i + 1] = Math.max(0, Math.min(255, Math.round((d[i + 1] - (1 - a) * 255) / Math.max(a, 0.05))));
     d[i + 1] = Math.min(d[i + 1], Math.max(d[i], d[i + 2])); // убрать остаток зелёного

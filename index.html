@@ -16,7 +16,7 @@
     // Отладка на телефоне: показываем ошибки прямо на экране, консоли там нет.
     (function () {
       var box = document.getElementById('debug');
-      function log(msg) { box.textContent += '\n' + msg; }
+      function log(msg) { box.hidden = false; box.textContent += '\n' + msg; }
       log(navigator.userAgent);
       window.onerror = function (msg, src, line, col) { log('ОШИБКА: ' + msg + ' @ ' + src + ':' + line + ':' + col); };
       window.addEventListener('unhandledrejection', function (e) { log('ОШИБКА (promise): ' + (e.reason && e.reason.stack || e.reason)); });

@@ -40,7 +40,7 @@ export class CatView extends Phaser.GameObjects.Container {
 
   image(key, cfg, tint, parent = this) {
     if (!this.scene.textures.exists(key)) return null;
-    const img = this.scene.add.image(cfg.artX ?? 0, cfg.artY ?? 0, key).setScale(cfg.artScale);
+    const img = this.scene.add.image(cfg.artX ?? 0, cfg.artY ?? 0, key).setScale(cfg.artScaleX ?? cfg.artScale, cfg.artScale);
     if (cfg.originX !== undefined) img.setOrigin(cfg.originX, cfg.originY);
     if (tint) img.setTint(this.fill);
     parent.add(img);

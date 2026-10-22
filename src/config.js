@@ -129,11 +129,12 @@ export const CONFIG = {
     confetti: 60,
   },
 
-  // Части кота. x/y — где часть на коте; artScale/artX/artY — подгонка картинок из src/assets.
+  // Части кота. x/y — где часть на коте; artScale/artX/artY — подгонка картинок из src/assets
+  // (artScaleX — если ширину нужно масштабировать отдельно от высоты).
   cat: {
     tail: { x: 22, y: 50, artScale: 0.12, originX: 0.22, originY: 0.95 }, // x/y — основание хвоста
     body: { x: 0, y: 58, artScale: 0.13, originX: 0.5, originY: 1 }, // y — низ лап
-    leg: { x: 10, y: 36, artScale: 0.1, originX: 0.5, originY: 0.06 },  // x/y — «плечо» левой лапы, правая зеркально
+    leg: { x: 11, y: 29, artScale: 0.065, artScaleX: 0.09, originX: 0.5, originY: 0.06 },  // x/y — «плечо» левой лапы, правая зеркально
     head: { x: 0, y: -22, artScale: 0.16, artY: -12 },
     eyes: { x: 0, y: -6, artScale: 0.16 },
     mouth: { x: 0, y: 10, artScale: 0.14 },

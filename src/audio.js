@@ -32,8 +32,9 @@ export function music(scene, key) {
     if (state.stopped) return;
     const snd = mgr.add(key, { volume: 0 });
     snd.play();
+    snd.setVolume(0); // Phaser до старта отдаёт volume = 1 — без этого музыка начиналась на полной громкости
     state.sound = snd;
-    fade(snd, CONFIG.audio.music, xf);
+    fade(snd, CONFIG.audio.music, xf, null, 0);
     const untilNext = Math.max(1000, snd.duration * 1000 - xf);
     state.timer = setTimeout(() => {
       if (state.stopped) return;
@@ -55,8 +56,7 @@ export function stopMusic() {
 }
 
 // Плавная громкость на таймере, а не на твинах сцены: переживает перезапуск сцены.
-function fade(sound, to, ms, done) {
-  const from = sound.volume;
+function fade(sound, to, ms, done, from = sound.volume) {
   const start = performance.now();
   const id = setInterval(() => {
     const t = Math.min(1, (performance.now() - start) / ms);

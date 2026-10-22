@@ -43,7 +43,8 @@ export class GameScene extends Phaser.Scene {
     const title = `Уровень ${level.id}` + (level.puzzle ? ' · головоломка' : '');
     this.add.text(CONFIG.width / 2, L.titleY, title, {
       fontFamily: 'sans-serif', fontSize: '44px', color: '#ffffff',
-    }).setOrigin(0.5);
+      stroke: '#1b1426', strokeThickness: 8,
+    }).setOrigin(0.5).setDepth(15);
 
     this.layoutBowls();
     this.createBowls();
@@ -79,7 +80,7 @@ export class GameScene extends Phaser.Scene {
     });
     const bh = this.board.capacity * d.ph + d.pad * 2;
     const totalH = rows * bh + (rows - 1) * d.gy;
-    const top0 = L.bowlsTop + (availH - totalH) / 2;
+    const top0 = L.bowlsBottom - totalH; // нижний ряд стоит на столе
 
     this.bowlRects = [];
     for (let r = 0; r < rows; r++) {
@@ -166,8 +167,9 @@ export class GameScene extends Phaser.Scene {
     const x0 = CONFIG.width / 2 - ((n - 1) * spacing) / 2;
     this.cats = [];
     for (let c = 0; c < n; c++) {
-      const cat = new CatView(this, x0 + c * spacing, L.catsY, c);
-      cat.setDepth(10).setBaseScale(Math.min(1, spacing / L.catSpacing)).startIdle();
+      const scale = Math.min(1, spacing / L.catSpacing);
+      const cat = new CatView(this, x0 + c * spacing, L.catsFloorY - CONFIG.cat.body.y * scale, c);
+      cat.setDepth(10).setBaseScale(scale).startIdle();
       cat.home = { x: cat.x, y: cat.y };
       cat.fedBowl = null;
       // тап по коту — случайная реакция (только если сидит на месте)

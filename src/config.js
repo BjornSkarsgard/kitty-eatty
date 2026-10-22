@@ -68,10 +68,10 @@ export const CONFIG = {
 
   layout: {
     titleY: 60,
-    catsY: 190,         // ряд котов
+    catsFloorY: 234,    // где стоят лапы котов (подоконник на фоне bg_game)
     catSpacing: 120,    // максимум между котами
-    bowlsTop: 360,      // зона мисок
-    bowlsBottom: 1090,
+    bowlsTop: 300,      // зона банок
+    bowlsBottom: 1050,  // низ нижнего ряда банок (стол на фоне); банки «стоят» на нём
     maxPerRow: 6,
     sideMargin: 24,     // отступ мисок от краёв экрана
     bowlWidth: 120,
@@ -79,7 +79,7 @@ export const CONFIG = {
     bowlPadding: 10,
     bowlGapX: 40,
     bowlGapY: 80,
-    buttonsY: 1190,
+    buttonsY: 1212,
   },
 
   anim: {

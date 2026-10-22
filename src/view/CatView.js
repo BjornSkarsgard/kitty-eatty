@@ -56,7 +56,12 @@ export class CatView extends Phaser.GameObjects.Container {
     const h = this.head;
     if (this.useArt) {
       this.image('cat_head', C.head, true, h);
-      this.image('cat_spots_head', C.head, false, h);
+      // пятно на морде: картинка, если есть, иначе временное белое пятно
+      if (!this.image('cat_spots_head', C.head, false, h)) {
+        const g = this.scene.add.graphics();
+        drawFallback.muzzle(g);
+        h.add(g);
+      }
     } else {
       const g = this.scene.add.graphics();
       drawFallback.head(g, this.fill);
@@ -398,6 +403,9 @@ const drawFallback = {
     g.strokeTriangle(30, -10, 24, -44, 6, -20);
     g.fillCircle(0, 0, 34);
     g.strokeCircle(0, 0, 34);
+    drawFallback.muzzle(g);
+  },
+  muzzle(g) {
     g.fillStyle(0xffffff, 0.85);
     g.fillEllipse(0, 14, 34, 20);
   },

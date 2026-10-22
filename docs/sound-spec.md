@@ -61,6 +61,48 @@ Meow-meow-meow-meow, MEOW!
 
 **Не забудь BPM.** В стиле указано 85. Если Suno сделает другой темп, напиши мне, и я подгоню вращение головы на экране загрузки (`loading.bpm` в `src/config.js`).
 
+### «Кошачий трэп» (агрессивный рэп из мяуканья)
+
+Шуточный трек, тоже свой, с нуля. Куда можно: трейлер и промо в магазинах, экран победы на сложных уровнях и головоломках, будущие «боссы» или испытания. Файл: `music_trap.mp3`.
+
+**Suno → Style:**
+> aggressive trap rap, 140 bpm, hard 808 bass, rattling hi-hats, dark minor piano loop, angry cat rapper vocals rapping only "meow" and "mrrrow", fast flow, ad-libs "hiss", "rrrr", "mya!", punchy, meme energy, no intro, no fade out
+
+**Suno → Lyrics** (Custom):
+```
+[Intro]
+(Hsss...) Mrrrow! Mya! Mya!
+
+[Verse 1]
+Meow meow meow-meow, meow meow meow!
+Meow-meow-meow meow, mrrrow, meow meow!
+Mya-mya-mya meow, meow-meow-MEOW!
+Meow meow meow, meow meow — HSSS!
+
+[Hook]
+MEOW! MEOW! Meow-meow-meow-meow!
+MRRROW! MRRROW! Meow-meow-meow-meow!
+Mya-mya-mya, meow-meow-meow!
+MEOW! (rrrr) MEOW! (hsss)
+
+[Verse 2]
+Meow-meow, meow-meow, meow-meow-meow-meow!
+Mrrr-meow-meow, meow-meow-meow-MEOW!
+Mya mya meow, mya mya meow!
+Meow meow meow meow — MRRROW!
+
+[Hook]
+MEOW! MEOW! Meow-meow-meow-meow!
+MRRROW! MRRROW! Meow-meow-meow-meow!
+Mya-mya-mya, meow-meow-meow!
+MEOW! (rrrr) MEOW! (hsss)
+
+[Outro]
+Meow... (hsss)
+```
+
+Если Suno начнёт вставлять настоящие слова, добавь в Style `no real words, only meow sounds`.
+
 ## Эффекты
 
 | Файл | Когда звучит | Характер |

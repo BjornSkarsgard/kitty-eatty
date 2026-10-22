@@ -142,7 +142,7 @@ export class PreloadScene extends Phaser.Scene {
     const n = Math.floor(t / beat);
     const frac = (t % beat) / beat;
     const hit = Math.pow(1 - frac, 3);
-    this.catHead.angle = Math.sin((t / beat) * Math.PI) * Lc.headBob;
+    this.catHead.angle = Lc.headAngle + Math.sin((t / beat) * Math.PI) * Lc.headBob;
     this.catHead.setScale(this.catHeadBase * (1 + Lc.pulse * hit));
     this.paws.forEach((paw, i) => {
       paw.y = n % 2 === i ? -Lc.pawLift * Math.sin(frac * Math.PI) : 0;

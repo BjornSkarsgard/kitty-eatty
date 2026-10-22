@@ -10,29 +10,38 @@
 
     /* Первый экран загрузки — до того, как загрузился Phaser. Повторяет PreloadScene: вид изнутри миски,
        кот заглядывает через ободок и обходит его. 85 BPM: доля 0,706 с, круг = 8 долей = 5,647 с. */
-    #loader { position: fixed; inset: 0; overflow: hidden;
-      background: radial-gradient(circle at 50% 46%, #e0895c 0, #e0895c 40vmin, #9c4f33 95vmin); }
+    /* Заставка занимает ту же рамку 9:16, что и игра (Phaser Scale.FIT), чтобы при подмене ничего не прыгало.
+       --u = 1/100 ширины рамки = 7,2 игровых пикселя (игра 720×1280). */
+    #loader { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      --u: calc(min(100vw, 56.25vh) / 100); }
     #loader[hidden] { display: none; }
-    #loader .bowl, #loader .orbit { position: absolute; left: 50%; top: 46%; width: 69vmin; height: 69vmin;
-      margin: -34.5vmin 0 0 -34.5vmin; border-radius: 50%; }
-    #loader .bowl { background: radial-gradient(circle at 50% 40%, #fffaf2 0, #fff3e0 60%);
-      box-shadow: 0 0 0 0.8vmin #1b1426, 0 0 0 4.6vmin #f6b48a, 0 0 0 5.4vmin #1b1426; }
-    #loader .orbit { animation: kitty-orbit 5.647s linear infinite; }
-    #loader .peek { position: absolute; left: 50%; top: 0; width: 47.2vmin; margin: -11.1vmin 0 0 -23.6vmin; }
+    #loader .box { position: relative; overflow: hidden; width: calc(var(--u) * 100); height: calc(var(--u) * 177.78);
+      background: radial-gradient(circle at 50% 46%, #e0895c 0, #e0895c calc(var(--u) * 49), #9c4f33 calc(var(--u) * 99)); }
+    /* проём до внутреннего контура: радиус 250 − 14 − 3 = 233 px → диаметр 64,72u; центр на 46% высоты */
+    #loader .bowl { position: absolute; left: 50%; top: 46%; width: calc(var(--u) * 64.72); height: calc(var(--u) * 64.72);
+      margin: calc(var(--u) * -32.36) 0 0 calc(var(--u) * -32.36); border-radius: 50%;
+      background: radial-gradient(circle at 50% 40%, #fffaf2 0, #fff3e0 60%);
+      box-shadow: 0 0 0 calc(var(--u) * 0.83) #1b1426, 0 0 0 calc(var(--u) * 3.89) #f6b48a, 0 0 0 calc(var(--u) * 4.72) #1b1426; }
+    /* орбита — по средней линии ободка (радиус 250 px → диаметр 69,44u) */
+    #loader .orbit { position: absolute; left: 50%; top: 46%; width: calc(var(--u) * 69.44); height: calc(var(--u) * 69.44);
+      margin: calc(var(--u) * -34.72) 0 0 calc(var(--u) * -34.72); animation: kitty-orbit 5.647s linear infinite; }
+    #loader .peek { position: absolute; left: 50%; top: 0; width: calc(var(--u) * 47.22);
+      margin: calc(var(--u) * -11.11) 0 0 calc(var(--u) * -23.61); }
     #loader .peek .h { transform-box: fill-box; transform-origin: 50% 50%; animation: kitty-bob 1.412s ease-in-out infinite alternate; }
-    #loader .text { position: absolute; left: 0; right: 0; top: 44%; text-align: center; font: 5.5vmin sans-serif; color: #5a3a2a; }
+    #loader .text { position: absolute; left: 0; right: 0; top: calc(var(--u) * 77); text-align: center;
+      font: calc(var(--u) * 5.56) sans-serif; color: #5a3a2a; }
     @keyframes kitty-orbit { to { transform: rotate(360deg); } }
     @keyframes kitty-bob { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
   </style>
 </head>
 <body>
   <div id="game"></div>
-  <div id="loader">
+  <div id="loader"><div class="box">
     <div class="bowl"></div>
     <div class="text">Загрузка…</div>
     <div class="orbit">
       <svg class="peek" viewBox="-170 -80 340 260" aria-hidden="true">
-        <g transform="translate(0 62) scale(2.2)"><g class="h">
+        <g transform="translate(0 62) rotate(180) scale(2.2)"><g class="h">
           <g stroke="#1b1426" stroke-width="5" stroke-linejoin="round" fill="#ffd43b">
             <path d="M-30-10 L-24-44 L-6-20 Z" /><path d="M30-10 L24-44 L6-20 Z" /><circle r="34" />
           </g>
@@ -50,7 +59,7 @@
         </g>
       </svg>
     </div>
-  </div>
+  </div></div>
   <div id="debug" hidden style="position:fixed;left:0;right:0;top:0;padding:12px;color:#fff;background:rgba(0,0,0,.6);font:14px monospace;white-space:pre-wrap;word-break:break-all;z-index:9"></div>
   <script>
     // Отладка на телефоне: ошибки выводятся прямо на экран, консоли там нет.

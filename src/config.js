@@ -137,7 +137,7 @@ export const CONFIG = {
     leg: { x: 11, y: 29, artScale: 0.065, artScaleX: 0.09, originX: 0.5, originY: 0.06 },  // x/y — «плечо» левой лапы, правая зеркально
     head: { x: 0, y: -22, artScale: 0.16, artY: -12 },
     eyes: { x: 0, y: -6, artScale: 0.146, variantScale: { grumpy: 1.15 } },  // глаза и рты — без обрезки полей (cutout --notrim), чтобы варианты совпадали
-    mouth: { x: 0, y: 10, artScale: 0.14 },
+    mouth: { x: 0, y: 9, artScale: 0.19 },
   },
 
   audio: {

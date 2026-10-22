@@ -99,7 +99,9 @@ export class PreloadScene extends Phaser.Scene {
     this.catHeadBase = head.scaleX;
 
     this.paws = [-1, 1].map((side) => {
-      const paw = this.add.container(side * Lc.pawSpread, 0);
+      // рисуем лапу вокруг её центра, чтобы поворот pawAngle был на месте
+      const paw = this.add.container(side * Lc.pawSpread, 6 * Lc.catScale).setAngle(Lc.pawAngle);
+      paw.baseY = paw.y;
       if (this.textures.exists('cat_paw')) {
         const img = this.add.image(0, 0, 'cat_paw').setTint(CONFIG.colors[Lc.color].fill);
         img.setScale((40 * Lc.catScale) / Math.max(img.width, img.height));
@@ -108,10 +110,10 @@ export class PreloadScene extends Phaser.Scene {
         const g = this.add.graphics();
         const s = Lc.catScale;
         g.fillStyle(CONFIG.colors[Lc.color].fill, 1).lineStyle(5, CONFIG.outline, 1);
-        g.fillEllipse(0, 6 * s, 30 * s, 38 * s).strokeEllipse(0, 6 * s, 30 * s, 38 * s);
+        g.fillEllipse(0, 0, 30 * s, 38 * s).strokeEllipse(0, 0, 30 * s, 38 * s);
         g.lineStyle(3, CONFIG.outline, 1);
-        g.lineBetween(-5 * s, 18 * s, -5 * s, 24 * s); // пальчики смотрят внутрь миски
-        g.lineBetween(5 * s, 18 * s, 5 * s, 24 * s);
+        g.lineBetween(-5 * s, 12 * s, -5 * s, 18 * s); // пальчики (при pawAngle 0 — внутрь миски)
+        g.lineBetween(5 * s, 12 * s, 5 * s, 18 * s);
         paw.add(g);
       }
       return paw;
@@ -145,7 +147,7 @@ export class PreloadScene extends Phaser.Scene {
     this.catHead.angle = Lc.headAngle + Math.sin((t / beat) * Math.PI) * Lc.headBob;
     this.catHead.setScale(this.catHeadBase * (1 + Lc.pulse * hit));
     this.paws.forEach((paw, i) => {
-      paw.y = n % 2 === i ? -Lc.pawLift * Math.sin(frac * Math.PI) : 0;
+      paw.y = paw.baseY - (n % 2 === i ? Lc.pawLift * Math.sin(frac * Math.PI) : 0);
     });
   }
 }

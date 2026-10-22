@@ -1,4 +1,4 @@
-// Вырезает картинку с зелёного фона (chroma key): node tools/cutout.mjs файл.png [ещё.png ...] [--max=512] [--notrim]
+// Вырезает картинку с зелёного фона (chroma key): node tools/cutout.mjs файл.png [ещё.png ...] [--max=512] [--notrim] [--align=образец.png]
 // - фон убирается заливкой от краёв картинки, поэтому белое внутри контура (морда) не трогается;
 // - на сглаженном контуре убирается зелёная кайма (полупрозрачность восстанавливается);
 // - пустые поля обрезаются, картинка уменьшается до --max по большей стороне;
@@ -14,6 +14,8 @@ const args = process.argv.slice(2);
 const MAX = Number((args.find((a) => a.startsWith('--max=')) || '--max=512').slice(6));
 // --notrim: не обрезать поля — для наборов вариантов (глаза, рты), чтобы у всех был один кадр и центр
 const NOTRIM = args.includes('--notrim');
+// --align=art-src/cat_mouth_closed.png: сдвинуть картинку так, чтобы розовый нос совпал с носом на образце
+const ALIGN = (args.find((a) => a.startsWith('--align=')) || '').slice(8);
 const files = args.filter((a) => !a.startsWith('--'));
 if (!files.length) {
   console.log('Использование: node tools/cutout.mjs src/assets/cat_head.png [--max=512]');
@@ -197,10 +199,38 @@ function downscale(img, max) {
   return { w: nw, h: nh, rgba: out };
 }
 
+// Центр розового носа: розовые пиксели в верхней части розового (ниже может быть язык).
+function noseCenter({ w, h, rgba }) {
+  const pink = (i) => rgba[i + 3] > 200 && rgba[i] > 200 && rgba[i + 1] > 90 && rgba[i + 1] < 180 && rgba[i + 2] > 110 && rgba[i + 2] < 200;
+  let top = h;
+  for (let y = 0; y < h && top === h; y++) for (let x = 0; x < w; x++) if (pink((y * w + x) * 4)) { top = y; break; }
+  if (top === h) throw new Error('--align: не нашёл розовый нос');
+  let sx = 0, sy = 0, n = 0;
+  for (let y = top; y < Math.min(h, top + h * 0.1); y++) for (let x = 0; x < w; x++) {
+    if (pink((y * w + x) * 4)) { sx += x; sy += y; n++; }
+  }
+  return { x: sx / n, y: sy / n };
+}
+
+function alignTo(img, ref) {
+  const a = noseCenter(img);
+  const b = noseCenter(ref);
+  const dx = Math.round((b.x / ref.w) * img.w - a.x);
+  const dy = Math.round((b.y / ref.h) * img.h - a.y);
+  console.log(`  выравнивание по носу: сдвиг ${dx}, ${dy} px`);
+  const out = Buffer.alloc(img.rgba.length);
+  for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++) {
+    const sx = x - dx, sy = y - dy;
+    if (sx >= 0 && sy >= 0 && sx < img.w && sy < img.h) img.rgba.copy(out, (y * img.w + x) * 4, (sy * img.w + sx) * 4, (sy * img.w + sx) * 4 + 4);
+  }
+  return { w: img.w, h: img.h, rgba: out };
+}
+
 for (const file of files) {
   const name = basename(file).replace(/\.+png$/i, '').replace(/\.+$/, '');
   const src = readFileSync(file);
-  const cut = cutout(decodePNG(src));
+  let cut = cutout(decodePNG(src));
+  if (ALIGN) cut = alignTo(cut, decodePNG(readFileSync(ALIGN)));
   const img = downscale(NOTRIM ? cut : trim(cut), MAX);
   // сначала сохраняем исходник в art-src (не в git) — чтобы при желании перегнать с другими настройками
   mkdirSync(join(ROOT, 'art-src'), { recursive: true });

@@ -1,0 +1,70 @@
+// Звук с защитой от отсутствующих файлов: нет файла — тишина, без ошибок.
+import { CONFIG } from './config.js';
+
+const has = (scene, key) => scene.cache.audio.exists(key);
+
+export function sfx(scene, key, volume = 1) {
+  if (has(scene, key)) scene.sound.play(key, { volume: CONFIG.audio.sfx * volume });
+}
+
+// Случайный из вариантов: sfxRandom(scene, 'sfx_meow', 3) → sfx_meow_1..3
+export function sfxRandom(scene, base, count, volume = 1) {
+  const keys = [];
+  for (let i = 1; i <= count; i++) if (has(scene, `${base}_${i}`)) keys.push(`${base}_${i}`);
+  if (keys.length) sfx(scene, keys[Math.floor(Math.random() * keys.length)], volume);
+}
+
+// Одна музыка на всю игру. Зацикливание с перекрёстным затуханием: за loopCrossfade мс до конца
+// трека запускается новая копия с начала, старая гаснет. Поэтому трек не обязан идеально
+// стыковаться конец-в-начало — шов размывается.
+let current = null;
+
+export function music(scene, key) {
+  if (current && current.key === key) return;
+  stopMusic();
+  if (!has(scene, key)) return;
+  const mgr = scene.sound;
+  const xf = CONFIG.audio.loopCrossfade;
+  const state = { key, stopped: false, sound: null, timer: null };
+  current = state;
+
+  const startCopy = () => {
+    if (state.stopped) return;
+    const snd = mgr.add(key, { volume: 0 });
+    snd.play();
+    state.sound = snd;
+    fade(snd, CONFIG.audio.music, xf);
+    const untilNext = Math.max(1000, snd.duration * 1000 - xf);
+    state.timer = setTimeout(() => {
+      if (state.stopped) return;
+      fade(snd, 0, xf, () => snd.destroy());
+      startCopy();
+    }, untilNext);
+  };
+  startCopy();
+}
+
+export function stopMusic() {
+  if (!current) return;
+  const state = current;
+  current = null;
+  state.stopped = true;
+  clearTimeout(state.timer);
+  const snd = state.sound;
+  if (snd) fade(snd, 0, CONFIG.audio.musicFade, () => snd.destroy());
+}
+
+// Плавная громкость на таймере, а не на твинах сцены: переживает перезапуск сцены.
+function fade(sound, to, ms, done) {
+  const from = sound.volume;
+  const start = performance.now();
+  const id = setInterval(() => {
+    const t = Math.min(1, (performance.now() - start) / ms);
+    if (!sound.manager) return clearInterval(id); // уже уничтожен
+    sound.setVolume(from + (to - from) * t);
+    if (t === 1) {
+      clearInterval(id);
+      if (done) done();
+    }
+  }, 30);
+}

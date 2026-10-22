@@ -7,23 +7,48 @@
   <style>
     html, body { margin: 0; height: 100%; background: #2b2140; overflow: hidden; touch-action: none; }
     #game { width: 100%; height: 100%; }
+
+    /* Первый экран загрузки — до того, как загрузился Phaser. Тот же стиль, что и в PreloadScene:
+       голова кота едет по кругу (orbit) и крутится (spin). 85 BPM: доля 0,706 с, круг = 4 доли. */
+    #loader { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+    #loader[hidden] { display: none; }
+    #loader .orbit { width: 34vmin; height: 34vmin; position: relative; animation: kitty-spin 2.824s linear infinite; }
+    #loader .head { position: absolute; left: 50%; top: 0; width: 16vmin; height: 16vmin; margin: -8vmin 0 0 -8vmin;
+      animation: kitty-spin 1.412s linear infinite, kitty-pulse 0.706s ease-out infinite; }
+    @keyframes kitty-spin { to { transform: rotate(360deg); } }
+    @keyframes kitty-pulse { 0% { scale: 1.12; } 100% { scale: 1; } }
   </style>
 </head>
 <body>
   <div id="game"></div>
-  <div id="debug" style="position:fixed;left:0;right:0;top:0;padding:12px;color:#fff;font:14px monospace;white-space:pre-wrap;word-break:break-all;z-index:9">HTML загружен, жду JS…</div>
+  <div id="loader">
+    <div class="orbit">
+      <svg class="head" viewBox="-50 -60 100 100" aria-hidden="true">
+        <g stroke="#1b1426" stroke-width="5" stroke-linejoin="round" fill="#ffd43b">
+          <path d="M-30-10 L-24-44 L-6-20 Z" /><path d="M30-10 L24-44 L6-20 Z" />
+          <circle r="34" />
+        </g>
+        <ellipse cy="14" rx="17" ry="10" fill="#fff" opacity=".85" />
+        <g stroke="#1b1426" stroke-width="5" fill="none" stroke-linecap="round">
+          <path d="M-21-2 L-13-10 L-5-2" /><path d="M5-2 L13-10 L21-2" />
+        </g>
+        <path d="M-4 6 L4 6 L0 11 Z" fill="#1b1426" />
+      </svg>
+    </div>
+  </div>
+  <div id="debug" hidden style="position:fixed;left:0;right:0;top:0;padding:12px;color:#fff;background:rgba(0,0,0,.6);font:14px monospace;white-space:pre-wrap;word-break:break-all;z-index:9"></div>
   <script>
-    // Отладка на телефоне: показываем ошибки прямо на экране, консоли там нет.
+    // Отладка на телефоне: ошибки выводятся прямо на экран, консоли там нет.
     (function () {
       var box = document.getElementById('debug');
+      box.textContent = navigator.userAgent;
       function log(msg) { box.hidden = false; box.textContent += '\n' + msg; }
-      log(navigator.userAgent);
       window.onerror = function (msg, src, line, col) { log('ОШИБКА: ' + msg + ' @ ' + src + ':' + line + ':' + col); };
       window.addEventListener('unhandledrejection', function (e) { log('ОШИБКА (promise): ' + (e.reason && e.reason.stack || e.reason)); });
       window.__debugLog = log;
     })();
   </script>
-  <script nomodule>document.getElementById('debug').textContent += '\nБраузер не поддерживает ES-модули';</script>
+  <script nomodule>window.__debugLog ? window.__debugLog('Браузер не поддерживает ES-модули') : 0;</script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

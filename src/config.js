@@ -42,8 +42,21 @@ export const CONFIG = {
 
   outline: 0x1b1426,     // толстый тёмный контур
   outlineWidth: 6,
-  bowlFill: 0x3d3058,
-  bowlDoneStroke: 0xffd43b, // контур собранной миски
+  bowlDoneStroke: 0xffd43b, // ободок собранной банки
+
+  // Банка для корма (рисуется кодом)
+  jar: {
+    glass: 0xdfe7ff,      // стекло
+    glassAlpha: 0.16,
+    rim: 0xcfd8ff,        // горлышко
+    rimHeight: 16,
+    rimOverhang: 6,       // насколько горлышко шире банки с каждой стороны
+    base: 0x8c6a4f,       // подставка-миска снизу
+    baseHeight: 18,
+    baseOverhang: 12,
+    highlightAlpha: 0.35, // блик на стекле
+    radius: 18,
+  },
 
   layout: {
     titleY: 60,
@@ -69,10 +82,58 @@ export const CONFIG = {
     moveStagger: 45,      // задержка между порциями одной серии
     shakeDistance: 10,
     shakeDuration: 50,
-    catWalkDuration: 420, // кот идёт к миске
-    catEatOffsetY: 70,    // где кот стоит относительно верха миски
-    eatPerPortion: 160,   // съедание одной порции
-    catReturnDelay: 250,
-    winDelay: 600,        // пауза перед окном победы
+    // кот: фон
+    idleBreath: 0.04,     // дыхание: насколько тело раздувается
+    idleBreathDuration: 1300,
+    idleTailAngle: 14,    // размах хвоста, градусы
+    idleTailDuration: 900,
+    blinkMin: 1800,       // моргание: случайный интервал
+    blinkMax: 5000,
+    blinkDuration: 130,
+
+    // кот: кормление
+    meowDuration: 260,
+    hopHeight: 90,        // высота прыжка
+    hopSpeed: 900,        // px/с
+    hopMinDuration: 320,
+    squash: 0.12,         // сплющивание при приземлении
+    squashDuration: 90,
+    catEatOffsetY: 62,    // где кот стоит относительно верха банки
+    eatPerPortion: 260,   // один укус
+    eatDip: 16,           // насколько голова ныряет в банку
+    eatTilt: 8,           // наклон головы при укусе, градусы
+    crumbs: 7,            // крошек на укус
+    hearts: 5,            // сердечек, когда наелся
+    catReturnDelay: 350,
+
+    winDelay: 900,        // пауза перед окном победы
+    confetti: 60,
+  },
+
+  // Части кота. x/y — где часть на коте; artScale/artX/artY — подгонка картинок из src/assets.
+  cat: {
+    tail: { x: 36, y: 56, artScale: 0.2, originX: 0.3, originY: 1 },
+    body: { x: 0, y: 30, artScale: 0.2 },
+    head: { x: 0, y: -22, artScale: 0.2 },
+    eyes: { x: 0, y: -6, artScale: 0.16 },
+    mouth: { x: 0, y: 10, artScale: 0.14 },
+  },
+
+  audio: {
+    sfx: 0.7,       // громкость эффектов
+    music: 0.35,    // громкость музыки
+    musicFade: 600, // мс, плавное включение/выключение
+    loopCrossfade: 2500, // мс, перекрёстное затухание на стыке петли музыки
+  },
+
+  // Экран загрузки: голова кота едет по кругу и крутится в ритм музыки.
+  loading: {
+    bpm: 85,             // темп музыки загрузки (поменять под трек; и длительности анимаций #loader в index.html)
+    beatsPerOrbit: 4,    // за сколько долей голова проходит круг
+    spinsPerOrbit: 2,    // сколько раз она при этом поворачивается вокруг себя
+    radius: 140,
+    pulse: 0.12,         // «подпрыгивание» на каждую долю
+    minDuration: 1200,   // показывать не меньше, мс
+    color: 2,            // цвет кота на загрузке (индекс в colors)
   },
 };

@@ -50,74 +50,65 @@ export function drawShape(g, shape, s) {
   }
 }
 
-// Порция корма: цветная плашка со значком формы.
+// Порция корма: цветной слой + иконка корма (картинка food_N, если есть, иначе значок формы).
 export function makePortion(scene, colorIndex, w, h) {
   const { fill, shape } = CONFIG.colors[colorIndex];
+  const r = Math.min(12, h * 0.25);
   const g = scene.add.graphics();
   g.fillStyle(fill, 1);
-  g.fillRoundedRect(-w / 2, -h / 2, w, h, 12);
+  g.fillRoundedRect(-w / 2, -h / 2, w, h, r);
+  g.fillStyle(0x000000, 0.12); // один тон тени снизу
+  g.fillRoundedRect(-w / 2, h * 0.15, w, h * 0.35, { tl: 0, tr: 0, bl: r, br: r });
+  g.fillStyle(0xffffff, 0.35); // белый блик
+  g.fillRoundedRect(-w / 2 + 6, -h / 2 + 5, w * 0.3, h * 0.16, h * 0.08);
   g.lineStyle(4, CONFIG.outline, 1);
-  g.strokeRoundedRect(-w / 2, -h / 2, w, h, 12);
-  g.fillStyle(CONFIG.outline, 0.6);
-  drawShape(g, shape, h * 0.3);
-  const p = scene.add.container(0, 0, [g]);
+  g.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
+  const parts = [g];
+  const key = `food_${colorIndex}`;
+  if (scene.textures.exists(key)) {
+    const img = scene.add.image(0, 0, key);
+    img.setScale((h * 0.9) / Math.max(img.width, img.height));
+    parts.push(img);
+  } else {
+    g.fillStyle(CONFIG.outline, 0.6);
+    drawShape(g, shape, h * 0.3);
+  }
+  const p = scene.add.container(0, 0, parts);
   p.color = colorIndex;
   return p;
 }
 
-// Кот: тело, голова, уши, хвост + отдельный слой глаз, который меняется по настроению.
-export function makeCat(scene, colorIndex) {
-  const { fill } = CONFIG.colors[colorIndex];
-  const o = CONFIG.outline;
-  const g = scene.add.graphics();
-  g.lineStyle(5, o, 1);
-  g.fillStyle(fill, 1);
-  // хвост
-  g.fillRoundedRect(28, 10, 16, 46, 8);
-  g.strokeRoundedRect(28, 10, 16, 46, 8);
-  // тело
-  g.fillEllipse(0, 30, 76, 56);
-  g.strokeEllipse(0, 30, 76, 56);
-  // уши
-  g.fillTriangle(-30, -32, -24, -66, -6, -42);
-  g.strokeTriangle(-30, -32, -24, -66, -6, -42);
-  g.fillTriangle(30, -32, 24, -66, 6, -42);
-  g.strokeTriangle(30, -32, 24, -66, 6, -42);
-  // голова
-  g.fillCircle(0, -22, 34);
-  g.strokeCircle(0, -22, 34);
-  // белое пятно на морде
-  g.fillStyle(0xffffff, 0.85);
-  g.fillEllipse(0, -8, 34, 20);
+// Текстуры для частиц: крошка, сердечко, звёздочка, конфетти.
+export function makeFxTextures(scene) {
+  if (scene.textures.exists('fx_dot')) return;
+  const g = scene.make.graphics({ add: false });
+  const centered = (size, draw) => {
+    g.clear();
+    g.save();
+    g.translateCanvas(size / 2, size / 2);
+    draw();
+    g.restore();
+  };
 
-  const eyes = scene.add.graphics();
-  const cat = scene.add.container(0, 0, [g, eyes]);
-  cat.eyes = eyes;
-  setCatMood(cat, 'open');
-  return cat;
-}
+  centered(16, () => g.fillStyle(0xffffff, 1).fillCircle(0, 0, 8));
+  g.generateTexture('fx_dot', 16, 16);
 
-// mood: 'open' — ждёт, 'happy' — ест / сыт, 'grumpy' — ворчит.
-export function setCatMood(cat, mood) {
-  const e = cat.eyes;
-  const o = CONFIG.outline;
-  e.clear();
-  e.lineStyle(5, o, 1);
-  for (const x of [-13, 13]) {
-    if (mood === 'happy') {
-      e.beginPath();
-      e.moveTo(x - 8, -24);
-      e.lineTo(x, -32);
-      e.lineTo(x + 8, -24);
-      e.strokePath();
-    } else {
-      e.fillStyle(0xffffff, 1);
-      e.fillCircle(x, -28, 8);
-      e.fillStyle(o, 1);
-      e.fillCircle(x, -27, 4);
-      if (mood === 'grumpy') {
-        e.lineBetween(x - 9, -34, x + 9, -30 + (x < 0 ? 0 : -4));
-      }
-    }
-  }
+  centered(40, () => {
+    g.fillStyle(CONFIG.outline, 1);
+    drawShape(g, 'heart', 19);
+    g.fillStyle(0xff6b9a, 1);
+    drawShape(g, 'heart', 14);
+  });
+  g.generateTexture('fx_heart', 40, 40);
+
+  centered(32, () => {
+    g.fillStyle(0xffffff, 1);
+    drawShape(g, 'star', 15);
+  });
+  g.generateTexture('fx_star', 32, 32);
+
+  g.clear();
+  g.fillStyle(0xffffff, 1).fillRect(0, 0, 10, 16);
+  g.generateTexture('fx_confetti', 10, 16);
+  g.destroy();
 }

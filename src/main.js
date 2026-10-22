@@ -1,8 +1,7 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from './config.js';
 import { GameScene } from './scenes/GameScene.js';
-
-if (window.__debugLog) window.__debugLog('main.js загружен, Phaser ' + Phaser.VERSION);
+import { BootScene, PreloadScene } from './scenes/LoadingScenes.js';
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -14,13 +13,7 @@ const game = new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [GameScene],
-});
-
-// Игра запустилась — отладочный текст больше не нужен.
-game.events.once(Phaser.Core.Events.READY, () => {
-  const debug = document.getElementById('debug');
-  if (debug) debug.hidden = true;
+  scene: [BootScene, PreloadScene, GameScene],
 });
 
 // Для отладки из консоли браузера в режиме разработки.

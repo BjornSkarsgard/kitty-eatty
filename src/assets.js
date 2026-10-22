@@ -19,7 +19,7 @@ for (const [path, url] of Object.entries(files)) {
 export const LOADING_KEYS = [
   'loading_head', 'music_loading',
   // кот на загрузке собирается из тех же частей, если отдельной loading_head нет
-  'cat_head', 'cat_spots_head', 'cat_paw',
+  'cat_head', 'cat_spots_head', 'cat_paw_grip',
   'cat_eyes_open', 'cat_eyes_happy', 'cat_eyes_grumpy', 'cat_eyes_closed',
   'cat_mouth_open', 'cat_mouth_closed',
 ];

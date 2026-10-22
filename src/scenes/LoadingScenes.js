@@ -32,9 +32,6 @@ export class PreloadScene extends Phaser.Scene {
     const H = CONFIG.height;
     this.center = { x: W / 2, y: H * 0.46 };
 
-    const html = document.getElementById('loader');
-    if (html) html.hidden = true; // дальше рисует Phaser
-
     this.drawBowl();
     this.createCat();
 
@@ -42,15 +39,18 @@ export class PreloadScene extends Phaser.Scene {
       fontFamily: 'sans-serif', fontSize: '40px', color: '#5a3a2a',
     }).setOrigin(0.5);
     this.bar = this.add.graphics();
+    this.loadProgress = 0;
     this.drawBar(0);
 
     music(this, 'music_loading');
     this.startedAt = this.time.now;
 
+    // Полоса идёт по меньшему из двух: сколько загружено и сколько прошло от minDuration —
+    // поэтому плавно заполняется, даже если файлы загрузились мгновенно.
     queueAssets(this.load, (key) => !LOADING_KEYS.includes(key));
-    this.load.on('progress', (p) => this.drawBar(p));
+    this.load.on('progress', (p) => { this.loadProgress = p; });
     this.load.once('complete', () => {
-      this.drawBar(1);
+      this.loadProgress = 1;
       const wait = Math.max(0, Lc.minDuration - (this.time.now - this.startedAt));
       this.time.delayedCall(wait, () => this.scene.start('Game'));
     });
@@ -82,7 +82,7 @@ export class PreloadScene extends Phaser.Scene {
   // Контейнер кота повёрнут так, что его локальная ось +y смотрит в центр миски.
   createCat() {
     const Lc = CONFIG.loading;
-    this.peek = this.add.container(0, 0);
+    this.peek = this.add.container(0, 0).setDepth(10); // кот поверх надписи и полосы
 
     let head;
     if (this.textures.exists('loading_head')) {
@@ -102,9 +102,10 @@ export class PreloadScene extends Phaser.Scene {
       // рисуем лапу вокруг её центра, чтобы поворот pawAngle был на месте
       const paw = this.add.container(side * Lc.pawSpread, 6 * Lc.catScale).setAngle(Lc.pawAngle);
       paw.baseY = paw.y;
-      if (this.textures.exists('cat_paw')) {
-        const img = this.add.image(0, 0, 'cat_paw').setTint(CONFIG.colors[Lc.color].fill);
-        img.setScale((40 * Lc.catScale) / Math.max(img.width, img.height));
+      if (this.textures.exists('cat_paw_grip')) {
+        // согнутая лапа, пальчики внизу картинки — как у временной фигуры
+        const img = this.add.image(0, 0, 'cat_paw_grip').setTint(CONFIG.colors[Lc.color].fill);
+        img.setScale((Lc.pawArtSize * Lc.catScale) / Math.max(img.width, img.height));
         paw.add(img);
       } else {
         const g = this.add.graphics();
@@ -122,7 +123,7 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   drawBar(p) {
-    const w = 300;
+    const w = 220;
     const x = this.center.x - w / 2;
     const y = this.center.y + 40;
     this.bar.clear();
@@ -135,6 +136,7 @@ export class PreloadScene extends Phaser.Scene {
     const Lc = CONFIG.loading;
     const beat = 60000 / Lc.bpm;
     const t = time - this.startedAt;
+    this.drawBar(Math.min(this.loadProgress, t / Lc.minDuration));
     const a = (t / (beat * Lc.beatsPerOrbit)) * Math.PI * 2 - Math.PI / 2; // старт сверху
     this.peek.x = this.center.x + Math.cos(a) * Lc.radius;
     this.peek.y = this.center.y + Math.sin(a) * Lc.radius;

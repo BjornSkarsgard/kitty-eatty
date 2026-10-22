@@ -11,7 +11,8 @@
     /* Первый экран загрузки — до того, как загрузился Phaser. Повторяет PreloadScene: вид изнутри миски,
        кот заглядывает через ободок и обходит его. 85 BPM: доля 0,706 с, круг = 8 долей = 5,647 с. */
     /* Заставка занимает ту же рамку 9:16, что и игра (Phaser Scale.FIT), чтобы при подмене ничего не прыгало.
-       --u = 1/100 ширины рамки = 7,2 игровых пикселя (игра 720×1280). */
+       --u = 1/100 ширины рамки = 7,2 игровых пикселя (игра 720×1280). Точное значение ставит скрипт ниже
+       по размеру #game — того же элемента, по которому Phaser вписывает игру (100vh на iPhone врёт). */
     #loader { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
       --u: calc(min(100vw, 56.25vh) / 100); }
     #loader[hidden] { display: none; }
@@ -60,6 +61,20 @@
       </svg>
     </div>
   </div></div>
+  <script>
+    // Размер заставки = размер рамки игры: считаем по #game, как Phaser (Scale.FIT, 9:16).
+    (function () {
+      var game = document.getElementById('game');
+      var loader = document.getElementById('loader');
+      function fit() {
+        var r = game.getBoundingClientRect();
+        var w = Math.min(r.width, r.height * 9 / 16);
+        loader.style.setProperty('--u', (w / 100) + 'px');
+      }
+      fit();
+      window.addEventListener('resize', fit);
+    })();
+  </script>
   <div id="debug" hidden style="position:fixed;left:0;right:0;top:0;padding:12px;color:#fff;background:rgba(0,0,0,.6);font:14px monospace;white-space:pre-wrap;word-break:break-all;z-index:9"></div>
   <script>
     // Отладка на телефоне: ошибки выводятся прямо на экран, консоли там нет.

@@ -52,7 +52,11 @@ export function drawShape(g, shape, s) {
 
 // Порция корма: цветной слой + иконка корма (картинка food_N, если есть, иначе значок формы).
 export function makePortion(scene, colorIndex, w, h) {
-  const { fill, shape } = CONFIG.colors[colorIndex];
+  const { fill: color, shape } = CONFIG.colors[colorIndex];
+  const key = `food_${colorIndex}`;
+  const hasArt = scene.textures.exists(key);
+  // с картинкой корма слой светлее, чтобы корм того же цвета на нём выделялся
+  const fill = hasArt ? lighten(color, CONFIG.portion.layerLighten) : color;
   const r = Math.min(12, h * 0.25);
   const g = scene.add.graphics();
   g.fillStyle(fill, 1);
@@ -64,10 +68,9 @@ export function makePortion(scene, colorIndex, w, h) {
   g.lineStyle(4, CONFIG.outline, 1);
   g.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
   const parts = [g];
-  const key = `food_${colorIndex}`;
-  if (scene.textures.exists(key)) {
+  if (hasArt) {
     const img = scene.add.image(0, 0, key);
-    img.setScale((h * 0.9) / Math.max(img.width, img.height));
+    img.setScale((h * CONFIG.portion.iconSize) / Math.max(img.width, img.height));
     parts.push(img);
   } else {
     g.fillStyle(CONFIG.outline, 0.6);
@@ -76,6 +79,12 @@ export function makePortion(scene, colorIndex, w, h) {
   const p = scene.add.container(0, 0, parts);
   p.color = colorIndex;
   return p;
+}
+
+// Смешать цвет с белым: k = 0 — как есть, 1 — белый.
+function lighten(c, k) {
+  const mix = (v) => Math.round(v + (255 - v) * k);
+  return (mix((c >> 16) & 255) << 16) | (mix((c >> 8) & 255) << 8) | mix(c & 255);
 }
 
 // Текстуры для частиц: крошка, сердечко, звёздочка, конфетти.

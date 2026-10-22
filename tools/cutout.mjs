@@ -16,6 +16,8 @@ const MAX = Number((args.find((a) => a.startsWith('--max=')) || '--max=512').sli
 const NOTRIM = args.includes('--notrim');
 // --align=art-src/cat_mouth_closed.png: сдвинуть картинку так, чтобы розовый нос совпал с носом на образце
 const ALIGN = (args.find((a) => a.startsWith('--align=')) || '').slice(8);
+// --split-pink: розовое (подушечки лап) — отдельным файлом <имя>_pink.png, чтобы перекраска кота его не трогала
+const SPLIT_PINK = args.includes('--split-pink');
 const files = args.filter((a) => !a.startsWith('--'));
 if (!files.length) {
   console.log('Использование: node tools/cutout.mjs src/assets/cat_head.png [--max=512]');
@@ -228,6 +230,21 @@ function alignTo(img, ref) {
   return { w: img.w, h: img.h, rgba: out };
 }
 
+// Только розовые пиксели (подушечки), остальное прозрачное.
+function pinkOnly({ w, h, rgba }) {
+  const out = Buffer.alloc(rgba.length);
+  for (let i = 0; i < rgba.length; i += 4) {
+    const r = rgba[i], g = rgba[i + 1], b = rgba[i + 2];
+    // насколько пиксель «розовый»: красный заметно выше зелёного, синий посередине
+    const pink = Math.max(0, Math.min(1, (r - g - 40) / 60)) * (r > 150 ? 1 : 0);
+    if (pink > 0) {
+      out[i] = r; out[i + 1] = g; out[i + 2] = b;
+      out[i + 3] = Math.round(rgba[i + 3] * pink);
+    }
+  }
+  return { w, h, rgba: out };
+}
+
 for (const file of files) {
   const name = basename(file).replace(/\.+png$/i, '').replace(/\.+$/, '');
   const src = readFileSync(file);
@@ -239,6 +256,10 @@ for (const file of files) {
   writeFileSync(join(ROOT, 'art-src', `${name}.png`), src);
   const outPath = join(ROOT, 'src', 'assets', `${name}.png`);
   writeFileSync(outPath, encodePNG(img));
+  if (SPLIT_PINK) {
+    writeFileSync(join(ROOT, 'src', 'assets', `${name}_pink.png`), encodePNG(pinkOnly(img)));
+    console.log(`  розовое → src/assets/${name}_pink.png`);
+  }
   if (resolve(file) !== resolve(outPath)) unlinkSync(file); // файл с другим именем (cat_head..png) больше не нужен
   console.log(`${name}: ${img.w}×${img.h} → src/assets/${name}.png (исходник в art-src/)`);
 }

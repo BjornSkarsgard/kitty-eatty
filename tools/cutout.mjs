@@ -1,4 +1,4 @@
-// Вырезает картинку с зелёного фона (chroma key): node tools/cutout.mjs файл.png [ещё.png ...] [--max=512]
+// Вырезает картинку с зелёного фона (chroma key): node tools/cutout.mjs файл.png [ещё.png ...] [--max=512] [--notrim]
 // - фон убирается заливкой от краёв картинки, поэтому белое внутри контура (морда) не трогается;
 // - на сглаженном контуре убирается зелёная кайма (полупрозрачность восстанавливается);
 // - пустые поля обрезаются, картинка уменьшается до --max по большей стороне;
@@ -12,6 +12,8 @@ import zlib from 'node:zlib';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const MAX = Number((args.find((a) => a.startsWith('--max=')) || '--max=512').slice(6));
+// --notrim: не обрезать поля — для наборов вариантов (глаза, рты), чтобы у всех был один кадр и центр
+const NOTRIM = args.includes('--notrim');
 const files = args.filter((a) => !a.startsWith('--'));
 if (!files.length) {
   console.log('Использование: node tools/cutout.mjs src/assets/cat_head.png [--max=512]');
@@ -198,7 +200,8 @@ function downscale(img, max) {
 for (const file of files) {
   const name = basename(file).replace(/\.+png$/i, '').replace(/\.+$/, '');
   const src = readFileSync(file);
-  const img = downscale(trim(cutout(decodePNG(src))), MAX);
+  const cut = cutout(decodePNG(src));
+  const img = downscale(NOTRIM ? cut : trim(cut), MAX);
   // сначала сохраняем исходник в art-src (не в git) — чтобы при желании перегнать с другими настройками
   mkdirSync(join(ROOT, 'art-src'), { recursive: true });
   writeFileSync(join(ROOT, 'art-src', `${name}.png`), src);

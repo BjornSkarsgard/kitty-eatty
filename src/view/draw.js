@@ -55,8 +55,10 @@ export function makePortion(scene, colorIndex, w, h) {
   const { fill: color, shape } = CONFIG.colors[colorIndex];
   const key = `food_${colorIndex}`;
   const hasArt = scene.textures.exists(key);
-  // с картинкой корма слой светлее, чтобы корм того же цвета на нём выделялся
-  const fill = hasArt ? lighten(color, CONFIG.portion.layerLighten) : color;
+  // с картинкой корма слой светлее, чтобы корм того же цвета на нём выделялся;
+  // у очень светлых цветов (белый) — наоборот, чуть темнее
+  const fill = !hasArt ? color
+    : luminance(color) > 0.85 ? darken(color, CONFIG.portion.layerDarken) : lighten(color, CONFIG.portion.layerLighten);
   const r = Math.min(12, h * 0.25);
   const g = scene.add.graphics();
   g.fillStyle(fill, 1);
@@ -79,6 +81,15 @@ export function makePortion(scene, colorIndex, w, h) {
   const p = scene.add.container(0, 0, parts);
   p.color = colorIndex;
   return p;
+}
+
+function luminance(c) {
+  return (0.299 * ((c >> 16) & 255) + 0.587 * ((c >> 8) & 255) + 0.114 * (c & 255)) / 255;
+}
+
+function darken(c, k) {
+  const mix = (v) => Math.round(v * (1 - k));
+  return (mix((c >> 16) & 255) << 16) | (mix((c >> 8) & 255) << 8) | mix(c & 255);
 }
 
 // Смешать цвет с белым: k = 0 — как есть, 1 — белый.

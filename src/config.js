@@ -136,7 +136,7 @@ export const CONFIG = {
     body: { x: 0, y: 58, artScale: 0.13, originX: 0.5, originY: 1 }, // y — низ лап
     leg: { x: 11, y: 29, artScale: 0.065, artScaleX: 0.09, originX: 0.5, originY: 0.06 },  // x/y — «плечо» левой лапы, правая зеркально
     head: { x: 0, y: -22, artScale: 0.16, artY: -12 },
-    eyes: { x: 0, y: -6, artScale: 0.16 },
+    eyes: { x: 0, y: -6, artScale: 0.085 },
     mouth: { x: 0, y: 10, artScale: 0.14 },
   },
 

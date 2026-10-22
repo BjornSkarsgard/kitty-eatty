@@ -2,6 +2,8 @@ import * as Phaser from 'phaser';
 import { CONFIG } from './config.js';
 import { BootScene } from './scenes/BootScene.js';
 
+if (window.__debugLog) window.__debugLog('main.js загружен, Phaser ' + Phaser.VERSION);
+
 new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',

@@ -11,6 +11,19 @@
 </head>
 <body>
   <div id="game"></div>
+  <div id="debug" style="position:fixed;left:0;right:0;top:0;padding:12px;color:#fff;font:14px monospace;white-space:pre-wrap;word-break:break-all;z-index:9">HTML загружен, жду JS…</div>
+  <script>
+    // Отладка на телефоне: показываем ошибки прямо на экране, консоли там нет.
+    (function () {
+      var box = document.getElementById('debug');
+      function log(msg) { box.textContent += '\n' + msg; }
+      log(navigator.userAgent);
+      window.onerror = function (msg, src, line, col) { log('ОШИБКА: ' + msg + ' @ ' + src + ':' + line + ':' + col); };
+      window.addEventListener('unhandledrejection', function (e) { log('ОШИБКА (promise): ' + (e.reason && e.reason.stack || e.reason)); });
+      window.__debugLog = log;
+    })();
+  </script>
+  <script nomodule>document.getElementById('debug').textContent += '\nБраузер не поддерживает ES-модули';</script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

@@ -8,6 +8,10 @@ export class BootScene extends Phaser.Scene {
   }
 
   create() {
+    // Сцена запустилась — отладочный текст больше не нужен.
+    const debug = document.getElementById('debug');
+    if (debug) debug.hidden = true;
+
     const { width, height } = CONFIG;
 
     this.add.text(width / 2, height * 0.3, 'Накорми котиков', {

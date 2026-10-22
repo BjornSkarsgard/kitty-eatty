@@ -362,7 +362,7 @@ export class GameScene extends Phaser.Scene {
     cat.meow();
 
     const eatY = r.top - CONFIG.jar.rimHeight * this.dim.scale - A.catEatOffsetY * cat.baseScale;
-    cat.hopTo(r.x, eatY, () => {
+    cat.walkTo(r.x, eatY, () => {
       cat.setMood('happy');
       const food = this.portions[bowl].slice().reverse(); // сверху вниз
       cat.eat(food.length, (k) => {
@@ -375,7 +375,7 @@ export class GameScene extends Phaser.Scene {
       }, () => {
         sfx(this, 'sfx_purr');
         this.fxHearts.explode(A.hearts, cat.x, cat.y - 60 * cat.baseScale);
-        cat.track(this.time.delayedCall(A.catReturnDelay, () => cat.hopTo(cat.home.x, cat.home.y)));
+        cat.track(this.time.delayedCall(A.catReturnDelay, () => cat.walkTo(cat.home.x, cat.home.y)));
       });
     });
   }
@@ -391,7 +391,7 @@ export class GameScene extends Phaser.Scene {
       this.tweens.killTweensOf(p);
       p.setScale(1).setAlpha(1);
     });
-    cat.hopTo(cat.home.x, cat.home.y, () => cat.setMood('open'));
+    cat.walkTo(cat.home.x, cat.home.y, () => cat.setMood('open'));
   }
 
   // ---------- победа ----------

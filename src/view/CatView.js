@@ -26,6 +26,7 @@ export class CatView extends Phaser.GameObjects.Container {
         drawFallback.chest(g);
         this.body.add(g);
       }
+      this.legs = [-1, 1].map((side) => this.makeLeg(side));
     }
     this.head = scene.add.container(C.head.x, C.head.y);
     this.add(this.head);
@@ -55,6 +56,30 @@ export class CatView extends Phaser.GameObjects.Container {
     drawFallback[name](g, this.fill);
     box.add(g);
     return box;
+  }
+
+  // Передняя лапа: контейнер в «плече» (ось шага), лапа свисает вниз. Правая — зеркальная копия левой.
+  makeLeg(side) {
+    const box = this.scene.add.container(side * C.leg.x, C.leg.y);
+    this.add(box);
+    const img = this.useArt ? this.image('cat_leg', C.leg, true, box) : null;
+    if (img) {
+      if (side > 0) img.setFlipX(true);
+    } else {
+      const g = this.scene.add.graphics();
+      drawFallback.leg(g, this.fill);
+      if (side > 0) g.setScale(-1, 1);
+      box.add(g);
+    }
+    return box;
+  }
+
+  resetLegs() {
+    if (!this.legs) return;
+    this.legs.forEach((leg) => {
+      leg.y = C.leg.y;
+      leg.angle = 0;
+    });
   }
 
   buildHead() {
@@ -166,6 +191,7 @@ export class CatView extends Phaser.GameObjects.Container {
     this.head.angle = 0;
     this.eyes.setScale(1);
     this.angle = 0;
+    this.resetLegs();
     this.setScale(this.baseScale);
     this.setMouth(false);
     if (this.reacting) {
@@ -312,6 +338,39 @@ export class CatView extends Phaser.GameObjects.Container {
     this.track(this.scene.time.delayedCall(CONFIG.anim.meowDuration, () => this.setMouth(false)));
   }
 
+  // Идёт в точку: лапы по очереди шагают, тело подпрыгивает на каждом шаге и чуть покачивается.
+  walkTo(x, y, onDone) {
+    const A = CONFIG.anim;
+    const x0 = this.x;
+    const y0 = this.y;
+    const dist = Phaser.Math.Distance.Between(x0, y0, x, y);
+    const duration = Math.max(A.walkMinDuration, (dist / A.walkSpeed) * 1000);
+    const steps = Math.max(2, Math.round(duration / A.stepDuration));
+    this.track(this.scene.tweens.add({
+      targets: this, x, duration, ease: 'Linear',
+      onUpdate: (tw) => {
+        const ph = tw.progress * steps; // номер шага с дробной частью
+        const f = ph % 1;
+        const lift = Math.sin(f * Math.PI);
+        this.y = y0 + (y - y0) * tw.progress - lift * A.walkBob * this.baseScale;
+        this.angle = (Math.floor(ph) % 2 ? 1 : -1) * lift * A.walkSway;
+        const k = Math.floor(ph) % 2; // какая лапа сейчас в воздухе
+        this.legs?.forEach((leg, i) => {
+          const up = i === k ? lift : 0;
+          leg.y = C.leg.y - up * A.stepLift;
+          leg.angle = (i ? 1 : -1) * up * A.stepAngle;
+        });
+      },
+      onComplete: () => {
+        this.y = y;
+        this.angle = 0;
+        this.resetLegs();
+        this.squash();
+        if (onDone) onDone();
+      },
+    }));
+  }
+
   // Прыжок дугой в точку.
   hopTo(x, y, onDone) {
     const A = CONFIG.anim;
@@ -414,6 +473,17 @@ const drawFallback = {
     g.fillCircle(0, 0, 34);
     g.strokeCircle(0, 0, 34);
     drawFallback.muzzle(g);
+  },
+  // лапа свисает вниз от «плеча» (0, 0)
+  leg(g, fill) {
+    g.lineStyle(4, O(), 1).fillStyle(fill, 1);
+    g.fillRoundedRect(-7, -4, 14, 24, 6);
+    g.strokeRoundedRect(-7, -4, 14, 24, 6);
+    g.fillEllipse(0, 20, 18, 11);
+    g.strokeEllipse(0, 20, 18, 11);
+    g.lineStyle(2, O(), 1);
+    g.lineBetween(-3, 19, -3, 24);
+    g.lineBetween(3, 19, 3, 24);
   },
   muzzle(g) {
     g.fillStyle(0xffffff, 0.85);

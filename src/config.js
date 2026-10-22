@@ -91,6 +91,15 @@ export const CONFIG = {
     blinkMax: 5000,
     blinkDuration: 130,
 
+    // кот: ходьба
+    walkSpeed: 520,       // px/с
+    walkMinDuration: 350,
+    stepDuration: 150,    // один шаг
+    stepLift: 7,          // насколько поднимается лапа
+    stepAngle: 10,        // наклон лапы при шаге, градусы
+    walkBob: 4,           // подпрыгивание тела на шаге
+    walkSway: 3,          // покачивание тела, градусы
+
     // кот: кормление
     meowDuration: 260,
     hopHeight: 90,        // высота прыжка
@@ -122,8 +131,9 @@ export const CONFIG = {
 
   // Части кота. x/y — где часть на коте; artScale/artX/artY — подгонка картинок из src/assets.
   cat: {
-    tail: { x: 36, y: 56, artScale: 0.2, originX: 0.3, originY: 1 },
+    tail: { x: 22, y: 50, artScale: 0.12, originX: 0.22, originY: 0.95 }, // x/y — основание хвоста
     body: { x: 0, y: 58, artScale: 0.13, originX: 0.5, originY: 1 }, // y — низ лап
+    leg: { x: 10, y: 36, artScale: 0.1, originX: 0.5, originY: 0.06 },  // x/y — «плечо» левой лапы, правая зеркально
     head: { x: 0, y: -22, artScale: 0.16, artY: -12 },
     eyes: { x: 0, y: -6, artScale: 0.16 },
     mouth: { x: 0, y: 10, artScale: 0.14 },

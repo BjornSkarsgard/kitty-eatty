@@ -72,7 +72,8 @@ export function makePortion(scene, colorIndex, w, h) {
   const parts = [g];
   if (hasArt) {
     const img = scene.add.image(0, 0, key);
-    img.setScale((h * CONFIG.portion.iconSize) / Math.max(img.width, img.height));
+    // вписываем в рамку внутри слоя, чтобы корм не упирался в края
+    img.setScale(Math.min((h * CONFIG.portion.iconHeight) / img.height, (w * CONFIG.portion.iconWidth) / img.width));
     parts.push(img);
   } else {
     g.fillStyle(CONFIG.outline, 0.6);

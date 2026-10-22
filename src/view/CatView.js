@@ -103,10 +103,12 @@ export class CatView extends Phaser.GameObjects.Container {
   }
 
   // Слой с вариантами (глаза, рот): картинка, если есть, иначе фигура.
-  swapLayer(layer, key, cfg, fallback) {
+  // variant — имя варианта (open, grumpy…): у каждого может быть свой множитель в cfg.variantScale
+  swapLayer(layer, key, cfg, fallback, variant) {
     layer.removeAll(true);
     if (this.useArt && this.scene.textures.exists(key)) {
-      layer.add(this.scene.add.image(0, 0, key).setScale(cfg.artScale));
+      const k = cfg.variantScale?.[variant] ?? 1;
+      layer.add(this.scene.add.image(0, 0, key).setScale(cfg.artScale * k));
     } else {
       const g = this.scene.add.graphics();
       fallback(g);
@@ -122,7 +124,7 @@ export class CatView extends Phaser.GameObjects.Container {
   }
 
   showEyes(kind) {
-    this.swapLayer(this.eyes, `cat_eyes_${kind}`, C.eyes, (g) => drawEyes(g, kind));
+    this.swapLayer(this.eyes, `cat_eyes_${kind}`, C.eyes, (g) => drawEyes(g, kind), kind);
   }
 
   setMouth(open) {

@@ -35,6 +35,14 @@ export function drawShape(g, shape, s) {
       g.fillCircle(s * 0.45, -s * 0.2, s * 0.5);
       g.fillTriangle(-s * 0.93, 0, s * 0.93, 0, 0, s * 0.95);
       break;
+    case 'drop':
+      g.fillCircle(0, s * 0.3, s * 0.65);
+      g.fillTriangle(-s * 0.6, s * 0.1, s * 0.6, s * 0.1, 0, -s);
+      break;
+    case 'hourglass':
+      g.fillTriangle(-s * 0.8, -s, s * 0.8, -s, 0, 0);
+      g.fillTriangle(-s * 0.8, s, s * 0.8, s, 0, 0);
+      break;
     case 'ring':
       g.lineStyle(s * 0.4, g.defaultFillColor, g.defaultFillAlpha);
       g.strokeCircle(0, 0, s * 0.75);

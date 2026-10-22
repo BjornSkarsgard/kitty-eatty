@@ -2,9 +2,17 @@ import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { Board } from '../core/Board.js';
 import { makePortion, makeCat, setCatMood } from '../view/draw.js';
-import LEVELS from '../levels/manual.json';
+import LEVELS from '../levels/levels.json';
 
 const L = CONFIG.layout;
+
+// В режиме разработки можно открыть любой уровень: http://<адрес>:5173/?level=150
+function levelFromUrl() {
+  if (!import.meta.env.DEV) return 0;
+  const n = Number(new URLSearchParams(location.search).get('level'));
+  return n >= 1 && n <= LEVELS.length ? n - 1 : 0;
+}
+
 const A = CONFIG.anim;
 
 export class GameScene extends Phaser.Scene {
@@ -13,7 +21,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   init(data) {
-    this.levelIndex = data.levelIndex ?? 0;
+    this.levelIndex = data.levelIndex ?? levelFromUrl();
   }
 
   create() {
@@ -22,7 +30,8 @@ export class GameScene extends Phaser.Scene {
     this.selected = null;
     this.won = false;
 
-    this.add.text(CONFIG.width / 2, L.titleY, `Уровень ${level.id}`, {
+    const title = `Уровень ${level.id}` + (level.puzzle ? ' · головоломка' : '');
+    this.add.text(CONFIG.width / 2, L.titleY, title, {
       fontFamily: 'sans-serif', fontSize: '44px', color: '#ffffff',
     }).setOrigin(0.5);
 
@@ -35,29 +44,49 @@ export class GameScene extends Phaser.Scene {
 
   // ---------- раскладка ----------
 
+  // Подбираем число рядов так, чтобы миски были как можно крупнее, и масштабируем размеры под экран.
   layoutBowls() {
     const n = this.board.bowls.length;
-    const rows = Math.ceil(n / L.maxPerRow);
-    const perRow = Math.ceil(n / rows);
-    const bh = this.board.capacity * L.portionHeight + L.bowlPadding * 2;
-    const totalH = rows * bh + (rows - 1) * L.bowlGapY;
-    const top0 = L.bowlsTop + (L.bowlsBottom - L.bowlsTop - totalH) / 2;
+    const bh0 = this.board.capacity * L.portionHeight + L.bowlPadding * 2;
+    const availW = CONFIG.width - L.sideMargin * 2;
+    const availH = L.bowlsBottom - L.bowlsTop;
+    let best = null;
+    for (let rows = 1; rows <= 4; rows++) {
+      const perRow = Math.ceil(n / rows);
+      const w = perRow * L.bowlWidth + (perRow - 1) * L.bowlGapX;
+      const h = rows * bh0 + (rows - 1) * L.bowlGapY;
+      const scale = Math.min(1, availW / w, availH / h);
+      if (perRow <= L.maxPerRow && (!best || scale > best.scale + 0.001)) best = { rows, perRow, scale };
+    }
+    const { rows, perRow, scale } = best;
+    const d = (this.dim = {
+      bw: L.bowlWidth * scale,
+      ph: L.portionHeight * scale,
+      pad: L.bowlPadding * scale,
+      gx: L.bowlGapX * scale,
+      gy: L.bowlGapY * scale,
+      scale,
+    });
+    const bh = this.board.capacity * d.ph + d.pad * 2;
+    const totalH = rows * bh + (rows - 1) * d.gy;
+    const top0 = L.bowlsTop + (availH - totalH) / 2;
 
     this.bowlRects = [];
     for (let r = 0; r < rows; r++) {
       const count = Math.min(perRow, n - r * perRow);
-      const rowW = count * L.bowlWidth + (count - 1) * L.bowlGapX;
-      const x0 = (CONFIG.width - rowW) / 2 + L.bowlWidth / 2;
-      const top = top0 + r * (bh + L.bowlGapY);
+      const rowW = count * d.bw + (count - 1) * d.gx;
+      const x0 = (CONFIG.width - rowW) / 2 + d.bw / 2;
+      const top = top0 + r * (bh + d.gy);
       for (let c = 0; c < count; c++) {
-        this.bowlRects.push({ x: x0 + c * (L.bowlWidth + L.bowlGapX), top, bottom: top + bh });
+        this.bowlRects.push({ x: x0 + c * (d.bw + d.gx), top, bottom: top + bh });
       }
     }
   }
 
   slotPos(bowl, slot) {
     const r = this.bowlRects[bowl];
-    return { x: r.x, y: r.bottom - L.bowlPadding - L.portionHeight / 2 - slot * L.portionHeight };
+    const d = this.dim;
+    return { x: r.x, y: r.bottom - d.pad - d.ph / 2 - slot * d.ph };
   }
 
   // ---------- создание объектов ----------
@@ -65,7 +94,7 @@ export class GameScene extends Phaser.Scene {
   createBowls() {
     this.bowlGfx = this.bowlRects.map((r, i) => {
       const g = this.add.graphics({ x: r.x, y: 0 });
-      const zone = this.add.zone(r.x, (r.top + r.bottom) / 2, L.bowlWidth + L.bowlGapX * 0.8, r.bottom - r.top + 80)
+      const zone = this.add.zone(r.x, (r.top + r.bottom) / 2, this.dim.bw + this.dim.gx * 0.9, r.bottom - r.top + this.dim.gy * 0.9)
         .setInteractive();
       zone.on('pointerdown', () => this.onBowlTap(i));
       return g;
@@ -77,16 +106,17 @@ export class GameScene extends Phaser.Scene {
     const g = this.bowlGfx[i];
     const r = this.bowlRects[i];
     const done = this.board.isComplete(i);
+    const bw = this.dim.bw;
     g.clear();
     g.fillStyle(CONFIG.bowlFill, 1);
-    g.fillRoundedRect(-L.bowlWidth / 2, r.top, L.bowlWidth, r.bottom - r.top, 18);
+    g.fillRoundedRect(-bw / 2, r.top, bw, r.bottom - r.top, 18 * this.dim.scale);
     g.lineStyle(CONFIG.outlineWidth, done ? CONFIG.bowlDoneStroke : CONFIG.outline, 1);
-    g.strokeRoundedRect(-L.bowlWidth / 2, r.top, L.bowlWidth, r.bottom - r.top, 18);
+    g.strokeRoundedRect(-bw / 2, r.top, bw, r.bottom - r.top, 18 * this.dim.scale);
   }
 
   createPortions() {
-    const w = L.bowlWidth - L.bowlPadding * 2 - 4;
-    const h = L.portionHeight - 6;
+    const w = this.dim.bw - this.dim.pad * 2 - 4;
+    const h = this.dim.ph - 6 * this.dim.scale;
     this.portions = this.board.bowls.map((bowl, i) => bowl.map((color, slot) => {
       const p = makePortion(this, color, w, h);
       const pos = this.slotPos(i, slot);
@@ -161,7 +191,7 @@ export class GameScene extends Phaser.Scene {
     this.portions[i].slice(-run).forEach((p, k, arr) => {
       const slot = this.portions[i].length - arr.length + k;
       this.tweens.killTweensOf(p);
-      this.tweens.add({ targets: p, y: this.slotPos(i, slot).y - A.liftY, duration: A.liftDuration, ease: 'Quad.easeOut' });
+      this.tweens.add({ targets: p, y: this.slotPos(i, slot).y - A.liftY * this.dim.scale, duration: A.liftDuration, ease: 'Quad.easeOut' });
     });
   }
 
@@ -309,7 +339,7 @@ export class GameScene extends Phaser.Scene {
     this.add.text(W / 2, H * 0.4, 'Все котики сыты!', {
       fontFamily: 'sans-serif', fontSize: '56px', color: '#ffffff',
     }).setOrigin(0.5).setDepth(21);
-    this.add.text(W / 2, H * 0.47, `Ходов: ${this.board.history.length}`, {
+    this.add.text(W / 2, H * 0.47, `Ходов: ${this.board.history.length} (минимум ${LEVELS[this.levelIndex].minMoves})`, {
       fontFamily: 'sans-serif', fontSize: '34px', color: '#cfc6e0',
     }).setOrigin(0.5).setDepth(21);
     this.makeButton(W / 2, H * 0.58, isLast ? 'С начала' : 'Дальше', () => {

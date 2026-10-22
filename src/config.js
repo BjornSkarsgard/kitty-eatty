@@ -14,7 +14,31 @@ export const CONFIG = {
     { fill: 0xff922b, shape: 'cross' },
     { fill: 0x3bc9db, shape: 'heart' },
     { fill: 0xf8f9fa, shape: 'ring' },
+    { fill: 0xa47148, shape: 'drop' },
+    { fill: 0xf783ac, shape: 'hourglass' },
   ],
+
+  // Генерация уровней (tools/generate-levels.mjs). После правки: npm run levels
+  levelGen: {
+    seed: 20261022,
+    count: 300,
+    candidates: 24,     // сколько вариантов пробуем на каждый уровень, берём ближайший к цели
+    // Ступени сложности: до какого уровня, цвета (от→до внутри ступени), вместимость,
+    // пустые миски, целевая трудность (доля случайных прохождений, зашедших в тупик, от→до).
+    tiers: [
+      { upTo: 10,  colors: [2, 4], capacity: 4, empties: 2, dead: [0.0, 0.1] },
+      { upTo: 40,  colors: [4, 6], capacity: 4, empties: 2, dead: [0.05, 0.3] },
+      { upTo: 80,  colors: [6, 8], capacity: 4, empties: 2, dead: [0.25, 0.45] },
+      { upTo: 130, colors: [6, 8], capacity: 5, empties: 2, dead: [0.35, 0.55] },
+      { upTo: 200, colors: [8, 9], capacity: 5, empties: 2, dead: [0.5, 0.7] },
+      { upTo: 300, colors: [9, 10], capacity: 5, empties: 2, dead: [0.65, 0.9] },
+    ],
+    breatherEvery: 5,      // каждый N-й уровень — передышка
+    breatherFactor: 0.4,   // во сколько раз ниже целевая трудность на передышке
+    // Головоломки: короткие уровни всего с одной пустой миской, вставляются через каждые `every` уровней.
+    puzzle: { from: 120, every: 10, offset: 7, colors: [3, 5], capacity: 4, empties: 1, dead: [0.4, 0.8] },
+    minMovesPerColor: 1.5, // отсев слишком коротких уровней: минимум ходов ≥ цвета × это
+  },
 
   outline: 0x1b1426,     // толстый тёмный контур
   outlineWidth: 6,
@@ -27,7 +51,8 @@ export const CONFIG = {
     catSpacing: 120,    // максимум между котами
     bowlsTop: 360,      // зона мисок
     bowlsBottom: 1090,
-    maxPerRow: 4,
+    maxPerRow: 6,
+    sideMargin: 24,     // отступ мисок от краёв экрана
     bowlWidth: 120,
     portionHeight: 58,
     bowlPadding: 10,

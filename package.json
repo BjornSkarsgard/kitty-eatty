@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "levels": "node tools/generate-levels.mjs",
+    "levels:check": "node tools/check-levels.mjs"
   },
   "dependencies": {
     "phaser": "3.90.0"

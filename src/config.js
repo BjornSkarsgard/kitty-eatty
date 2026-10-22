@@ -106,6 +106,16 @@ export const CONFIG = {
     hearts: 5,            // сердечек, когда наелся
     catReturnDelay: 350,
 
+    // реакции кота на тап (5 штук, выбирается случайная)
+    poke: {
+      hold: 220,           // пауза в конце реакции
+      jumpHeight: 45, jumpDuration: 170,
+      nopeAngle: 14, nopeDuration: 90, nopeRepeat: 2,
+      purrDuration: 220, purrTilt: 10, purrHearts: 3,
+      flipHeight: 70, flipDuration: 520,
+      scaredHeight: 30, scaredDuration: 140,
+    },
+
     winDelay: 900,        // пауза перед окном победы
     confetti: 60,
   },

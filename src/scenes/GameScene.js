@@ -170,6 +170,9 @@ export class GameScene extends Phaser.Scene {
       cat.setDepth(10).setBaseScale(Math.min(1, spacing / L.catSpacing)).startIdle();
       cat.home = { x: cat.x, y: cat.y };
       cat.fedBowl = null;
+      // тап по коту — случайная реакция (только если сидит на месте)
+      cat.setInteractive(new Phaser.Geom.Rectangle(-55, -75, 110, 145), Phaser.Geom.Rectangle.Contains);
+      cat.on('pointerdown', () => cat.poke());
       this.cats.push(cat);
     }
   }

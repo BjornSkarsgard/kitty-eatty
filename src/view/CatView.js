@@ -151,13 +151,149 @@ export class CatView extends Phaser.GameObjects.Container {
   stopActions() {
     this.actions.forEach(safeRemove);
     this.actions = [];
-    this.scene.tweens.killTweensOf(this);
-    this.scene.tweens.killTweensOf(this.head);
+    this.scene.tweens.killTweensOf([this, this.head, this.eyes]);
     this.head.y = this.headY;
     this.head.angle = 0;
+    this.eyes.setScale(1);
+    this.angle = 0;
     this.setScale(this.baseScale);
     this.setMouth(false);
+    if (this.reacting) {
+      this.reacting = false;
+      this.setMood(this.moodBeforePoke);
+      this.startIdle();
+    }
     return this;
+  }
+
+  // ---------- реакции на тап ----------
+
+  // Реагирует, только если сидит на своём месте и ничем не занят.
+  canReact() {
+    return !this.reacting && this.home &&
+      Math.abs(this.x - this.home.x) < 2 && Math.abs(this.y - this.home.y) < 2;
+  }
+
+  poke() {
+    if (!this.canReact()) return;
+    this.reacting = true;
+    this.moodBeforePoke = this.mood;
+    this.stopIdle();
+    if (this.tail) this.tail.angle = 0;
+    const kinds = ['jump', 'nope', 'purr', 'flip', 'scared'];
+    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    this[`react_${kind}`](() => {
+      this.reacting = false;
+      this.angle = 0;
+      this.setScale(this.baseScale);
+      this.head.y = this.headY;
+      this.head.angle = 0;
+      this.eyes.setScale(1);
+      this.setMouth(false).setMood(this.moodBeforePoke);
+      this.startIdle();
+    });
+  }
+
+  // 1. Прыжок на месте с мяу.
+  react_jump(done) {
+    const P = CONFIG.anim.poke;
+    this.meow();
+    this.setMood('happy');
+    this.track(this.scene.tweens.add({
+      targets: this, y: this.home.y - P.jumpHeight * this.baseScale,
+      duration: P.jumpDuration, yoyo: true, ease: 'Quad.easeOut',
+      onComplete: () => {
+        this.squash();
+        this.track(this.scene.time.delayedCall(CONFIG.anim.squashDuration * 2, done));
+      },
+    }));
+  }
+
+  // 2. «Нет-нет»: ворчит и мотает головой.
+  react_nope(done) {
+    const P = CONFIG.anim.poke;
+    this.setMood('grumpy');
+    sfx(this.scene, 'sfx_invalid', 0.6);
+    this.track(this.scene.tweens.add({
+      targets: this.head, angle: { from: -P.nopeAngle, to: P.nopeAngle },
+      duration: P.nopeDuration, yoyo: true, repeat: P.nopeRepeat, ease: 'Sine.easeInOut',
+      onComplete: () => {
+        this.head.angle = 0;
+        this.track(this.scene.time.delayedCall(P.hold, done));
+      },
+    }));
+  }
+
+  // 3. Мурлыканье: жмурится, прижимается, сердечки.
+  react_purr(done) {
+    const P = CONFIG.anim.poke;
+    this.setMood('happy');
+    sfx(this.scene, 'sfx_purr');
+    const s = this.baseScale;
+    this.track(this.scene.tweens.add({
+      targets: this, scaleX: s * 1.08, scaleY: s * 0.92,
+      duration: P.purrDuration, yoyo: true, repeat: 2, ease: 'Sine.easeInOut',
+      onComplete: done,
+    }));
+    this.track(this.scene.tweens.add({ targets: this.head, angle: P.purrTilt, duration: P.purrDuration * 2, yoyo: true, ease: 'Sine.easeInOut' }));
+    for (let i = 0; i < P.purrHearts; i++) this.heart(i * 160);
+  }
+
+  // 4. Кувырок: подпрыгивает и крутится в воздухе.
+  react_flip(done) {
+    const P = CONFIG.anim.poke;
+    this.meow();
+    this.setMood('happy');
+    this.track(this.scene.tweens.add({
+      targets: this, y: this.home.y - P.flipHeight * this.baseScale,
+      duration: P.flipDuration / 2, yoyo: true, ease: 'Quad.easeOut',
+    }));
+    this.track(this.scene.tweens.add({
+      targets: this, angle: 360, duration: P.flipDuration, ease: 'Sine.easeInOut',
+      onComplete: () => {
+        this.angle = 0;
+        this.squash();
+        this.track(this.scene.time.delayedCall(CONFIG.anim.squashDuration * 2, done));
+      },
+    }));
+  }
+
+  // 5. Испуг: глаза круглые, подскок, хвост дрожит, потом выдох.
+  react_scared(done) {
+    const P = CONFIG.anim.poke;
+    this.setMood('open');
+    sfxRandom(this.scene, 'sfx_meow', 3, 1.2);
+    this.setMouth(true);
+    this.eyes.setScale(1.35);
+    const s = this.baseScale;
+    this.track(this.scene.tweens.add({
+      targets: this, y: this.home.y - P.scaredHeight * s, scaleX: s * 0.88, scaleY: s * 1.15,
+      duration: P.scaredDuration, yoyo: true, hold: P.hold, ease: 'Back.easeOut',
+      onComplete: () => {
+        this.setScale(s);
+        this.setMouth(false);
+        this.eyes.setScale(1);
+        this.setMood('closed'); // «фух»
+        this.track(this.scene.time.delayedCall(P.hold, done));
+      },
+    }));
+    if (this.tail) {
+      this.track(this.scene.tweens.add({
+        targets: this.tail, angle: { from: -6, to: 6 }, duration: 40, yoyo: true, repeat: 6,
+        onComplete: () => { this.tail.angle = 0; },
+      }));
+    }
+  }
+
+  // Сердечко всплывает над котом (текстура fx_heart создаётся в draw.js).
+  heart(delay) {
+    if (!this.scene.textures.exists('fx_heart')) return;
+    const h = this.scene.add.image(this.x + Phaser.Math.Between(-20, 20) * this.baseScale, this.y - 70 * this.baseScale, 'fx_heart')
+      .setDepth(13).setScale(0.6 * this.baseScale).setAlpha(0);
+    this.scene.tweens.add({
+      targets: h, delay, y: h.y - 70 * this.baseScale, alpha: { from: 1, to: 0 }, scale: this.baseScale,
+      duration: 900, ease: 'Sine.easeOut', onComplete: () => h.destroy(),
+    });
   }
 
   meow() {

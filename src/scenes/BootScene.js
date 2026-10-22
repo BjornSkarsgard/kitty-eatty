@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 
 // Временная сцена этапа 1: проверка, что Phaser работает и тач доходит.

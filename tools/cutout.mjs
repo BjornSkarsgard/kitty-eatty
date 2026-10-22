@@ -4,8 +4,8 @@
 // - пустые поля обрезаются, картинка уменьшается до --max по большей стороне;
 // - результат: src/assets/<имя>.png, исходник переезжает в art-src/ (не в git).
 // Без зависимостей: PNG читается и пишется вручную через zlib.
-import { readFileSync, writeFileSync, mkdirSync, renameSync, existsSync } from 'node:fs';
-import { basename, join, dirname } from 'node:path';
+import { readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
+import { basename, join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import zlib from 'node:zlib';
 
@@ -199,12 +199,11 @@ for (const file of files) {
   const name = basename(file).replace(/\.+png$/i, '').replace(/\.+$/, '');
   const src = readFileSync(file);
   const img = downscale(trim(cutout(decodePNG(src))), MAX);
+  // сначала сохраняем исходник в art-src (не в git) — чтобы при желании перегнать с другими настройками
+  mkdirSync(join(ROOT, 'art-src'), { recursive: true });
+  writeFileSync(join(ROOT, 'art-src', `${name}.png`), src);
   const outPath = join(ROOT, 'src', 'assets', `${name}.png`);
   writeFileSync(outPath, encodePNG(img));
-  // исходник — в art-src (не в git), чтобы при желании перегнать с другими настройками
-  mkdirSync(join(ROOT, 'art-src'), { recursive: true });
-  const keep = join(ROOT, 'art-src', `${name}.png`);
-  if (file !== outPath) renameSync(file, keep);
-  else if (!existsSync(keep)) writeFileSync(keep, src);
+  if (resolve(file) !== resolve(outPath)) unlinkSync(file); // файл с другим именем (cat_head..png) больше не нужен
   console.log(`${name}: ${img.w}×${img.h} → src/assets/${name}.png (исходник в art-src/)`);
 }

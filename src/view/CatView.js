@@ -20,7 +20,12 @@ export class CatView extends Phaser.GameObjects.Container {
     if (!headOnly) {
       this.tail = this.part('tail', C.tail);
       this.body = this.part('body', C.body);
-      this.bodySpots = this.useArt ? this.image('cat_spots_body', C.body, false) : null;
+      // пятно на грудке — внутри контейнера тела, чтобы «дышало» вместе с ним
+      if (this.scene.textures.exists('cat_body') && this.useArt && !this.image('cat_spots_body', C.body, false, this.body)) {
+        const g = this.scene.add.graphics();
+        drawFallback.chest(g);
+        this.body.add(g);
+      }
     }
     this.head = scene.add.container(C.head.x, C.head.y);
     this.add(this.head);
@@ -388,12 +393,17 @@ const drawFallback = {
     g.fillRoundedRect(-8, -46, 16, 46, 8);
     g.strokeRoundedRect(-8, -46, 16, 46, 8);
   },
+  // контейнер тела стоит на лапах (низ тела), поэтому всё рисуется выше нуля
   body(g, fill) {
     g.lineStyle(5, O(), 1).fillStyle(fill, 1);
-    g.fillEllipse(0, 0, 76, 56);
-    g.strokeEllipse(0, 0, 76, 56);
+    g.fillEllipse(0, -28, 76, 56);
+    g.strokeEllipse(0, -28, 76, 56);
     g.fillStyle(0xffffff, 0.85);
-    g.fillEllipse(0, 6, 30, 22);
+    g.fillEllipse(0, -22, 30, 22);
+  },
+  chest(g) {
+    g.fillStyle(0xffffff, 0.85);
+    g.fillEllipse(0, -36, 26, 22);
   },
   head(g, fill) {
     g.lineStyle(5, O(), 1).fillStyle(fill, 1);

@@ -123,7 +123,7 @@ export const CONFIG = {
   // Части кота. x/y — где часть на коте; artScale/artX/artY — подгонка картинок из src/assets.
   cat: {
     tail: { x: 36, y: 56, artScale: 0.2, originX: 0.3, originY: 1 },
-    body: { x: 0, y: 30, artScale: 0.2 },
+    body: { x: 0, y: 58, artScale: 0.13, originX: 0.5, originY: 1 }, // y — низ лап
     head: { x: 0, y: -22, artScale: 0.16, artY: -12 },
     eyes: { x: 0, y: -6, artScale: 0.16 },
     mouth: { x: 0, y: 10, artScale: 0.14 },

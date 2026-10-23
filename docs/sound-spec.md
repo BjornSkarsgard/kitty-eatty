@@ -118,3 +118,30 @@ Meow... (hsss)
 | `sfx_undo.mp3` | Отмена хода | Быстрый «вжух» назад |
 
 Эффекты должны быть короткими, без тишины в начале и тихими: громкость я выставлю в `src/config.js`.
+
+## Промпты для ElevenLabs Sound Effects
+
+**Настройки:** длительность задавай вручную, как в таблице, не оставляй Auto. Prompt Influence ставь высокий, около 70–80 %: так результат ближе к тексту. На каждый промпт генерируй 3–4 варианта и выбирай лучший. Коммерческое использование разрешено только на платном тарифе, его указывай в `SOURCES.txt`.
+
+**Общий хвост** (добавлять в конец каждого промпта):
+> cute cozy mobile casual game, clean, close-mic, dry, no reverb, no music, no background noise, starts instantly with no silence
+
+| Файл | Длит. | Промпт |
+|---|---|---|
+| `sfx_pick.mp3` | 0,5 с | Soft short bubbly pop, like lifting a small piece of cat food, light and playful, gentle upward pitch |
+| `sfx_drop.mp3` | 0,5 с | Soft muffled plop of a small piece of kibble landing in a glass jar on top of other food, gentle wooden-ish tap |
+| `sfx_invalid.mp3` | 0,5 с | Gentle dull low thud, soft rubbery double bump, polite "not allowed" feedback, not harsh, not a buzzer |
+| `sfx_complete.mp3` | 1 с | Bright sparkly magical chime, two quick rising bell notes, happy reward ding with a short shimmer tail |
+| `sfx_button.mp3` | 0,5 с | Short soft UI button click, rounded plastic tap, subtle and pleasant |
+| `sfx_undo.mp3` | 0,5 с | Quick soft reverse whoosh, airy swoosh going backwards, light rewind feel |
+| `sfx_meow_1.mp3` | 1 с | Single short cute kitten meow, curious and friendly, rising intonation "mew?" |
+| `sfx_meow_2.mp3` | 1 с | Single short happy cat meow, cheerful and excited, bright "meow!" |
+| `sfx_meow_3.mp3` | 1 с | Single short soft cat chirp-meow, sweet trilling "mrrp", like greeting its owner |
+| `sfx_chew.mp3` | 1 с | Small cat eating dry kibble, a few quick crunchy bites, cute close-up chewing, no slurping |
+| `sfx_purr.mp3` | 2 с | Content cat purring close up, warm soft steady rumble, happy and relaxed, ends with a fade |
+| `music_win.mp3` | 2,5 с | Short cheerful victory jingle, xylophone and bells playing a quick rising arpeggio ending on a happy major chord, cartoon style |
+
+**После генерации:**
+- Переименуй файл точно по таблице и положи в `src/assets/audio/`. Если ElevenLabs отдаёт не MP3, просто положи файл как есть: я сконвертирую и обрежу тишину.
+- Для `music_win` в «Общем хвосте» убери слова `no music`.
+- Если мяу звучит слишком реалистично или грустно, добавь `cartoon, playful`. Если звук слишком «игрушечный», убери `cute`.

@@ -111,23 +111,34 @@ export function makeJuteWrap(scene, colorIndex, w, top, bottom) {
   const tex = scene.textures.get('jute_wrap').getSourceImage();
   const k = (w * J.width) / tex.width;
   const limit = Math.max(0, tex.height - (bottom - top) / k); // выше этой строки картинки верёвку не показываем
+  const tip = makeJuteTip(scene);
+  const r = tip.width / 2; // кончик: левая половина — верёвка, правая — скруглённый конец
   const coils = [];
+  const tips = [];
   for (let y1 = tex.height, n = Math.floor((tex.height - J.coilFirst) / J.coilPitch); y1 > limit; n--) {
     const y0 = Math.max(limit, n >= 0 ? J.coilFirst + n * J.coilPitch : 0);
     const img = scene.add.image(0, bottom, 'jute_wrap').setOrigin(0.5, 1).setScale(k).setTint(color);
     img.band = [y0, y1 - y0];
     coils.push(img);
+    // кончик того же витка: по высоте — как виток, по ширине — в масштабе верёвки
+    const t = scene.add.image(0, bottom - (tex.height - (y0 + y1) / 2) * k, 'jute_tip').setOrigin(0, 0.5)
+      .setScale(k, (k * (y1 - y0)) / J.coilPitch).setTint(color).setVisible(false);
+    tips.push(t);
     y1 = y0;
   }
-  const rope = coils;
+  const x0 = (-tex.width / 2) * k; // левый край верёвки на экране
   const reveal = (t) => {
     const done = t * coils.length;
     coils.forEach((img, i) => {
       const f = Math.min(1, Math.max(0, done - i));
-      img.setVisible(f > 0).setCrop(0, img.band[0], tex.width * f, img.band[1]);
+      const end = tex.width * f; // докуда дошла верёвка, px картинки
+      const moving = f > 0 && f < 1;
+      img.setVisible(f > 0).setCrop(0, img.band[0], moving ? Math.max(0, end - r) : end, img.band[1]);
+      tips[i].setVisible(moving).setX(x0 + (end - r) * k);
     });
   };
   reveal(1);
+  const rope = [...coils, ...tips];
   // картинка корма поверх джута
   const cy = (top + bottom) / 2;
   const size = Math.min(w * J.iconSize, (bottom - top) * 0.6);
@@ -146,10 +157,32 @@ export function makeJuteWrap(scene, colorIndex, w, top, bottom) {
   }
   const c = scene.add.container(0, 0, [...rope, icon]);
   c.rope = rope;
+  c.coils = coils.length;
   c.reveal = reveal;
   c.icon = icon;
   c.iconScale = iconScale;
   return c;
+}
+
+// Кончик верёвки для наматывания: кусок витка из середины jute_wrap шириной в высоту витка,
+// правая половина скруглена полукругом. Делается один раз.
+function makeJuteTip(scene) {
+  if (scene.textures.exists('jute_tip')) return scene.textures.get('jute_tip').getSourceImage();
+  const J = CONFIG.jute;
+  const src = scene.textures.get('jute_wrap').getSourceImage();
+  const h = Math.round(J.coilPitch);
+  const w = h;
+  const sy = Math.round(J.coilFirst + J.coilPitch * 8);
+  const canvas = scene.textures.createCanvas('jute_tip', w, h);
+  const ctx = canvas.getContext();
+  ctx.drawImage(src, Math.round(src.width / 2 - w / 2), sy, w, h, 0, 0, w, h);
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.beginPath();
+  ctx.rect(0, 0, w / 2, h);
+  ctx.ellipse(w / 2, h / 2, w / 2, h / 2, 0, -Math.PI / 2, Math.PI / 2);
+  ctx.fill();
+  canvas.refresh();
+  return canvas.getSourceImage();
 }
 
 function luminance(c) {

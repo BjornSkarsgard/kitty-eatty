@@ -420,7 +420,7 @@ export class GameScene extends Phaser.Scene {
     this.wraps[bowl] = wrap;
     wrap.reveal(0);
     wrap.t = 0;
-    const wrapTime = J.coilDuration * wrap.rope.length;
+    const wrapTime = J.coilDuration * wrap.coils;
     this.tweens.add({ targets: wrap, t: 1, duration: wrapTime, onUpdate: () => wrap.reveal(wrap.t) });
     wrap.icon.setScale(0);
     this.tweens.add({ targets: wrap.icon, scale: wrap.iconScale, delay: wrapTime, duration: J.iconDuration, ease: 'Back.easeOut' });

@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { LOADING_KEYS, queueAssets } from '../assets.js';
 import { CatView } from '../view/CatView.js';
+import { Capsule } from '../view/Capsule.js';
 import { music } from '../audio.js';
 
 // 1) Boot: грузит только то, что нужно самому экрану загрузки (голова, музыка).
@@ -46,7 +47,7 @@ export class PreloadScene extends Phaser.Scene {
     grad.addColorStop(0.25, T.top);
     grad.addColorStop(0.8, T.bottom);
     title.setFill(grad);
-    this.bar = this.add.graphics();
+    this.createBar();
     this.loadProgress = 0;
     this.drawBar(0);
 
@@ -139,7 +140,27 @@ export class PreloadScene extends Phaser.Scene {
     this.peek.add([head, ...this.paws]); // лапы поверх головы
   }
 
+  // Полоса из картинок: жёлоб loading_bar_track и заливка loading_bar_fill в цвет кота.
+  createBar() {
+    const B = CONFIG.loading.bar;
+    const x = this.center.x - B.width / 2;
+    const y = this.center.y + B.y;
+    if (!this.textures.exists('loading_bar_track') || !this.textures.exists('loading_bar_fill')) {
+      this.bar = this.add.graphics();
+      return;
+    }
+    new Capsule(this, x, y, 'loading_bar_track', B.height).setWidth(B.width);
+    const inset = B.height * B.fillInset;
+    this.barFill = new Capsule(this, x + inset, y, 'loading_bar_fill', B.height * B.fillHeight)
+      .setTint(CONFIG.colors[CONFIG.loading.color].fill);
+    this.barFillMax = B.width - 2 * inset;
+  }
+
   drawBar(p) {
+    if (this.barFill) {
+      this.barFill.setWidth(this.barFillMax * p);
+      return;
+    }
     const w = 220;
     const x = this.center.x - w / 2;
     const y = this.center.y + 40;

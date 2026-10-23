@@ -21,7 +21,7 @@ for (const [path, url] of Object.entries(files)) {
 // Что нужно экрану загрузки — грузится первым.
 const LOADING_CAT = CONFIG.colors[CONFIG.loading.color].name;
 export const LOADING_KEYS = [
-  'loading_head', 'loading_bowl', 'music_loading',
+  'loading_head', 'loading_bowl', 'loading_bar_track', 'loading_bar_fill', 'music_loading',
   // кот на загрузке собирается из тех же частей, если отдельной loading_head нет
   `cat_${LOADING_CAT}_head`, `cat_${LOADING_CAT}_eyes_grumpy`, `cat_${LOADING_CAT}_eyes_closed`, `cat_${LOADING_CAT}_paw`,
   'eyes_open', 'eyes_happy', 'mouth_open', 'mouth_closed',

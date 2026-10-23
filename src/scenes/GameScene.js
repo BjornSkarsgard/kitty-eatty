@@ -675,7 +675,7 @@ export class GameScene extends Phaser.Scene {
       star.setScale(0);
       this.tweens.add({
         targets: star, scale: target, duration: 380, ease: 'Back.easeOut', delay: 400 + i * S.popDelay,
-        onStart: () => sfx(this, 'sfx_star', CONFIG.audio.star, CONFIG.audio.starPitch ** i), // каждая следующая — выше
+        onStart: () => sfx(this, 'sfx_star', CONFIG.audio.star, CONFIG.audio.starPitch[i]), // до — ми — соль
         onComplete: () => this.fxStars.setDepth(23).explode(10, box.x + sx, box.y + sy),
       });
     }

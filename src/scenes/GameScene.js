@@ -414,23 +414,23 @@ export class GameScene extends Phaser.Scene {
     this.unwrapJar(bowl, true);
     const J = CONFIG.jute;
     const r = this.bowlRects[bowl];
-    const s = this.dim.scale;
     const top = r.top;
     const bottom = r.bottom - this.dim.base;
-    const wrap = makeJuteWrap(this, color, this.dim.bw, top, bottom, s).setPosition(r.x, 0).setDepth(2);
+    const wrap = makeJuteWrap(this, color, this.dim.bw, top, bottom).setPosition(r.x, 0).setDepth(2);
     this.wraps[bowl] = wrap;
     wrap.reveal(0);
     wrap.t = 0;
-    this.tweens.add({ targets: wrap, t: 1, duration: J.wrapDuration, ease: 'Sine.easeInOut', onUpdate: () => wrap.reveal(wrap.t) });
+    const wrapTime = J.coilDuration * wrap.rope.length;
+    this.tweens.add({ targets: wrap, t: 1, duration: wrapTime, onUpdate: () => wrap.reveal(wrap.t) });
     wrap.icon.setScale(0);
-    this.tweens.add({ targets: wrap.icon, scale: wrap.iconScale, delay: J.wrapDuration, duration: J.iconDuration, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: wrap.icon, scale: wrap.iconScale, delay: wrapTime, duration: J.iconDuration, ease: 'Back.easeOut' });
   }
 
   unwrapJar(bowl, instant = false) {
     const wrap = this.wraps[bowl];
     if (!wrap) return;
     this.wraps[bowl] = null;
-    const parts = [wrap.rope, wrap.icon];
+    const parts = [...wrap.rope, wrap.icon];
     this.tweens.killTweensOf(parts);
     this.tweens.killTweensOf(wrap);
     if (instant) return wrap.destroy();

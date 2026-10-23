@@ -103,17 +103,29 @@ function makeLayer(scene, w, h, fill, g) {
 
 // Когтеточка: джутовая верёвка jute_wrap вокруг банки от bottom до top (центр по x = 0), покрашенная tint'ом
 // в цвет корма, и картинка корма поверх. Верёвка не растягивается (витки не сплющиваются): лишняя высота
-// обрезается сверху. container.reveal(t) — показать нижнюю долю t (0…1): так верёвка «наматывается» снизу вверх.
-export function makeJuteWrap(scene, colorIndex, w, top, bottom, s) {
+// обрезается сверху. Каждый виток — свой кусок картинки (между стыками, CONFIG.jute.coilFirst/coilPitch).
+// container.reveal(t), t = 0…1: витки по очереди снизу вверх, каждый проходит слева направо — верёвку наматывают.
+export function makeJuteWrap(scene, colorIndex, w, top, bottom) {
   const J = CONFIG.jute;
   const color = lighten(CONFIG.colors[colorIndex].fill, J.tintLighten);
-  const rope = scene.add.image(0, bottom, 'jute_wrap').setOrigin(0.5, 1).setTint(color);
-  const k = (w * J.width) / rope.width;
-  rope.setScale(k);
-  const full = Math.min(rope.height, (bottom - top) / k); // высота видимой части в пикселях картинки
+  const tex = scene.textures.get('jute_wrap').getSourceImage();
+  const k = (w * J.width) / tex.width;
+  const limit = Math.max(0, tex.height - (bottom - top) / k); // выше этой строки картинки верёвку не показываем
+  const coils = [];
+  for (let y1 = tex.height, n = Math.floor((tex.height - J.coilFirst) / J.coilPitch); y1 > limit; n--) {
+    const y0 = Math.max(limit, n >= 0 ? J.coilFirst + n * J.coilPitch : 0);
+    const img = scene.add.image(0, bottom, 'jute_wrap').setOrigin(0.5, 1).setScale(k).setTint(color);
+    img.band = [y0, y1 - y0];
+    coils.push(img);
+    y1 = y0;
+  }
+  const rope = coils;
   const reveal = (t) => {
-    const hh = full * t;
-    rope.setCrop(0, rope.height - hh, rope.width, hh);
+    const done = t * coils.length;
+    coils.forEach((img, i) => {
+      const f = Math.min(1, Math.max(0, done - i));
+      img.setVisible(f > 0).setCrop(0, img.band[0], tex.width * f, img.band[1]);
+    });
   };
   reveal(1);
   // картинка корма поверх джута
@@ -132,7 +144,7 @@ export function makeJuteWrap(scene, colorIndex, w, top, bottom, s) {
     icon.fillStyle(lighten(color, 0.6), 1);
     drawShape(icon, CONFIG.colors[colorIndex].shape, size * 0.42);
   }
-  const c = scene.add.container(0, 0, [rope, icon]);
+  const c = scene.add.container(0, 0, [...rope, icon]);
   c.rope = rope;
   c.reveal = reveal;
   c.icon = icon;

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { decodePNG, encodePNG } from './png.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const WALL = [330, 1265];  // строки стены (между подоконником и столом), px фона
+const WALL = [342, 1265];  // строки стены (между тенью подоконника и столом), px фона
 const LOCAL = 24;          // радиус «фона стены» для сравнения, px
 const DARK = 5;            // насколько лапка темнее стены вокруг (яркость 0–255)
 const JOIN = 7;            // радиус склейки пальчиков и подушечки в одну лапку
@@ -96,6 +96,19 @@ for (let y = ref.y - Math.floor((ref.y - WALL[0]) / dy) * dy; y < WALL[1] - avgH
 console.log(`сетка: шаг ${dx.toFixed(0)}×${dy.toFixed(0)}, добавлено пропущенных: ${added}`);
 console.log(`лапок: ${paws.length}`);
 
+// Уточняем рамку каждой лапки по тёмным пикселям вокруг её центра (у дорисованных по сетке рамка была средняя
+// и могла отрезать пальчики). Порог мягче — у подоконника лапки бледнее.
+for (const p of paws) {
+  const rx = Math.round(avgW * 0.9), ry = Math.round(avgH * 0.9);
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = Math.max(WALL[0], p.y - ry); y <= Math.min(WALL[1] - 1, p.y + ry); y++) {
+    for (let x = Math.max(0, p.x - rx); x <= Math.min(w - 1, p.x + rx); x++) {
+      if (local[y * w + x] - lum[y * w + x] > DARK * 0.6) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    }
+  }
+  if (x1 - x0 > avgW * 0.5 && y1 - y0 > avgH * 0.5) Object.assign(p, { x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: x1 - x0 + 1, h: y1 - y0 + 1 });
+}
+
 // Каждая лапка — свой кусок фона: её же пиксели, прозрачность — по её форме (чёткий край). Куски сложены
 // в атлас src/assets/paw_glow.png; игра кладёт каждый ровно на его место фона и «подсвечивает» сложением цветов.
 const PAD = 3;
@@ -112,11 +125,17 @@ for (const p of paws) {
 const AH = ay + rowH;
 const atlas = Buffer.alloc(ATLAS_W * AH * 4);
 for (const f of frames) {
+  // контраст этой лапки: бледные (в тени подоконника) получают свой порог и подсвечиваются целиком
+  let maxd = 0;
   for (let y = 0; y < f.h; y++) for (let x = 0; x < f.w; x++) {
     const sx = f.x0 + x, sy = f.y0 + y;
-    if (sx < 0 || sy < 0 || sx >= w || sy >= h) continue;
+    if (sx >= 0 && sy >= WALL[0] && sx < w && sy < h) maxd = Math.max(maxd, local[sy * w + sx] - lum[sy * w + sx]);
+  }
+  for (let y = 0; y < f.h; y++) for (let x = 0; x < f.w; x++) {
+    const sx = f.x0 + x, sy = f.y0 + y;
+    if (sx < 0 || sy < WALL[0] || sx >= w || sy >= h) continue;
     const i = sy * w + sx;
-    const alpha = Math.min(1, Math.max(0, (local[i] - lum[i] - 1.5) / 3)); // форма лапки, край в 1–2 px
+    const alpha = Math.min(1, Math.max(0, (local[i] - lum[i] - maxd * 0.2) / (maxd * 0.3))); // форма лапки, чёткий край
     const o = ((f.ay + y) * ATLAS_W + f.ax + x) * 4;
     for (let k = 0; k < 3; k++) atlas[o + k] = rgba[i * 4 + k];
     atlas[o + 3] = Math.round(alpha * 255);

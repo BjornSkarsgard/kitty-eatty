@@ -5,6 +5,9 @@ import { sfx } from '../audio.js';
 // Переход «поворот» между комнатой и кухней (уровнем): обе сцены едут вбок одновременно, вплотную друг к другу —
 // старая уходит, новая въезжает, пустоты между ними нет. Размытие в движении и звук ветра — будто резко
 // повернулись на 180°. dir: 1 — поворот вправо (новая въезжает справа), -1 — влево.
+// Кухня стоит в доме сразу за последним участком комнаты, поэтому из комнаты проезжаем все участки до её края
+// (главная → коллекция → лежанка → кухня) и обратно так же. Сколько ехать — спрашиваем у сцен:
+// scene.turnExit(dir) — путь до своего края, scene.turnEnter(dir) — путь от края до своего места; без них — экран.
 // Размытие — только WebGL и включённые эффекты; в Canvas — просто быстрый проезд.
 const T = () => CONFIG.transition;
 
@@ -29,14 +32,15 @@ export function turnIn(scene, { from, dir }) {
   const old = scene.scene.get(from);
   scene.scene.bringToTop();
   const W = CONFIG.width;
-  const ms = T().duration;
   const cam = scene.cameras.main;
   const oldCam = old.cameras.main;
   const to = cam.scrollX;
+  const span = (old.turnExit ? old.turnExit(dir) : W) + (scene.turnEnter ? scene.turnEnter(dir) : 0);
+  const ms = T().duration + T().perScreen * Math.max(0, span / W - 1);
   const bounds = cam.useBounds ? Phaser.Geom.Rectangle.Clone(cam.getBounds()) : null;
   cam.removeBounds();
   oldCam.removeBounds();
-  cam.scrollX = to - dir * W;
+  cam.scrollX = to - dir * span;
 
   const blurs = [blurOn(scene), blurOn(old)].filter(Boolean);
   // размытие: нарастает к середине поворота и уходит к концу
@@ -55,7 +59,7 @@ export function turnIn(scene, { from, dir }) {
   });
   if (CONFIG.fx.enabled) windStreaks(scene, dir, ms);
   scene.input.enabled = false;
-  scene.tweens.add({ targets: oldCam, scrollX: oldCam.scrollX + dir * W, duration: ms, ease: 'Cubic.easeInOut' });
+  scene.tweens.add({ targets: oldCam, scrollX: oldCam.scrollX + dir * span, duration: ms, ease: 'Cubic.easeInOut' });
   scene.tweens.add({
     targets: cam, scrollX: to, duration: ms, ease: 'Cubic.easeInOut',
     onComplete: () => {

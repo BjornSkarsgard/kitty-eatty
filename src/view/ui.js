@@ -278,6 +278,7 @@ export function tabBar(scene, tabs, onSelect, { depth = 20 } = {}) {
   const bar = {
     zones: icons,
     setPosition(f) {
+      f = Phaser.Math.Clamp(f, 0, tabs.length - 1); // во время поворота камера уезжает за край
       glassBox.x = cell * f + cell / 2;
       const near = Math.round(f);
       label.setText(tabs[near].label);

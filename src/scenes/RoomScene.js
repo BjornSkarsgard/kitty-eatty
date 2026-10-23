@@ -63,6 +63,18 @@ export class RoomScene extends Phaser.Scene {
     if (this.turn) turnIn(this, this.turn);
   }
 
+  // Путь поворота: кухня — за правым краем комнаты. Уходим вправо — едем до края и ещё экран;
+  // приезжаем оттуда (dir -1) — от правого края до своего участка.
+  turnExit(dir) {
+    const s = this.cameras.main.scrollX;
+    return dir > 0 ? W * (ZONES.length - 1) - s + W : s + W;
+  }
+
+  turnEnter(dir) {
+    const s = this.cameras.main.scrollX;
+    return dir < 0 ? W * (ZONES.length - 1) - s : s;
+  }
+
   // В уровень — «поворотом» на кухню.
   startLevel(index) {
     turnTo(this, 'Game', { levelIndex: index }, 1);

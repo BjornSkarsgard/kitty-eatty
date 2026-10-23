@@ -102,43 +102,45 @@ function makeLayer(scene, w, h, fill, g) {
 }
 
 // Когтеточка: джутовая верёвка jute_wrap вокруг банки от bottom до top (центр по x = 0), покрашенная tint'ом
-// в цвет корма, и картинка корма поверх. Верёвка не растягивается (витки не сплющиваются): лишняя высота
-// обрезается сверху. Каждый виток — свой кусок картинки (между стыками, CONFIG.jute.coilFirst/coilPitch).
-// container.reveal(t), t = 0…1: витки по очереди снизу вверх, каждый проходит слева направо — верёвку наматывают.
-export function makeJuteWrap(scene, colorIndex, w, top, bottom) {
+// в цвет корма, и картинка корма поверх. Берётся целое число витков (по стыкам картинки, CONFIG.jute.coilFirst/
+// coilPitch), чуть растянутых по высоте, чтобы ровно закрыть стенку. Верёвка рисуется в свою текстуру key:
+// container.reveal(t), t = 0…1 — витки по очереди снизу вверх, каждый идёт слева направо со скруглённым концом.
+export function makeJuteWrap(scene, colorIndex, w, top, bottom, key) {
   const J = CONFIG.jute;
   const color = lighten(CONFIG.colors[colorIndex].fill, J.tintLighten);
-  const tex = scene.textures.get('jute_wrap').getSourceImage();
-  const k = (w * J.width) / tex.width;
-  const limit = Math.max(0, tex.height - (bottom - top) / k); // выше этой строки картинки верёвку не показываем
-  const tip = makeJuteTip(scene);
-  const r = tip.width / 2; // кончик: левая половина — верёвка, правая — скруглённый конец
-  const coils = [];
-  const tips = [];
-  for (let y1 = tex.height, n = Math.floor((tex.height - J.coilFirst) / J.coilPitch); y1 > limit; n--) {
-    const y0 = Math.max(limit, n >= 0 ? J.coilFirst + n * J.coilPitch : 0);
-    const img = scene.add.image(0, bottom, 'jute_wrap').setOrigin(0.5, 1).setScale(k).setTint(color);
-    img.band = [y0, y1 - y0];
-    coils.push(img);
-    // кончик того же витка: по высоте — как виток, по ширине — в масштабе верёвки
-    const t = scene.add.image(0, bottom - (tex.height - (y0 + y1) / 2) * k, 'jute_tip').setOrigin(0, 0.5)
-      .setScale(k, (k * (y1 - y0)) / J.coilPitch).setTint(color).setVisible(false);
-    tips.push(t);
-    y1 = y0;
-  }
-  const x0 = (-tex.width / 2) * k; // левый край верёвки на экране
+  const src = scene.textures.get('jute_wrap').getSourceImage();
+  const W = src.width;
+  const p = J.coilPitch;
+  const k = (w * J.width) / W;
+  const lastSeam = J.coilFirst + Math.floor((src.height - J.coilFirst - p * 0.5) / p) * p; // верх нижнего витка
+  const maxCoils = Math.floor((lastSeam - J.coilFirst) / p) + 1;
+  const n = Math.max(1, Math.min(maxCoils, Math.round((bottom - top) / (p * k))));
+  const H = Math.ceil(n * p);
+  if (scene.textures.exists(key)) scene.textures.remove(key);
+  const canvas = scene.textures.createCanvas(key, W, H);
+  const ctx = canvas.getContext();
+  const r = p / 2;
   const reveal = (t) => {
-    const done = t * coils.length;
-    coils.forEach((img, i) => {
-      const f = Math.min(1, Math.max(0, done - i));
-      const end = tex.width * f; // докуда дошла верёвка, px картинки
-      const moving = f > 0 && f < 1;
-      img.setVisible(f > 0).setCrop(0, img.band[0], moving ? Math.max(0, end - r) : end, img.band[1]);
-      tips[i].setVisible(moving).setX(x0 + (end - r) * k);
-    });
+    ctx.clearRect(0, 0, W, H);
+    const done = t * n;
+    for (let i = 0; i < n && i < done; i++) {
+      const sy = lastSeam - i * p; // виток i снизу в картинке
+      const dy = H - (i + 1) * p;  // и на холсте
+      const end = W * Math.min(1, done - i);
+      ctx.save();
+      if (end < W) {
+        ctx.beginPath();
+        ctx.rect(0, dy, Math.max(0, end - r), p);
+        ctx.ellipse(Math.max(0, end - r), dy + r, Math.min(r, end), r, 0, -Math.PI / 2, Math.PI / 2);
+        ctx.clip();
+      }
+      ctx.drawImage(src, 0, sy, W, p, 0, dy, W, p);
+      ctx.restore();
+    }
+    canvas.refresh();
   };
   reveal(1);
-  const rope = [...coils, ...tips];
+  const rope = scene.add.image(0, bottom, key).setOrigin(0.5, 1).setScale(k, (bottom - top) / H).setTint(color);
   // картинка корма поверх джута
   const cy = (top + bottom) / 2;
   const size = Math.min(w * J.iconSize, (bottom - top) * 0.6);
@@ -155,34 +157,13 @@ export function makeJuteWrap(scene, colorIndex, w, top, bottom) {
     icon.fillStyle(lighten(color, 0.6), 1);
     drawShape(icon, CONFIG.colors[colorIndex].shape, size * 0.42);
   }
-  const c = scene.add.container(0, 0, [...rope, icon]);
+  const c = scene.add.container(0, 0, [rope, icon]);
   c.rope = rope;
-  c.coils = coils.length;
+  c.coils = n;
   c.reveal = reveal;
   c.icon = icon;
   c.iconScale = iconScale;
   return c;
-}
-
-// Кончик верёвки для наматывания: кусок витка из середины jute_wrap шириной в высоту витка,
-// правая половина скруглена полукругом. Делается один раз.
-function makeJuteTip(scene) {
-  if (scene.textures.exists('jute_tip')) return scene.textures.get('jute_tip').getSourceImage();
-  const J = CONFIG.jute;
-  const src = scene.textures.get('jute_wrap').getSourceImage();
-  const h = Math.round(J.coilPitch);
-  const w = h;
-  const sy = Math.round(J.coilFirst + J.coilPitch * 8);
-  const canvas = scene.textures.createCanvas('jute_tip', w, h);
-  const ctx = canvas.getContext();
-  ctx.drawImage(src, Math.round(src.width / 2 - w / 2), sy, w, h, 0, 0, w, h);
-  ctx.globalCompositeOperation = 'destination-in';
-  ctx.beginPath();
-  ctx.rect(0, 0, w / 2, h);
-  ctx.ellipse(w / 2, h / 2, w / 2, h / 2, 0, -Math.PI / 2, Math.PI / 2);
-  ctx.fill();
-  canvas.refresh();
-  return canvas.getSourceImage();
 }
 
 function luminance(c) {

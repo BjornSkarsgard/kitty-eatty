@@ -418,7 +418,7 @@ export class GameScene extends Phaser.Scene {
     const r = this.bowlRects[bowl];
     const top = r.top;
     const bottom = r.bottom - this.dim.base;
-    const wrap = makeJuteWrap(this, color, this.dim.bw, top, bottom).setPosition(r.x, 0).setDepth(2);
+    const wrap = makeJuteWrap(this, color, this.dim.bw, top, bottom, `jute_anim_${bowl}`).setPosition(r.x, 0).setDepth(2);
     this.wraps[bowl] = wrap;
     wrap.reveal(0);
     wrap.t = 0;
@@ -432,7 +432,7 @@ export class GameScene extends Phaser.Scene {
     const wrap = this.wraps[bowl];
     if (!wrap) return;
     this.wraps[bowl] = null;
-    const parts = [...wrap.rope, wrap.icon];
+    const parts = [wrap.rope, wrap.icon];
     this.tweens.killTweensOf(parts);
     this.tweens.killTweensOf(wrap);
     if (instant) return wrap.destroy();

@@ -4,9 +4,10 @@ import { setting } from './save.js';
 
 const has = (scene, key) => scene.cache.audio.exists(key);
 
-export function sfx(scene, key, volume = 1) {
+// rate — скорость воспроизведения: больше 1 — выше тоном, меньше — ниже.
+export function sfx(scene, key, volume = 1, rate = 1) {
   if (!setting('sound')) return;
-  if (has(scene, key)) scene.sound.play(key, { volume: CONFIG.audio.sfx * volume });
+  if (has(scene, key)) scene.sound.play(key, { volume: CONFIG.audio.sfx * volume, rate });
 }
 
 // Случайный из вариантов: sfxRandom(scene, 'sfx_meow', 3) → sfx_meow_1..3. Тот же вариант дважды подряд не играет.

@@ -561,7 +561,7 @@ export class GameScene extends Phaser.Scene {
     const price = CONFIG.economy.undoPrice;
     const buttons = [{
       label: `Купить за ${price} монет`, color: 0x4caf50, disabled: coins() < price,
-      onTap: () => { if (buyUndo()) { this.refreshUndo(); this.undo(); } },
+      onTap: () => { if (buyUndo()) { sfx(this, 'sfx_coins', CONFIG.audio.coins); this.refreshUndo(); this.undo(); } },
     }];
     if (CONFIG.ads.enabled) buttons.push({ label: 'Смотреть рекламу', color: 0xf0a020, onTap: () => {} }); // этап 6
     buttons.push({ label: 'Не надо' });
@@ -648,6 +648,9 @@ export class GameScene extends Phaser.Scene {
     }));
 
     box.setScale(0.5).setAlpha(0);
+    sfx(this, 'sfx_popup', CONFIG.audio.popup);
+    // монеты звенят, когда звёзды отпрыгали
+    if (reward.coins) this.time.delayedCall(400 + reward.stars * CONFIG.stars.popDelay + 200, () => sfx(this, 'sfx_coins', CONFIG.audio.coins));
     this.tweens.add({ targets: box, scale: 1, alpha: 1, duration: 320, ease: 'Back.easeOut' });
     this.showStars(box, WC.starsY, reward.stars);
   }
@@ -672,7 +675,7 @@ export class GameScene extends Phaser.Scene {
       star.setScale(0);
       this.tweens.add({
         targets: star, scale: target, duration: 380, ease: 'Back.easeOut', delay: 400 + i * S.popDelay,
-        onStart: () => sfx(this, 'sfx_pick'),
+        onStart: () => sfx(this, 'sfx_star', CONFIG.audio.star, CONFIG.audio.starPitch ** i), // каждая следующая — выше
         onComplete: () => this.fxStars.setDepth(23).explode(10, box.x + sx, box.y + sy),
       });
     }

@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { makeButton } from './Button.js';
+import { sfx } from '../audio.js';
 
 // Окно поверх экрана: затемнение (тап по нему закрывает), панель, заголовок, текст и кнопки столбиком.
 // buttons: [{ label, onTap, color, disabled, keep }] — после onTap окно закрывается, если не keep
@@ -11,6 +12,7 @@ export function showPopup(scene, { title, text = '', buttons = [], depth = 50 })
   const H = CONFIG.height;
   const parts = [];
   const close = () => parts.forEach((o) => o.destroy());
+  sfx(scene, 'sfx_popup', CONFIG.audio.popup);
 
   const shade = scene.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.55).setDepth(depth).setScrollFactor(0).setInteractive();
   shade.on('pointerdown', close);

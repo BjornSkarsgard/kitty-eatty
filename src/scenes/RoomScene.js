@@ -6,7 +6,7 @@ import { makeButton } from '../view/Button.js';
 import { counterPill, tabBar, iconButton, makeIcon } from '../view/ui.js';
 import { addSettingsMenu } from '../view/settings.js';
 import { turnTo, turnIn } from '../view/transition.js';
-import { music } from '../audio.js';
+import { music, sfx } from '../audio.js';
 import { beatPhase } from '../beat.js';
 import { currentLevel, unlockedLevel, levelStars, coins } from '../save.js';
 import LEVELS from '../levels/levels.json';
@@ -193,6 +193,7 @@ export class RoomScene extends Phaser.Scene {
 
   goTo(i) {
     if (this.mapOpen && i !== 1) this.collapseMap();
+    if (Math.abs(this.cameras.main.scrollX - i * W) > 1) sfx(this, 'sfx_swipe', CONFIG.audio.swipe);
     this.tweens.killTweensOf(this.cameras.main);
     this.tweens.add({ targets: this.cameras.main, scrollX: i * W, duration: R.panDuration, ease: 'Cubic.easeInOut' });
   }
@@ -200,6 +201,7 @@ export class RoomScene extends Phaser.Scene {
   expandMap() {
     if (this.mapOpen) return;
     this.mapOpen = true;
+    sfx(this, 'sfx_swipe', CONFIG.audio.swipe, 1.15);
     this.goTo(1);
     this.tweens.add({ targets: this.map.root, x: W + W / 2, y: H / 2, scale: 1, duration: R.zoomDuration, ease: 'Cubic.easeInOut' });
     this.tweens.add({ targets: this.mapFrame, alpha: 0, duration: R.zoomDuration });
@@ -210,6 +212,7 @@ export class RoomScene extends Phaser.Scene {
   collapseMap() {
     if (!this.mapOpen) return;
     this.mapOpen = false;
+    sfx(this, 'sfx_swipe', CONFIG.audio.swipe, 0.85);
     const P = this.mapPlace;
     this.map.velocity = 0;
     this.tweens.add({ targets: this.map.root, x: P.x, y: P.y, scale: P.scale, duration: R.zoomDuration, ease: 'Cubic.easeInOut' });

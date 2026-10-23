@@ -123,7 +123,7 @@ export function makeIcon(scene, name, size) {
 // Кнопка-иконка: квадратная (или круглая) глянцевая, бейдж с числом справа сверху, подпись снизу.
 // Возвращает контейнер с методами setBadge(n | null) и setEnabled(bool).
 export function iconButton(scene, x, y, icon, onTap, {
-  size = U.iconButton, shape = 'square', color = U.buttonColor, label = null, badge = null, depth = 15,
+  size = U.iconButton, shape = 'square', color = U.buttonColor, label = null, badge = null, depth = 15, sound = 'sfx_button',
 } = {}) {
   const btn = scene.add.container(x, y).setDepth(depth);
   const g = scene.add.graphics();
@@ -154,7 +154,7 @@ export function iconButton(scene, x, y, icon, onTap, {
 
   btn.setSize(size, size).setInteractive();
   btn.on('pointerdown', () => {
-    sfx(scene, 'sfx_button');
+    if (sound) sfx(scene, sound);
     scene.tweens.add({ targets: btn, scale: 0.9, duration: 60, yoyo: true });
     if (btn.enabled) onTap();
   });
@@ -207,6 +207,7 @@ export function settingsMenu(scene, x, y, items, actions = [], { size = 84, dept
     .setDepth(depth - 1).setScrollFactor(0).setInteractive().setVisible(false);
   let open = false;
   const toggle = (on = !open) => {
+    if (on !== open) sfx(scene, 'sfx_swipe', CONFIG.audio.swipe, on ? 1.2 : 1);
     open = on;
     catcher.setVisible(open);
     col.forEach((b, i) => {
@@ -220,10 +221,14 @@ export function settingsMenu(scene, x, y, items, actions = [], { size = 84, dept
     });
   };
   catcher.on('pointerdown', () => toggle(false));
-  const gear = iconButton(scene, x, y, 'gear', () => toggle(), { size, shape: 'round', depth: depth + 1 }).setScrollFactor(0);
+  const gear = iconButton(scene, x, y, 'gear', () => toggle(), { size, shape: 'round', depth: depth + 1, sound: null }).setScrollFactor(0);
   items.forEach((it) => {
     const on = () => (it.get() ? U.onColor : U.offColor);
-    const b = iconButton(scene, x, y, it.icon, () => { it.set(!it.get()); b.setColor(on()); }, { size, shape: 'round', depth, color: on() });
+    const b = iconButton(scene, x, y, it.icon, () => {
+      it.set(!it.get());
+      b.setColor(on());
+      sfx(scene, 'sfx_toggle', CONFIG.audio.toggle, it.get() ? 1 : CONFIG.audio.toggleOff); // выключение — ниже тоном
+    }, { size, shape: 'round', depth, color: on(), sound: null });
     col.push(b.setScrollFactor(0).setVisible(false));
   });
   actions.forEach((a) => {
@@ -269,8 +274,7 @@ export function tabBar(scene, tabs, onSelect, { depth = 20 } = {}) {
     const zone = scene.add.zone(x, H - h / 2, cell, h).setDepth(depth + 3).setScrollFactor(0).setInteractive();
     zone.on('pointerdown', () => {
       if (t.enabled === false) return sfx(scene, 'sfx_invalid');
-      sfx(scene, 'sfx_button');
-      onSelect(i);
+      onSelect(i); // звук переезда — у комнаты
     });
     return icon;
   });

@@ -5,7 +5,7 @@
 import { writeFileSync } from 'node:fs';
 import { CONFIG } from '../src/config.js';
 import { Board } from '../src/core/Board.js';
-import { scramble, solve, deadEndRate, keyOf, isComplete, rng } from './lib.mjs';
+import { scramble, solve, deadEndRate, keyOf, isComplete, isNearComplete, rng } from './lib.mjs';
 
 const G = CONFIG.levelGen;
 const rand = rng(G.seed);
@@ -61,6 +61,7 @@ for (let n = 1; n <= G.count; n++) {
     attempts++;
     const bowls = scramble(p.colors, p.capacity, p.empties, p.colors * p.capacity * 3, rand);
     if (bowls.some((b) => isComplete(b, p.capacity))) continue;
+    if (n >= G.noNearCompleteFrom && bowls.some((b) => isNearComplete(b, p.capacity))) continue;
     const key = keyOf(bowls);
     if (used.has(key)) continue;
     const sol = solve(bowls, p.capacity, 500_000);

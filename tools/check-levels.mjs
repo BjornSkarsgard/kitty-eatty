@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { CONFIG } from '../src/config.js';
 import { Board } from '../src/core/Board.js';
-import { solve, keyOf, isComplete } from './lib.mjs';
+import { solve, keyOf, isComplete, isNearComplete } from './lib.mjs';
 
 const levels = JSON.parse(readFileSync(new URL('../src/levels/levels.json', import.meta.url), 'utf8'));
 const errors = [];
@@ -19,6 +19,8 @@ for (const l of levels) {
   if (counts.size > CONFIG.colors.length) err(`цветов ${counts.size}, в конфиге только ${CONFIG.colors.length}`);
   if (l.bowls.some((b) => b.length > l.capacity)) err('переполненная миска');
   if (l.bowls.some((b) => isComplete(b, l.capacity))) err('миска собрана на старте');
+  if (l.id >= CONFIG.levelGen.noNearCompleteFrom && l.bowls.some((b) => isNearComplete(b, l.capacity)))
+    err('миска собирается одним ходом на старте');
   const key = keyOf(l.bowls);
   if (seen.has(key)) err('повтор другого уровня');
   seen.add(key);

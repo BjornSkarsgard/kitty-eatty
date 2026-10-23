@@ -12,6 +12,11 @@ export function topRun(b) {
 export const isComplete = (b, cap) => b.length === cap && b.every((c) => c === b[0]);
 export const isSolved = (st, cap) => st.every((b) => !b.length || isComplete(b, cap));
 
+// «Почти собранная» миска: полная, снизу cap-1 порций одного цвета, сверху одна чужая.
+// Собирается одним ходом — на старте уровня выглядит как недосмотр.
+export const isNearComplete = (b, cap) =>
+  b.length === cap && b.slice(0, cap - 1).every((c) => c === b[0]) && b[cap - 1] !== b[0];
+
 // Канонический ключ: порядок мисок не важен.
 export const keyOf = (st) => st.map((b) => b.join(',')).sort().join('|');
 

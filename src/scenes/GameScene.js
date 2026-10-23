@@ -6,6 +6,7 @@ import { beatPulse, beatPhase } from '../beat.js';
 import { CatView } from '../view/CatView.js';
 import { sfx, sfxRandom, music } from '../audio.js';
 import LEVELS from '../levels/levels.json';
+import PAWS from '../../tools/bg-paws.json';
 
 const L = CONFIG.layout;
 
@@ -42,6 +43,7 @@ export class GameScene extends Phaser.Scene {
     if (this.textures.exists('bg_game')) {
       const bg = this.add.image(CONFIG.width / 2, CONFIG.height / 2, 'bg_game');
       bg.setScale(Math.max(CONFIG.width / bg.width, CONFIG.height / bg.height));
+      this.createWallGlow(bg);
     }
     makeFxTextures(this);
     this.createEffects();
@@ -58,6 +60,27 @@ export class GameScene extends Phaser.Scene {
     this.createPortions();
     this.createCats();
     this.createButtons();
+  }
+
+  // Лапки на обоях по очереди в разнобой мягко разгораются и гаснут. Где лапки — tools/bg-paws.json.
+  createWallGlow(bg) {
+    const G = CONFIG.fx.wallGlow;
+    if (!CONFIG.fx.enabled || !this.textures.exists('paw_glow')) return;
+    const s = bg.scaleX;
+    const [bw, bh] = PAWS.bg;
+    for (const [x, y, w] of PAWS.paws) {
+      const img = this.add.image(bg.x + (x - bw / 2) * s, bg.y + (y - bh / 2) * s, 'paw_glow')
+        .setScale((s * w) / PAWS.glow).setTint(G.color).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
+      const glow = (first) => {
+        this.tweens.add({
+          targets: img, alpha: Phaser.Math.FloatBetween(...G.alpha),
+          delay: Phaser.Math.Between(first ? 0 : G.gap[0], G.gap[1]),
+          duration: G.fade, hold: G.hold, yoyo: true, ease: 'Sine.easeInOut',
+          onComplete: () => glow(false),
+        });
+      };
+      glow(true);
+    }
   }
 
   // ---------- раскладка ----------

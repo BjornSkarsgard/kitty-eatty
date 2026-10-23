@@ -12,7 +12,7 @@ import { CONFIG } from '../src/config.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ASSETS = join(ROOT, 'src', 'assets');
-const PARTS = ['head', 'body', 'tail', 'leg_l', 'leg_r', 'eyes_grumpy', 'eyes_closed'];
+const PARTS = ['head', 'body', 'tail', 'leg_l', 'leg_r', 'paw', 'eyes_grumpy', 'eyes_closed'];
 const HUE_RANGE = 32;   // градусы: насколько далеко от оттенка шерсти ещё перекрашиваем в полную силу
 const HUE_FADE = 18;    // и за сколько градусов после этого сходит на нет
 const SAT_MIN = 0.12;   // ниже — белое/серое, не трогаем

@@ -22,7 +22,7 @@ const LOADING_CAT = CONFIG.colors[CONFIG.loading.color].name;
 export const LOADING_KEYS = [
   'loading_head', 'music_loading',
   // кот на загрузке собирается из тех же частей, если отдельной loading_head нет
-  `cat_${LOADING_CAT}_head`, `cat_${LOADING_CAT}_eyes_grumpy`, `cat_${LOADING_CAT}_eyes_closed`, 'cat_paw_grip',
+  `cat_${LOADING_CAT}_head`, `cat_${LOADING_CAT}_eyes_grumpy`, `cat_${LOADING_CAT}_eyes_closed`, `cat_${LOADING_CAT}_paw`,
   'eyes_open', 'eyes_happy', 'mouth_open', 'mouth_closed',
 ];
 

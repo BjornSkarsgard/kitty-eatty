@@ -102,9 +102,10 @@ export class PreloadScene extends Phaser.Scene {
       // рисуем лапу вокруг её центра, чтобы поворот pawAngle был на месте
       const paw = this.add.container(side * Lc.pawSpread, 6 * Lc.catScale).setAngle(Lc.pawAngle);
       paw.baseY = paw.y;
-      if (this.textures.exists('cat_paw_grip')) {
-        // согнутая лапа, пальчики внизу картинки — как у временной фигуры
-        const img = this.add.image(0, 0, 'cat_paw_grip').setTint(CONFIG.colors[Lc.color].fill);
+      const pawKey = `cat_${CONFIG.colors[Lc.color].name}_paw`;
+      if (this.textures.exists(pawKey)) {
+        // лапа сверху, пальчики внизу картинки — как у временной фигуры; у каждого цвета свой спрайт, без tint
+        const img = this.add.image(0, 0, pawKey);
         img.setScale((Lc.pawArtSize * Lc.catScale) / Math.max(img.width, img.height));
         paw.add(img);
       } else {

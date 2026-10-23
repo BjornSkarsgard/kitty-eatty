@@ -2,8 +2,7 @@ import * as Phaser from 'phaser';
 import { CONFIG } from './config.js';
 import { GameScene } from './scenes/GameScene.js';
 import { BootScene, PreloadScene } from './scenes/LoadingScenes.js';
-import { MapScene } from './scenes/MapScene.js';
-import { HomeScene } from './scenes/HomeScene.js';
+import { RoomScene } from './scenes/RoomScene.js';
 import { setupAudioFocus } from './audio.js';
 import { loadFonts } from './fonts.js';
 import { applySettings } from './view/settings.js';
@@ -21,7 +20,7 @@ loadFonts(CONFIG.font).then(() => {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
-    scene: [BootScene, PreloadScene, GameScene, MapScene, HomeScene],
+    scene: [BootScene, PreloadScene, GameScene, RoomScene],
   });
   setupAudioFocus(game);
 

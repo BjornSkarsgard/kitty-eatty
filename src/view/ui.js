@@ -233,39 +233,60 @@ export function settingsMenu(scene, x, y, items, actions = [], { size = 84, dept
   return gear;
 }
 
-// Нижняя панель вкладок; активная — приподнята, крупнее и с подписью. tabs: [{ icon, label, scene, enabled }].
-export function tabBar(scene, tabs, active, { depth = 20 } = {}) {
+// Нижняя панель вкладок. Выделение — «стекло» как в iOS (полупрозрачная пластина с бликом и светлой кромкой);
+// оно скользит за прокруткой комнаты: setPosition(f), f — дробный номер вкладки (1.5 — посередине между 1 и 2).
+// Иконка под стеклом плавно приподнимается и растёт. tabs: [{ icon, label, enabled }]; onSelect(i) — тап по вкладке.
+export function tabBar(scene, tabs, onSelect, { depth = 20 } = {}) {
   const W = CONFIG.width;
   const H = CONFIG.height;
   const h = U.tabBarHeight;
-  const g = scene.add.graphics().setDepth(depth).setScrollFactor(0);
-  g.fillStyle(0x000000, 0.3).fillRect(0, H - h - 6, W, 6);
-  g.fillStyle(0x4b33a8, 1).fillRect(0, H - h, W, h);
-  g.fillStyle(0xf5b301, 1).fillRect(0, H - h, W, 6);
   const cell = W / tabs.length;
-  tabs.forEach((t, i) => {
+  const g = scene.add.graphics().setDepth(depth).setScrollFactor(0);
+  g.fillStyle(0x000000, 0.25).fillRect(0, H - h - 6, W, 6);
+  g.fillStyle(U.tabBarColor, U.tabBarAlpha).fillRect(0, H - h, W, h);
+  g.fillStyle(0xffffff, 0.18).fillRect(0, H - h, W, 3);
+
+  // стекло: рисуем один раз, двигаем контейнер
+  const gw = cell - 10;
+  const gh = h + 34;
+  const glass = scene.add.graphics();
+  glass.fillStyle(0x000000, 0.18).fillRoundedRect(-gw / 2 + 2, -gh / 2 + 6, gw, gh, 30);
+  glass.fillStyle(0xffffff, 0.16).fillRoundedRect(-gw / 2, -gh / 2, gw, gh, 30);
+  glass.fillStyle(0xffffff, 0.14).fillRoundedRect(-gw / 2 + 4, -gh / 2 + 4, gw - 8, gh * 0.42, { tl: 26, tr: 26, bl: 10, br: 10 });
+  glass.lineStyle(3, 0xffffff, 0.65).strokeRoundedRect(-gw / 2, -gh / 2, gw, gh, 30);
+  glass.lineStyle(2, 0x000000, 0.15).strokeRoundedRect(-gw / 2 + 3, -gh / 2 + 3, gw - 6, gh - 6, 27);
+  const label = scene.add.text(0, gh / 2 - 34, '', {
+    fontFamily: font(), fontStyle: 'bold', fontSize: '26px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 6,
+  }).setOrigin(0.5);
+  const glassBox = scene.add.container(0, H - gh / 2 - 4, [glass, label]).setDepth(depth + 1).setScrollFactor(0);
+
+  const icons = tabs.map((t, i) => {
     const x = cell * i + cell / 2;
-    if (i) g.fillStyle(0x3a2580, 1).fillRect(cell * i - 2, H - h + 6, 4, h - 6);
-    const isActive = t.scene === active;
-    if (isActive) {
-      g.fillStyle(0x000000, 0.25).fillRoundedRect(x - cell / 2 + 4, H - h - 34, cell - 8, h + 40, 26);
-      g.fillStyle(0x7b5cf0, 1).fillRoundedRect(x - cell / 2 + 4, H - h - 40, cell - 8, h + 40, 26);
-      g.lineStyle(5, 0xf5b301, 1).strokeRoundedRect(x - cell / 2 + 4, H - h - 40, cell - 8, h + 40, 26);
-    }
-    const iy = H - h / 2 - (isActive ? 34 : 0);
-    const icon = makeIcon(scene, t.icon, isActive ? 86 : 70).setPosition(x, iy).setDepth(depth + 1).setScrollFactor(0);
+    if (i) g.fillStyle(0x000000, 0.18).fillRect(cell * i - 1, H - h + 14, 2, h - 28);
+    const icon = makeIcon(scene, t.icon, 100).setPosition(x, H - h / 2).setDepth(depth + 2).setScrollFactor(0);
     if (t.enabled === false) icon.setAlpha(0.4);
-    if (isActive) {
-      scene.add.text(x, H - 30, t.label, {
-        fontFamily: font(), fontStyle: 'bold', fontSize: '28px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 6,
-      }).setOrigin(0.5).setDepth(depth + 1).setScrollFactor(0);
-    }
-    const zone = scene.add.zone(x, H - h / 2, cell, h).setDepth(depth + 2).setScrollFactor(0).setInteractive();
+    icon.base = icon.scale;
+    const zone = scene.add.zone(x, H - h / 2, cell, h).setDepth(depth + 3).setScrollFactor(0).setInteractive();
     zone.on('pointerdown', () => {
-      if (isActive) return;
-      sfx(scene, t.enabled === false ? 'sfx_invalid' : 'sfx_button');
-      if (t.enabled === false) return;
-      scene.tweens.add({ targets: icon, scale: icon.scale * 0.85, duration: 70, yoyo: true, onComplete: () => scene.scene.start(t.scene) });
+      if (t.enabled === false) return sfx(scene, 'sfx_invalid');
+      sfx(scene, 'sfx_button');
+      onSelect(i);
     });
+    return icon;
   });
+
+  const bar = {
+    zones: icons,
+    setPosition(f) {
+      glassBox.x = cell * f + cell / 2;
+      const near = Math.round(f);
+      label.setText(tabs[near].label);
+      icons.forEach((icon, i) => {
+        const t = Math.max(0, 1 - Math.abs(i - f)); // 1 — под стеклом, 0 — далеко
+        icon.y = H - h / 2 - 26 * t;
+        icon.setScale(icon.base * (0.7 + 0.18 * t));
+      });
+    },
+  };
+  return bar;
 }

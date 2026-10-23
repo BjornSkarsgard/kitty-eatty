@@ -164,7 +164,7 @@ export class PreloadScene extends Phaser.Scene {
 
   // Новичок — сразу в уровень; дошёл до map.homeFromLevel — на главный экран.
   firstScene() {
-    return unlockedLevel(LEVELS.length) + 1 < CONFIG.map.homeFromLevel ? 'Game' : 'Home';
+    return unlockedLevel(LEVELS.length) + 1 < CONFIG.map.homeFromLevel ? 'Game' : 'Room';
   }
 
   drawBar(p) {

@@ -59,7 +59,7 @@ export class GameScene extends Phaser.Scene {
     const U = CONFIG.ui;
     this.coinPill = counterPill(this, 30 + U.pillWidth / 2, U.topY, 'coin', coins());
     plate(this, CONFIG.width / 2, U.topY, `Уровень ${level.id}`, { color: level.puzzle ? 0x6b2fa8 : undefined });
-    addSettingsMenu(this, { onExit: () => this.scene.start('Home') });
+    addSettingsMenu(this, { onExit: () => this.scene.start('Room') });
 
     this.layoutBowls();
     this.createBowls();
@@ -635,7 +635,7 @@ export class GameScene extends Phaser.Scene {
 
     const next = () => this.scene.restart({ levelIndex: isLast ? 0 : this.levelIndex + 1 });
     box.add(makeButton(this, 0, WC.buttonY, isLast ? 'С начала' : 'Продолжить', next, { w: 440, h: 120, size: 52, color: 0x43c43a }));
-    box.add(iconButton(this, pw / 2 - 6, -ph / 2 + 4, 'close', () => this.scene.start('Home'), {
+    box.add(iconButton(this, pw / 2 - 6, -ph / 2 + 4, 'close', () => this.scene.start('Room'), {
       size: 92, shape: 'round', color: CONFIG.ui.exitColor, depth: 0,
     }));
 

@@ -78,15 +78,33 @@ export function makePortion(scene, colorIndex, w, h) {
   return p;
 }
 
-// Свет изнутри плитки: копия её формы, сложение цветов (ADD), прозрачность ведёт сцена. Не выходит за края плитки.
-export function makePortionShine(scene, p, color) {
-  let parts;
-  if (scene.textures.exists('portion_layer')) parts = makeLayer(scene, p.layerW, p.layerH, color, null);
-  else parts = [scene.add.graphics().fillStyle(color, 1).fillRoundedRect(-p.layerW / 2, -p.layerH / 2, p.layerW, p.layerH, 12)];
-  parts.forEach((o) => o.setBlendMode(Phaser.BlendModes.ADD));
-  const shine = scene.add.container(0, 0, parts).setAlpha(0);
-  p.addAt(shine, parts.length && p.list.length > 1 ? p.list.length - 1 : p.list.length); // под иконкой корма
-  return shine;
+// Золотой ореол вокруг плитки: размытый силуэт portion_glow (tools/portion-glow.mjs) под плиткой, сложение цветов,
+// прозрачность ведёт сцена. По ширине — не больше maxW (стекло банки), так что за банку свечение не выходит.
+export function makePortionHalo(scene, p, color, maxW) {
+  const key = 'portion_glow';
+  if (!scene.textures.exists(key)) return null;
+  const tex = scene.textures.get(key);
+  const { width: W, height: H } = tex.getSourceImage();
+  const pad = CONFIG.portion.glowPad;
+  const cap = CONFIG.portion.layerCap + pad;
+  if (!tex.has('l')) {
+    tex.add('l', 0, 0, 0, cap, H);
+    tex.add('m', 0, cap, 0, W - cap * 2, H);
+    tex.add('r', 0, W - cap, 0, cap, H);
+  }
+  const k = p.layerH / (H - pad * 2);
+  const h = H * k;
+  const w = Math.min(p.layerW + pad * 2 * k, maxW);
+  const cw = Math.min(cap * k, w / 2);
+  const parts = [
+    scene.add.image(-w / 2, 0, key, 'l').setOrigin(0, 0.5).setDisplaySize(cw, h),
+    scene.add.image(-w / 2 + cw, 0, key, 'm').setOrigin(0, 0.5).setDisplaySize(Math.max(0, w - cw * 2), h),
+    scene.add.image(w / 2 - cw, 0, key, 'r').setOrigin(0, 0.5).setDisplaySize(cw, h),
+  ];
+  parts.forEach((o) => o.setTint(color).setBlendMode(Phaser.BlendModes.ADD));
+  const halo = scene.add.container(0, 0, parts).setAlpha(0);
+  p.addAt(halo, 0); // под плиткой
+  return halo;
 }
 
 // Мягкое белое пятно (к краям прозрачное) — свет, рассеянный стеклом. Делается один раз.

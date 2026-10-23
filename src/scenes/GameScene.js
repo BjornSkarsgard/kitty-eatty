@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { Board } from '../core/Board.js';
-import { makePortion, makeFxTextures, makeJuteWrap, makePortionShine, makeSoftTexture } from '../view/draw.js';
+import { makePortion, makeFxTextures, makeJuteWrap, makePortionHalo, makeSoftTexture } from '../view/draw.js';
 import { beatPulse, beatPhase } from '../beat.js';
 import { CatView } from '../view/CatView.js';
 import { sfx, sfxRandom, music } from '../audio.js';
@@ -255,18 +255,18 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  // Порция из выбранной серии пульсирует в такт музыке (update): чуть увеличивается и светится изнутри.
+  // Порция из выбранной серии пульсирует в такт музыке (update): чуть увеличивается, вокруг — золотой ореол.
   pulse(p) {
     this.pulsing.add(p);
-    if (CONFIG.fx.enabled && !p.shine) p.shine = makePortionShine(this, p, CONFIG.fx.selectGlow);
+    if (CONFIG.fx.enabled && !p.halo) p.halo = makePortionHalo(this, p, CONFIG.fx.selectGlow, this.dim.bw - 2);
   }
 
   stopPulse(p) {
     this.pulsing.delete(p);
     p.setScale(1);
-    if (p.shine) {
-      p.shine.destroy();
-      p.shine = null;
+    if (p.halo) {
+      p.halo.destroy();
+      p.halo = null;
     }
   }
 
@@ -296,7 +296,7 @@ export class GameScene extends Phaser.Scene {
       const env = beatPulse(this);
       for (const p of this.pulsing) {
         p.setScale(1 + (A.selectPulse - 1) * env);
-        if (p.shine) p.shine.setAlpha(env * CONFIG.fx.shineAlpha);
+        if (p.halo) p.halo.setAlpha(env * CONFIG.fx.haloAlpha);
       }
       if (this.glass) this.glass.setAlpha(env * CONFIG.fx.glassAlpha);
     }

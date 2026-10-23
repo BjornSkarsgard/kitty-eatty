@@ -563,7 +563,7 @@ export class GameScene extends Phaser.Scene {
   // ---------- победа ----------
 
   // Окно победы (как в референсе): панель с табличкой «Уровень N» и крестиком, звёзды, похвала по звёздам,
-  // «Награды:» на подставке, зелёная «Продолжить». Крестик — домой.
+  // число ходов, «Награды:» на подставке, зелёная «Продолжить». Крестик — домой.
   showWin() {
     const W = CONFIG.width;
     const H = CONFIG.height;
@@ -603,6 +603,16 @@ export class GameScene extends Phaser.Scene {
     grad.addColorStop(0.75, '#ffa800');
     praise.setFill(grad);
     box.add(praise);
+
+    // ходы — на тёмной полоске, в стиле табличек окна
+    const moves = this.add.text(0, WC.movesY, `Ходов: ${this.board.history.length}  ·  минимум ${level.minMoves}`, {
+      fontFamily: font, fontStyle: 'bold', fontSize: '32px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 6,
+    }).setOrigin(0.5);
+    const mw = moves.width + 48;
+    const mg = this.add.graphics();
+    mg.fillStyle(0x3b27a0, 1).fillRoundedRect(-mw / 2, WC.movesY - 26, mw, 52, 26);
+    mg.lineStyle(3, 0x8f6be8, 1).strokeRoundedRect(-mw / 2, WC.movesY - 26, mw, 52, 26);
+    box.add([mg, moves]);
 
     box.add(this.add.text(0, WC.rewardsY - 92, 'Награды:', {
       fontFamily: font, fontStyle: 'bold', fontSize: '36px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 7,

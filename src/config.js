@@ -61,8 +61,8 @@ export const CONFIG = {
 
   // Окно победы: размеры панели и положения внутри неё (от центра панели); похвала — по числу звёзд (1, 2, 3).
   win: {
-    width: 600, height: 700, offsetY: -20,
-    starsY: -210, praiseY: -90, rewardsY: 90, buttonY: 260,
+    width: 600, height: 780, offsetY: -10,
+    starsY: -250, praiseY: -135, movesY: -45, rewardsY: 120, buttonY: 300,
     praise: ['Неплохо!', 'Отлично!', 'Идеально!'],
   },
 

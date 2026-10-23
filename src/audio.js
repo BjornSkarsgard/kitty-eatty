@@ -60,25 +60,39 @@ export function setupAudioFocus(game) {
     const snd = game.sound;
     if (!snd.context) return; // HTML5 Audio (без WebAudio) — оставляем как есть
     snd.pauseOnBlur = false;
+    const ctx = () => snd.context;
     const gain = snd.masterVolumeNode.gain;
     let timer = null;
+    // iOS может не дать включить звук без касания (InvalidStateError: Failed to start the audio device) —
+    // тогда ждём первого касания экрана и включаем по нему; до этого игра просто без звука.
+    const fadeIn = () => {
+      const now = ctx().currentTime;
+      gain.cancelScheduledValues(now);
+      gain.setValueAtTime(0, now);
+      gain.linearRampToValueAtTime(snd.volume, now + A.focusFadeIn / 1000);
+    };
+    const onTouch = () => {
+      document.removeEventListener('pointerdown', onTouch, true);
+      document.removeEventListener('touchend', onTouch, true);
+      ctx().resume().then(fadeIn).catch(() => {});
+    };
+    const resume = () => {
+      ctx().resume().then(fadeIn).catch(() => {
+        document.addEventListener('pointerdown', onTouch, true);
+        document.addEventListener('touchend', onTouch, true);
+      });
+    };
     document.addEventListener('visibilitychange', () => {
-      const ctx = snd.context;
-      const t = ctx.currentTime;
+      const t = ctx().currentTime;
       clearTimeout(timer);
       gain.cancelScheduledValues(t);
       gain.setValueAtTime(gain.value, t);
       if (document.hidden) {
         gain.linearRampToValueAtTime(0, t + A.focusFadeOut / 1000);
-        timer = setTimeout(() => ctx.suspend(), A.focusFadeOut + A.focusSuspendDelay);
+        timer = setTimeout(() => ctx().suspend().catch(() => {}), A.focusFadeOut + A.focusSuspendDelay);
       } else {
         gain.setValueAtTime(0, t);
-        ctx.resume().then(() => {
-          const now = ctx.currentTime;
-          gain.cancelScheduledValues(now);
-          gain.setValueAtTime(0, now);
-          gain.linearRampToValueAtTime(snd.volume, now + A.focusFadeIn / 1000);
-        });
+        resume();
       }
     });
   });

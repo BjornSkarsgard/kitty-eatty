@@ -42,6 +42,11 @@ export function currentLevel(count) {
   return Math.max(0, Math.min(d.current, d.unlocked, count - 1));
 }
 
+// Индекс самого дальнего открытого уровня — «край» прогресса на карте.
+export function unlockedLevel(count) {
+  return Math.max(0, Math.min(get().unlocked, count - 1));
+}
+
 export function setCurrentLevel(index) {
   const d = get();
   if (d.current === index) return;

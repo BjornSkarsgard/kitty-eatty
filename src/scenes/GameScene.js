@@ -236,10 +236,10 @@ export class GameScene extends Phaser.Scene {
   createButtons() {
     this.makeButton(CONFIG.width * 0.3, L.buttonsY, 'Отмена', () => this.undo());
     this.makeButton(CONFIG.width * 0.7, L.buttonsY, 'Заново', () => this.scene.restart({ levelIndex: this.levelIndex }));
+    this.makeButton(L.mapButtonX, L.titleY, 'Карта', () => this.scene.start('Map'), 15, 150);
   }
 
-  makeButton(x, y, label, onTap, depth = 0) {
-    const w = 220;
+  makeButton(x, y, label, onTap, depth = 0, w = 220) {
     const h = 84;
     const g = this.add.graphics();
     g.fillStyle(0x5f4b8b, 1);

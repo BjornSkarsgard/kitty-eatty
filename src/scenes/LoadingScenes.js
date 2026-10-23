@@ -1,6 +1,8 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { LOADING_KEYS, queueAssets } from '../assets.js';
+import { unlockedLevel } from '../save.js';
+import LEVELS from '../levels/levels.json';
 import { CatView } from '../view/CatView.js';
 import { Capsule } from '../view/Capsule.js';
 import { music } from '../audio.js';
@@ -61,7 +63,7 @@ export class PreloadScene extends Phaser.Scene {
     this.load.once('complete', () => {
       this.loadProgress = 1;
       const wait = Math.max(0, Lc.minDuration - (this.time.now - this.startedAt));
-      this.time.delayedCall(wait, () => this.scene.start('Game'));
+      this.time.delayedCall(wait, () => this.scene.start(this.firstScene()));
     });
     this.load.start();
   }
@@ -158,6 +160,13 @@ export class PreloadScene extends Phaser.Scene {
     this.barFill = new Capsule(this, x + inset, y, 'loading_bar_fill', B.height * B.fillHeight)
       .setTint(CONFIG.colors[CONFIG.loading.color].fill);
     this.barFillMax = B.width - 2 * inset;
+  }
+
+  // Новичок — сразу в уровень; дошёл до map.homeFromLevel — на главный экран.
+  // Комнаты кота пока нет — вместо неё карта.
+  firstScene() {
+    if (unlockedLevel(LEVELS.length) + 1 < CONFIG.map.homeFromLevel) return 'Game';
+    return this.scene.manager.keys.Home ? 'Home' : 'Map';
   }
 
   drawBar(p) {

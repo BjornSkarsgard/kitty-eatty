@@ -76,7 +76,8 @@ export class GameScene extends Phaser.Scene {
     for (let k = Math.ceil((P.top + half - P.y0) / P.dy); P.y0 + k * P.dy <= P.bottom - half; k++) {
       const y = P.y0 + k * P.dy;
       const shift = Math.abs(k) % 2 ? P.dx / 2 : 0;
-      for (let x = P.x0 + shift - Math.floor((P.x0 + shift - half) / P.dx) * P.dx; x <= src.width - half; x += P.dx) {
+      // по краям лапки могут уходить за экран наполовину, как обрезанный рисунок обоев
+      for (let x = P.x0 + shift - Math.floor((P.x0 + shift + half) / P.dx) * P.dx; x <= src.width + half; x += P.dx) {
         const pos = toScreen(x, y);
         this.add.image(pos.x, pos.y, 'paw').setScale(scale).setTint(P.color).setAlpha(P.alpha);
         lit.push(this.add.image(pos.x, pos.y, 'paw').setScale(scale).setTint(P.glow.color).setAlpha(0));

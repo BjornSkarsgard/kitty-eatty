@@ -7,11 +7,17 @@ export function sfx(scene, key, volume = 1) {
   if (has(scene, key)) scene.sound.play(key, { volume: CONFIG.audio.sfx * volume });
 }
 
-// Случайный из вариантов: sfxRandom(scene, 'sfx_meow', 3) → sfx_meow_1..3
+// Случайный из вариантов: sfxRandom(scene, 'sfx_meow', 3) → sfx_meow_1..3. Тот же вариант дважды подряд не играет.
+const lastVariant = {};
+
 export function sfxRandom(scene, base, count, volume = 1) {
   const keys = [];
   for (let i = 1; i <= count; i++) if (has(scene, `${base}_${i}`)) keys.push(`${base}_${i}`);
-  if (keys.length) sfx(scene, keys[Math.floor(Math.random() * keys.length)], volume);
+  const pool = keys.length > 1 ? keys.filter((k) => k !== lastVariant[base]) : keys;
+  if (!pool.length) return;
+  const key = pool[Math.floor(Math.random() * pool.length)];
+  lastVariant[base] = key;
+  sfx(scene, key, volume);
 }
 
 // Одна музыка на всю игру. Зацикливание с перекрёстным затуханием: за loopCrossfade мс до конца

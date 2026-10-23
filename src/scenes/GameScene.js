@@ -31,6 +31,7 @@ export class GameScene extends Phaser.Scene {
     this.board = new Board(level);
     this.selected = null;
     this.won = false;
+    this.lastFeedMeow = -Infinity;
     // Порядок хрустов на уровень, например 2 1 3: каждый кот берёт следующий, по кругу (2 1 3 2 1 …)
     this.chewOrder = Phaser.Utils.Array.Shuffle([1, 2, 3]);
     this.chewNext = 0;
@@ -278,7 +279,7 @@ export class GameScene extends Phaser.Scene {
     this.portions[to].push(...moved);
     this.selected = null;
 
-    this.fly(moved, from, to, startSlot);
+    this.fly(moved, to, startSlot);
     this.settleBowl(from); // если серия влезла не вся — остаток опускается обратно
 
     if (this.board.isComplete(to)) {
@@ -303,27 +304,30 @@ export class GameScene extends Phaser.Scene {
     const rec = this.board.undo();
     const moved = this.portions[rec.to].splice(-rec.n);
     this.portions[rec.from].push(...moved);
-    this.fly(moved, rec.to, rec.from, startSlot);
+    this.fly(moved, rec.from, startSlot);
     this.settleBowl(rec.to);
     this.drawBowl(rec.to);
   }
 
-  // Полёт порций дугой: вверх → над целевой банкой → вниз на место.
-  fly(sprites, from, to, startSlot) {
-    const arcY = Math.min(this.bowlRects[from].top, this.bowlRects[to].top) - A.moveUp;
-    const dstX = this.bowlRects[to].x;
+  // Полёт порций из банки в банку почти по прямой, с лёгким выгибом вверх (moveArc).
+  // Твинится свойство самой порции flyT, чтобы killTweensOf(p) останавливал и полёт.
+  fly(sprites, to, startSlot) {
     // верхняя порция летит первой
     sprites.slice().reverse().forEach((p, k) => {
       const slot = startSlot + sprites.length - 1 - k;
+      const dst = this.slotPos(to, slot);
       this.tweens.killTweensOf(p);
       p.setScale(1).setAlpha(1).setDepth(5);
-      this.tweens.chain({
-        targets: p,
-        tweens: [
-          { y: arcY, delay: k * A.moveStagger, duration: A.moveDuration, ease: 'Quad.easeOut' },
-          { x: dstX, duration: A.moveDuration, ease: 'Sine.easeInOut' },
-          { y: this.slotPos(to, slot).y, duration: A.moveDuration, ease: 'Quad.easeIn' },
-        ],
+      const x0 = p.x;
+      const y0 = p.y;
+      const arc = A.moveArc * this.dim.scale;
+      p.flyT = 0;
+      this.tweens.add({
+        targets: p, flyT: 1, delay: k * A.moveStagger, duration: A.moveDuration, ease: 'Sine.easeInOut',
+        onUpdate: () => {
+          const t = p.flyT;
+          p.setPosition(x0 + (dst.x - x0) * t, y0 + (dst.y - y0) * t - arc * 4 * t * (1 - t));
+        },
         onComplete: () => {
           p.setDepth(0);
           if (k === sprites.length - 1) sfx(this, 'sfx_drop');
@@ -365,7 +369,12 @@ export class GameScene extends Phaser.Scene {
 
     sfx(this, 'sfx_complete');
     this.fxStars.explode(10, r.x, r.top);
-    cat.meow();
+    // в конце уровня банки собираются одна за другой — мяукает только первый кот, остальные молча
+    if (this.time.now - this.lastFeedMeow >= CONFIG.audio.feedMeowCooldown) {
+      this.lastFeedMeow = this.time.now;
+      cat.meow();
+    }
+    cat.disableInteractive(); // пока кот у банки, он не перехватывает тапы по соседним банкам
 
     const eatY = r.top - CONFIG.jar.rimHeight * this.dim.scale - A.catEatOffsetY * cat.baseScale;
     cat.walkTo(r.x, eatY, () => {
@@ -383,7 +392,7 @@ export class GameScene extends Phaser.Scene {
         sfxRandom(this, 'sfx_purr', 3);
         this.wrapJar(bowl, color);
         this.fxHearts.explode(A.hearts, cat.x, cat.y - 60 * cat.baseScale);
-        cat.track(this.time.delayedCall(A.catReturnDelay, () => cat.walkTo(cat.home.x, cat.home.y)));
+        cat.track(this.time.delayedCall(A.catReturnDelay, () => cat.walkTo(cat.home.x, cat.home.y, () => cat.setInteractive())));
       });
     });
   }
@@ -400,7 +409,7 @@ export class GameScene extends Phaser.Scene {
       p.setScale(1).setAlpha(1);
     });
     this.unwrapJar(bowl);
-    cat.walkTo(cat.home.x, cat.home.y, () => cat.setMood('open'));
+    cat.walkTo(cat.home.x, cat.home.y, () => cat.setMood('open').setInteractive());
   }
 
   // Банку снизу вверх обматывает джут: каждый виток натягивается от центра к краям, затем выскакивает картинка корма.

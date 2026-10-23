@@ -2,8 +2,8 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 
-// Значок формы корма с центром в (0, 0), s — «радиус».
-export function drawShape(g, shape, s) {
+// Значок формы корма с центром в (0, 0), s — «радиус». chunky — толще лучи у звезды и креста (для мелких кусочков).
+export function drawShape(g, shape, s, chunky = false) {
   switch (shape) {
     case 'circle':
       g.fillCircle(0, 0, s);
@@ -20,17 +20,19 @@ export function drawShape(g, shape, s) {
     case 'star': {
       const pts = [];
       for (let i = 0; i < 10; i++) {
-        const r = i % 2 ? s * 0.45 : s;
+        const r = i % 2 ? s * (chunky ? 0.62 : 0.45) : s;
         const a = -Math.PI / 2 + (i * Math.PI) / 5;
         pts.push({ x: Math.cos(a) * r, y: Math.sin(a) * r });
       }
       g.fillPoints(pts, true);
       break;
     }
-    case 'cross':
-      g.fillRect(-s, -s * 0.3, s * 2, s * 0.6);
-      g.fillRect(-s * 0.3, -s, s * 0.6, s * 2);
+    case 'cross': {
+      const t = chunky ? 0.42 : 0.3;
+      g.fillRect(-s, -s * t, s * 2, s * t * 2);
+      g.fillRect(-s * t, -s, s * t * 2, s * 2);
       break;
+    }
     case 'heart':
       g.fillCircle(-s * 0.45, -s * 0.2, s * 0.5);
       g.fillCircle(s * 0.45, -s * 0.2, s * 0.5);
@@ -156,12 +158,12 @@ export function makeKibbleTextures(scene) {
     g.save();
     g.translateCanvas(T / 2, T / 2);
     g.fillStyle(CONFIG.outline, 1);
-    drawShape(g, shape, r + T * 0.08);
+    drawShape(g, shape, r + T * 0.08, true);
     g.fillStyle(darken(fill, 0.25), 1);
-    drawShape(g, shape, r);
+    drawShape(g, shape, r, true);
     g.translateCanvas(0, -T * 0.025);
     g.fillStyle(fill, 1);
-    drawShape(g, shape, r * 0.84);
+    drawShape(g, shape, r * 0.84, true);
     g.restore();
     g.fillStyle(0xffffff, 0.6).fillCircle(T / 2 - r * 0.32, T / 2 - r * 0.38, r * 0.17);
     g.generateTexture(`kibble_${i}`, T, T);
@@ -177,9 +179,9 @@ function makeKibblePortion(scene, colorIndex, w, h) {
   const size = h * K.size;
   const stepX = size * K.spacingX;
   const cols = Math.max(1, Math.floor((w - size) / stepX) + 1);
-  // ряды растянуты на всю высоту порции, чтобы соседние порции смыкались без щели
-  const minY = -h / 2 + size * 0.35;
-  const maxY = h / 2 - size * 0.35;
+  // ряды растянуты на всю высоту порции и чуть заходят на соседние — без щелей между порциями
+  const minY = -h / 2 + size * K.edge;
+  const maxY = h / 2 - size * K.edge;
   const rows = Math.max(2, Math.round((maxY - minY) / (size * K.spacingY)) + 1);
   const stepY = (maxY - minY) / (rows - 1);
   const spread = (w - size) / 2;

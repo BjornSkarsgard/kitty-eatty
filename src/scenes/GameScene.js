@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { Board } from '../core/Board.js';
-import { makePortion, makeFxTextures, makeJuteWrap, resetKibbles } from '../view/draw.js';
+import { makePortion, makeFxTextures, makeJuteWrap, makePileTextures, setPileCut, resetPile, grainKey } from '../view/draw.js';
 import { CatView } from '../view/CatView.js';
 import { sfx, sfxRandom, music } from '../audio.js';
 import LEVELS from '../levels/levels.json';
@@ -157,6 +157,7 @@ export class GameScene extends Phaser.Scene {
   createPortions() {
     const w = this.dim.bw - this.dim.pad * 2 - 4;
     const h = this.dim.ph - 6 * this.dim.scale;
+    if (CONFIG.portion.style === 'pile') makePileTextures(this, w, this.dim.ph, this.dim.scale);
     this.portions = this.board.bowls.map((bowl, i) => bowl.map((color, slot) => {
       const p = makePortion(this, color, w, h);
       const pos = this.slotPos(i, slot);
@@ -312,7 +313,7 @@ export class GameScene extends Phaser.Scene {
   // Полёт порций из банки в банку почти по прямой, с лёгким выгибом вверх (moveArc).
   // Твинится свойство самой порции flyT, чтобы killTweensOf(p) останавливал и полёт.
   fly(sprites, to, startSlot) {
-    if (sprites[0].kibbles) return this.pour(sprites, to, startSlot);
+    if (sprites[0].pile) return this.pour(sprites, to, startSlot);
     // верхняя порция летит первой
     sprites.slice().reverse().forEach((p, k) => {
       const slot = startSlot + sprites.length - 1 - k;
@@ -337,63 +338,86 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  // Кусочки пересыпаются струйкой. Улетает верхняя порция, в ней — верхние кусочки; ложатся снизу вверх.
-  // Порция-контейнер сразу встаёт на новое место, летят только кусочки внутри неё.
+  // Пересыпание горки: в банке A горка стаивает сверху, между банками летит струйка крупинок,
+  // в банке B горка насыпается снизу вверх. Порция-контейнер сразу встаёт на новое место.
   pour(sprites, to, startSlot) {
-    const K = CONFIG.kibble;
+    const P = CONFIG.pile;
     const s = this.dim.scale;
     const arc = A.moveArc * s;
     const order = sprites.slice().reverse();
-    // серия всегда одного цвета, поэтому первая улетевшая порция может лечь в нижний слот
+    // серия всегда одного цвета, поэтому первая высыпанная порция может лечь в нижний слот
     this.portions[to].splice(startSlot, order.length, ...order);
-    let delay = 0;
     order.forEach((p, k) => {
+      const img = p.pile;
+      const H = img.height;
+      const t0 = k * P.pourDuration;
+      const src = { x: p.x, y: p.y };
       const dst = this.slotPos(to, startSlot + k);
-      const ox = p.x - dst.x;
-      const oy = p.y - dst.y;
       this.tweens.killTweensOf(p);
-      this.tweens.killTweensOf(p.kibbles);
-      p.setPosition(dst.x, dst.y).setScale(1).setAlpha(1).setDepth(5);
-      const leaving = p.kibbles.slice().sort((a, b) => a.y - b.y);
-      const places = p.kibbles.map((kb) => ({ x: kb.restX, y: kb.restY })).sort((a, b) => b.y - a.y);
-      leaving.forEach((kb, i) => {
-        const x0 = kb.x + ox;
-        const y0 = kb.y + oy;
-        const { x: x1, y: y1 } = places[i];
-        const a0 = kb.angle;
-        kb.restX = x1;
-        kb.restY = y1;
-        kb.restAngle = a0 + Phaser.Math.Between(-K.spin, K.spin);
-        kb.setPosition(x0, y0).setScale(kb.restScale).setAlpha(1);
-        kb.flyT = 0;
-        const last = k === order.length - 1 && i === leaving.length - 1;
-        this.tweens.add({
-          targets: kb, flyT: 1, delay, duration: K.flyDuration, ease: 'Sine.easeInOut',
-          onUpdate: () => {
-            const t = kb.flyT;
-            kb.setPosition(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t - arc * 4 * t * (1 - t));
-            kb.angle = a0 + (kb.restAngle - a0) * t;
-          },
-          onComplete: () => {
-            this.tweens.add({ targets: kb, y: y1 - K.bounce * s, duration: K.bounceDuration, yoyo: true, ease: 'Quad.easeOut' });
-            if (i === leaving.length - 1) p.setDepth(0);
-            if (last) sfx(this, 'sfx_drop');
-          },
-        });
-        delay += K.stagger;
+      this.tweens.killTweensOf(img);
+
+      // банка A: копия горки стаивает сверху
+      const ghost = this.add.image(src.x, src.y, img.texture.key).setFlipX(img.flipX);
+      setPileCut(ghost, img.cut);
+      this.tweens.add({
+        targets: ghost, cut: H, delay: t0, duration: P.pourDuration,
+        onUpdate: () => setPileCut(ghost, ghost.cut), onComplete: () => ghost.destroy(),
       });
+
+      // банка B: горка насыпается снизу вверх
+      p.setPosition(dst.x, dst.y).setScale(1).setAlpha(1).setDepth(0);
+      setPileCut(img, H);
+      this.tweens.add({
+        targets: img, cut: 0, delay: t0 + P.flyDuration * 0.7, duration: P.pourDuration,
+        onUpdate: () => setPileCut(img, img.cut),
+        onComplete: () => { if (k === order.length - 1) sfx(this, 'sfx_drop'); },
+      });
+
+      // струйка: крупинки с поверхности горки A на поверхность B
+      for (let i = 0; i < P.streamGrains; i++) {
+        const f = i / P.streamGrains;
+        const x0 = src.x + (Math.random() - 0.5) * this.dim.bw * 0.4;
+        const y0 = src.y - H / 2 + H * f;
+        const x1 = dst.x + (Math.random() - 0.5) * this.dim.bw * 0.5;
+        const y1 = dst.y + H / 2 - H * f;
+        this.flyGrain(p.color, x0, y0, x1, y1, arc, t0 + f * P.pourDuration, P.flyDuration);
+      }
     });
   }
 
-  // Кот ест порцию: кусочки сверху вниз по одному улетают ко рту (x, y — точка в мире) и исчезают.
-  eatKibbles(p, x, y, duration, track) {
-    const list = p.kibbles.slice().sort((a, b) => a.y - b.y);
-    list.forEach((kb, i) => {
-      track(this.tweens.add({
-        targets: kb, x: x - p.x, y: y - p.y, scale: 0, delay: (i / list.length) * duration * 0.6,
-        duration: duration * 0.4, ease: 'Back.easeIn',
-      }));
+  // Одна летящая крупинка (объект живёт только на время полёта).
+  flyGrain(color, x0, y0, x1, y1, arc, delay, duration, shrink = false) {
+    const g = this.add.image(x0, y0, grainKey(color)).setDepth(6).setVisible(false)
+      .setScale((CONFIG.pile.grain * this.dim.scale) / 24).setAngle(Phaser.Math.Between(0, 359));
+    g.t = 0;
+    const s0 = g.scale;
+    const spin = Phaser.Math.Between(-240, 240);
+    return this.tweens.add({
+      targets: g, t: 1, delay, duration, ease: 'Sine.easeIn',
+      onStart: () => g.setVisible(true),
+      onUpdate: () => {
+        const t = g.t;
+        g.setPosition(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t - arc * 4 * t * (1 - t));
+        g.angle += spin / 60;
+        if (shrink) g.setScale(s0 * (1 - t));
+      },
+      onComplete: () => g.destroy(),
     });
+  }
+
+  // Кот ест порцию-горку: она стаивает сверху, несколько крупинок летят ко рту (x, y — точка в мире).
+  // Крупинки не привязаны к коту: при отмене хода они просто долетают и исчезают.
+  eatPile(p, x, y, duration, track) {
+    const P = CONFIG.pile;
+    const img = p.pile;
+    track(this.tweens.add({
+      targets: img, cut: img.height, duration: duration * 0.6,
+      onUpdate: () => setPileCut(img, img.cut),
+    }));
+    for (let i = 0; i < P.eatGrains; i++) {
+      const x0 = p.x + (Math.random() - 0.5) * this.dim.bw * 0.5;
+      this.flyGrain(p.color, x0, p.y - img.height * 0.3, x, y, 0, (i / P.eatGrains) * duration * 0.5, duration * 0.4, true);
+    }
   }
 
   // ---------- коты ----------
@@ -442,8 +466,8 @@ export class GameScene extends Phaser.Scene {
       const food = this.portions[bowl].slice().reverse(); // сверху вниз
       cat.eat(food.length, (k) => {
         if (k === 0) sfx(this, `sfx_chew_${this.chewOrder[this.chewNext++ % this.chewOrder.length]}`, 0.8);
-        // порция подлетает ко рту и исчезает (кусочки — по одному)
-        if (food[k].kibbles) this.eatKibbles(food[k], r.x, r.top, A.eatPerPortion, (t) => cat.track(t));
+        // порция подлетает ко рту и исчезает (горка — стаивает, крупинки летят ко рту)
+        if (food[k].pile) this.eatPile(food[k], r.x, r.top, A.eatPerPortion, (t) => cat.track(t));
         else cat.track(this.tweens.add({
           targets: food[k], y: r.top, scale: 0, alpha: 0, duration: A.eatPerPortion * 0.5, ease: 'Back.easeIn',
         }));
@@ -468,7 +492,7 @@ export class GameScene extends Phaser.Scene {
     this.portions[bowl].forEach((p) => {
       this.tweens.killTweensOf(p);
       p.setScale(1).setAlpha(1);
-      resetKibbles(this, p);
+      resetPile(this, p);
     });
     this.unwrapJar(bowl);
     cat.walkTo(cat.home.x, cat.home.y, () => cat.setMood('open').setInteractive());

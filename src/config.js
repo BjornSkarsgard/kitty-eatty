@@ -42,7 +42,7 @@ export const CONFIG = {
 
   outline: 0x1b1426,     // толстый тёмный контур
   outlineWidth: 6,
-  bowlDoneStroke: 0xffd43b, // ободок собранной банки
+  bowlDoneStroke: 0xffd43b, // цвет звёздочек, когда банка собрана
 
   // Порция корма в банке
   portion: {
@@ -54,16 +54,9 @@ export const CONFIG = {
 
   // Банка для корма (рисуется кодом)
   jar: {
-    glass: 0xdfe7ff,      // стекло
-    glassAlpha: 0.16,
-    rim: 0xcfd8ff,        // горлышко
-    rimHeight: 16,
-    rimOverhang: 6,       // насколько горлышко шире банки с каждой стороны
-    base: 0x8c6a4f,       // подставка-миска снизу
-    baseHeight: 18,
-    baseOverhang: 12,
-    highlightAlpha: 0.35, // блик на стекле
-    radius: 18,
+    // картинка банки (jar_back — целиком, jar_front — горлышко, донышко, край и блики поверх корма; tools/jar-layers.mjs).
+    // В пикселях файла: до top — горлышко, от bottom — донышко, между ними стенки растягиваются по высоте; edge — край стекла.
+    art: { top: 88, bottom: 570, edge: 6 },
   },
 
   // Когтеточка: собранную и съеденную банку обматывает джут цвета корма, сверху — картинка корма
@@ -92,7 +85,7 @@ export const CONFIG = {
     sideMargin: 24,     // отступ мисок от краёв экрана
     bowlWidth: 120,
     portionHeight: 58,
-    bowlPadding: 10,
+    bowlPadding: 10,    // запас под горлышком над верхней порцией
     bowlGapX: 40,
     bowlGapY: 80,
     buttonsY: 1212,

@@ -60,11 +60,17 @@ export class GameScene extends Phaser.Scene {
   // ---------- раскладка ----------
 
   // Подбираем число рядов так, чтобы банки были как можно крупнее, и масштабируем размеры под экран.
+  // Банка — картинка jar_back: сверху горлышко, снизу донышко, стенки между ними растягиваются по высоте.
+  // bowlRects: top — верх стенок (горлышко выше него), bottom — низ донышка (стоит на столе).
   layoutBowls() {
     const n = this.board.bowls.length;
-    const bh0 = this.board.capacity * L.portionHeight + L.bowlPadding * 2;
+    const tex = this.textures.get('jar_back').getSourceImage();
+    const art = CONFIG.jar.art;
+    const neck = (bw) => (art.top * bw) / tex.width;
+    const base = (bw) => ((tex.height - art.bottom) * bw) / tex.width;
+    const bh0 = this.board.capacity * L.portionHeight + L.bowlPadding + base(L.bowlWidth);
     const availW = CONFIG.width - L.sideMargin * 2;
-    const availH = L.bowlsBottom - L.bowlsTop;
+    const availH = L.bowlsBottom - L.bowlsTop - neck(L.bowlWidth);
     let best = null;
     for (let rows = 1; rows <= 4; rows++) {
       const perRow = Math.ceil(n / rows);
@@ -74,15 +80,19 @@ export class GameScene extends Phaser.Scene {
       if (perRow <= L.maxPerRow && (!best || scale > best.scale + 0.001)) best = { rows, perRow, scale };
     }
     const { rows, perRow, scale } = best;
+    const bw = L.bowlWidth * scale;
     const d = (this.dim = {
-      bw: L.bowlWidth * scale,
+      bw,
       ph: L.portionHeight * scale,
       pad: L.bowlPadding * scale,
       gx: L.bowlGapX * scale,
       gy: L.bowlGapY * scale,
+      neck: neck(bw),   // высота горлышка над верхом стенок
+      base: base(bw),   // высота донышка
+      k: bw / tex.width, // пикселей экрана на пиксель картинки банки
       scale,
     });
-    const bh = this.board.capacity * d.ph + d.pad * 2;
+    const bh = this.board.capacity * d.ph + d.pad + d.base;
     const totalH = rows * bh + (rows - 1) * d.gy;
     const top0 = L.bowlsBottom - totalH; // нижний ряд стоит на столе
 
@@ -101,62 +111,50 @@ export class GameScene extends Phaser.Scene {
   slotPos(bowl, slot) {
     const r = this.bowlRects[bowl];
     const d = this.dim;
-    return { x: r.x, y: r.bottom - d.pad - d.ph / 2 - slot * d.ph };
+    return { x: r.x, y: r.bottom - d.base - d.ph / 2 - slot * d.ph };
+  }
+
+  // Верх горлышка банки — сюда кот наклоняется есть.
+  mouthY(bowl) {
+    return this.bowlRects[bowl].top - this.dim.neck;
   }
 
   // ---------- создание объектов ----------
 
   createBowls() {
-    // Банка из двух слоёв: задний (стекло, горлышко, подставка) под кормом, передний (блик) над ним.
-    this.jarFront = this.bowlRects.map((r) => this.add.graphics({ x: r.x, y: 0 }).setDepth(1));
+    // Банка из двух картинок: jar_back (стекло, тёмное нутро) под кормом, jar_front (горлышко, донышко, блики) над ним.
+    for (const key of ['jar_back', 'jar_front']) {
+      const tex = this.textures.get(key);
+      if (tex.has('top')) continue;
+      const { width: W, height: H } = tex.getSourceImage();
+      const { top, bottom } = CONFIG.jar.art;
+      tex.add('top', 0, 0, 0, W, top);
+      tex.add('mid', 0, 0, top, W, bottom - top);
+      tex.add('bot', 0, 0, bottom, W, H - bottom);
+    }
+    this.jarBack = this.bowlRects.map((r) => this.makeJar('jar_back', r).setDepth(0));
+    this.jarFront = this.bowlRects.map((r) => this.makeJar('jar_front', r).setDepth(1));
     this.wraps = this.bowlRects.map(() => null); // обмотка-когтеточка съеденной банки
-    this.bowlGfx = this.bowlRects.map((r, i) => {
-      const g = this.add.graphics({ x: r.x, y: 0 });
-      const zone = this.add.zone(r.x, (r.top + r.bottom) / 2, this.dim.bw + this.dim.gx * 0.9, r.bottom - r.top + this.dim.gy * 0.9)
-        .setInteractive();
+    this.bowlRects.forEach((r, i) => {
+      const zone = this.add.zone(r.x, (r.top - this.dim.neck + r.bottom) / 2, this.dim.bw + this.dim.gx * 0.9,
+        r.bottom - r.top + this.dim.neck + this.dim.gy * 0.9).setInteractive();
       zone.on('pointerdown', () => this.onBowlTap(i));
-      return g;
     });
-    this.bowlGfx.forEach((_, i) => this.drawBowl(i));
   }
 
-  drawBowl(i) {
-    const J = CONFIG.jar;
-    const g = this.bowlGfx[i];
-    const front = this.jarFront[i];
-    const r = this.bowlRects[i];
-    const s = this.dim.scale;
-    const done = this.board.isComplete(i);
-    const bw = this.dim.bw;
-    const h = r.bottom - r.top;
-    const rad = J.radius * s;
-    const lw = CONFIG.outlineWidth * Math.max(0.6, s);
-
-    g.clear();
-    // подставка-миска
-    const bo = J.baseOverhang * s;
-    const by = r.bottom - J.baseHeight * s * 0.4;
-    g.fillStyle(J.base, 1).fillRoundedRect(-bw / 2 - bo, by, bw + bo * 2, J.baseHeight * s, rad * 0.6);
-    g.lineStyle(lw, CONFIG.outline, 1).strokeRoundedRect(-bw / 2 - bo, by, bw + bo * 2, J.baseHeight * s, rad * 0.6);
-    // стекло
-    g.fillStyle(J.glass, J.glassAlpha).fillRoundedRect(-bw / 2, r.top, bw, h, rad);
-    g.lineStyle(lw, CONFIG.outline, 1).strokeRoundedRect(-bw / 2, r.top, bw, h, rad);
-    // горлышко
-    const ro = J.rimOverhang * s;
-    const rh = J.rimHeight * s;
-    g.fillStyle(done ? CONFIG.bowlDoneStroke : J.rim, 1).fillRoundedRect(-bw / 2 - ro, r.top - rh / 2, bw + ro * 2, rh, rh / 2);
-    g.lineStyle(lw, CONFIG.outline, 1).strokeRoundedRect(-bw / 2 - ro, r.top - rh / 2, bw + ro * 2, rh, rh / 2);
-
-    // блик поверх корма
-    front.clear();
-    front.fillStyle(0xffffff, J.highlightAlpha);
-    front.fillRoundedRect(-bw / 2 + 7 * s, r.top + rh, 9 * s, h - rh * 2, 4 * s);
-    front.fillCircle(-bw / 2 + 11.5 * s, r.bottom - rh * 0.6, 4.5 * s);
+  // Банка из трёх кусков картинки: горлышко и донышко как есть, стенки растянуты по высоте.
+  makeJar(key, r) {
+    const { k, neck, base } = this.dim;
+    const top = this.add.image(0, r.top - neck, key, 'top').setOrigin(0.5, 0).setScale(k);
+    const mid = this.add.image(0, r.top, key, 'mid').setOrigin(0.5, 0).setScale(k);
+    mid.setDisplaySize(mid.displayWidth, r.bottom - base - r.top);
+    const bot = this.add.image(0, r.bottom - base, key, 'bot').setOrigin(0.5, 0).setScale(k);
+    return this.add.container(r.x, 0, [top, mid, bot]);
   }
 
   createPortions() {
-    const w = this.dim.bw - this.dim.pad * 2 - 4;
-    const h = this.dim.ph - 6 * this.dim.scale;
+    const w = this.dim.bw - CONFIG.jar.art.edge * 2 * this.dim.k - 2;
+    const h = this.dim.ph - 4 * this.dim.scale;
     this.portions = this.board.bowls.map((bowl, i) => bowl.map((color, slot) => {
       const p = makePortion(this, color, w, h);
       const pos = this.slotPos(i, slot);
@@ -260,7 +258,7 @@ export class GameScene extends Phaser.Scene {
 
   shake(i) {
     sfx(this, 'sfx_invalid');
-    const layers = [this.bowlGfx[i], this.jarFront[i], this.wraps[i]].filter(Boolean);
+    const layers = [this.jarBack[i], this.jarFront[i], this.wraps[i]].filter(Boolean);
     const x = this.bowlRects[i].x;
     this.tweens.killTweensOf(layers);
     layers.forEach((l) => { l.x = x; });
@@ -283,7 +281,6 @@ export class GameScene extends Phaser.Scene {
     this.settleBowl(from); // если серия влезла не вся — остаток опускается обратно
 
     if (this.board.isComplete(to)) {
-      this.drawBowl(to);
       this.feed(this.board.bowls[to][0], to);
     }
     if (this.board.isSolved()) {
@@ -306,7 +303,6 @@ export class GameScene extends Phaser.Scene {
     this.portions[rec.from].push(...moved);
     this.fly(moved, rec.from, startSlot);
     this.settleBowl(rec.to);
-    this.drawBowl(rec.to);
   }
 
   // Полёт порций из банки в банку почти по прямой, с лёгким выгибом вверх (moveArc).
@@ -368,7 +364,8 @@ export class GameScene extends Phaser.Scene {
     cat.stopActions().setMood('open');
 
     sfx(this, 'sfx_complete');
-    this.fxStars.explode(10, r.x, r.top);
+    const mouthY = this.mouthY(bowl);
+    this.fxStars.explode(10, r.x, mouthY);
     // в конце уровня банки собираются одна за другой — мяукает только первый кот, остальные молча
     if (this.time.now - this.lastFeedMeow >= CONFIG.audio.feedMeowCooldown) {
       this.lastFeedMeow = this.time.now;
@@ -376,7 +373,7 @@ export class GameScene extends Phaser.Scene {
     }
     cat.disableInteractive(); // пока кот у банки, он не перехватывает тапы по соседним банкам
 
-    const eatY = r.top - CONFIG.jar.rimHeight * this.dim.scale - A.catEatOffsetY * cat.baseScale;
+    const eatY = mouthY - A.catEatOffsetY * cat.baseScale;
     cat.walkTo(r.x, eatY, () => {
       cat.setMood('happy');
       const food = this.portions[bowl].slice().reverse(); // сверху вниз
@@ -384,10 +381,10 @@ export class GameScene extends Phaser.Scene {
         if (k === 0) sfx(this, `sfx_chew_${this.chewOrder[this.chewNext++ % this.chewOrder.length]}`, 0.8);
         // порция подлетает ко рту и исчезает
         cat.track(this.tweens.add({
-          targets: food[k], y: r.top, scale: 0, alpha: 0, duration: A.eatPerPortion * 0.5, ease: 'Back.easeIn',
+          targets: food[k], y: mouthY, scale: 0, alpha: 0, duration: A.eatPerPortion * 0.5, ease: 'Back.easeIn',
         }));
         this.fxCrumbs.setParticleTint(CONFIG.colors[color].fill);
-        this.fxCrumbs.explode(A.crumbs, r.x, r.top);
+        this.fxCrumbs.explode(A.crumbs, r.x, mouthY);
       }, () => {
         sfxRandom(this, 'sfx_purr', 3);
         this.wrapJar(bowl, color);
@@ -418,8 +415,8 @@ export class GameScene extends Phaser.Scene {
     const J = CONFIG.jute;
     const r = this.bowlRects[bowl];
     const s = this.dim.scale;
-    const top = r.top + CONFIG.jar.rimHeight * s / 2;
-    const bottom = r.bottom - CONFIG.jar.baseHeight * s * 0.4;
+    const top = r.top;
+    const bottom = r.bottom - this.dim.base;
     const wrap = makeJuteWrap(this, color, this.dim.bw, top, bottom, s).setPosition(r.x, 0).setDepth(2);
     this.wraps[bowl] = wrap;
     wrap.bands.forEach((b, k) => {

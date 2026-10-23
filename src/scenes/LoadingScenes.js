@@ -58,9 +58,17 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   // Стенки миски уходят от проёма к краям экрана (кольца темнеют), в центре — светлый проём с ободком.
+  // Есть картинка loading_bowl — рисуем её (проём на ней уже залит), иначе — кольцами.
   drawBowl() {
     const Lc = CONFIG.loading;
     const { x, y } = this.center;
+    if (this.textures.exists('loading_bowl')) {
+      const A = Lc.bowlArt;
+      this.add.rectangle(0, 0, CONFIG.width, CONFIG.height, Lc.wallDark).setOrigin(0); // если картинка не закроет экран
+      const img = this.add.image(x, y, 'loading_bowl');
+      img.setOrigin(A.cx / img.width, A.cy / img.height).setScale(Lc.radius / A.rim);
+      return;
+    }
     const g = this.add.graphics();
     g.fillStyle(Lc.wallDark, 1).fillRect(0, 0, CONFIG.width, CONFIG.height);
     const rings = 5;

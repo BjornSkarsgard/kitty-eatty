@@ -51,46 +51,6 @@ export function drawShape(g, shape, s) {
   }
 }
 
-// Порция корма. portion.style = 'pile' — горка крупинок (текстуры заранее, makePileTextures), 'blocks' — цветной слой с иконкой.
-export function makePortion(scene, colorIndex, w, h) {
-  if (CONFIG.portion.style === 'pile') return makePilePortion(scene, colorIndex);
-  return makeBlockPortion(scene, colorIndex, w, h);
-}
-
-// Цветной слой + иконка корма (картинка food_N, если есть, иначе значок формы).
-function makeBlockPortion(scene, colorIndex, w, h) {
-  const { fill: color, shape } = CONFIG.colors[colorIndex];
-  const key = `food_${colorIndex}`;
-  const hasArt = scene.textures.exists(key);
-  // с картинкой корма слой светлее, чтобы корм того же цвета на нём выделялся;
-  // у очень светлых цветов (белый) — наоборот, чуть темнее
-  const fill = !hasArt ? color
-    : luminance(color) > 0.85 ? darken(color, CONFIG.portion.layerDarken) : lighten(color, CONFIG.portion.layerLighten);
-  const r = Math.min(12, h * 0.25);
-  const g = scene.add.graphics();
-  g.fillStyle(fill, 1);
-  g.fillRoundedRect(-w / 2, -h / 2, w, h, r);
-  g.fillStyle(0x000000, 0.12); // один тон тени снизу
-  g.fillRoundedRect(-w / 2, h * 0.15, w, h * 0.35, { tl: 0, tr: 0, bl: r, br: r });
-  g.fillStyle(0xffffff, 0.35); // белый блик
-  g.fillRoundedRect(-w / 2 + 6, -h / 2 + 5, w * 0.3, h * 0.16, h * 0.08);
-  g.lineStyle(4, CONFIG.outline, 1);
-  g.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
-  const parts = [g];
-  if (hasArt) {
-    const img = scene.add.image(0, 0, key);
-    // вписываем в рамку внутри слоя, чтобы корм не упирался в края
-    img.setScale(Math.min((h * CONFIG.portion.iconHeight) / img.height, (w * CONFIG.portion.iconWidth) / img.width));
-    parts.push(img);
-  } else {
-    g.fillStyle(CONFIG.outline, 0.6);
-    drawShape(g, shape, h * 0.3);
-  }
-  const p = scene.add.container(0, 0, parts);
-  p.color = colorIndex;
-  return p;
-}
-
 // Когтеточка: витки джута цвета корма вокруг банки от bottom до top (центр по x = 0) и картинка корма поверх.
 // Витки — отдельные графики (container.bands, снизу вверх), чтобы их можно было наматывать по одному.
 export function makeJuteWrap(scene, colorIndex, w, top, bottom, s) {
@@ -142,8 +102,8 @@ function mix(a, b, k) {
   return (ch(16) << 16) | (ch(8) << 8) | ch(0);
 }
 
-// ---------- горка корма (portion.style = 'pile') ----------
-// Крупинки рисуются один раз в текстуру горки (по несколько вариантов на цвет). В покое порция — одна картинка,
+// ---------- корм: горка крупинок ----------
+// Крупинки рисуются один раз в текстуры (по несколько вариантов на цвет). В покое порция — одна картинка,
 // поэтому крупинок может быть сколько угодно без нагрузки. Отдельными объектами летят только крупинки струйки.
 const GRAIN_TEX = 24;
 
@@ -179,40 +139,70 @@ export function grainKey(colorIndex) {
   return `grain_${colorIndex}_${Math.floor(Math.random() * 3)}`;
 }
 
-// Текстуры горок под размер порции текущего уровня: pile_<цвет>_<вариант>, ширина w, высота с заходом на соседей.
-export function makePileTextures(scene, w, h, scale) {
+export function grainScale(scale) {
+  return (CONFIG.pile.grain * scale) / GRAIN_TEX;
+}
+
+// Насыпать крупинки в область: inside(x, y) — попадает ли точка. Под крупинками — сплошная тёмная подложка
+// (её рисует вызывающий), поэтому просветов нет. Объём: ранние крупинки «в глубине» темнее, у краёв темнее.
+function stampGrains(dt, c, W, H, gs, count, inside) {
+  const P = CONFIG.pile;
+  dt.beginDraw();
+  for (let i = 0, tries = 0; i < count && tries < count * 4; tries++) {
+    const k = gs * Phaser.Math.FloatBetween(1 - P.grainJitter, 1 + P.grainJitter);
+    const x = Phaser.Math.FloatBetween(0, W);
+    const y = Phaser.Math.FloatBetween(0, H);
+    if (!inside(x, y)) continue;
+    const dx = (x / W - 0.5) * 2;
+    const shade = Math.round(255 * (1 - P.shade * (1 - i / count)) * (1 - P.sideShade * dx * dx));
+    dt.stamp(grainKey(c), null, x, y, {
+      scale: k / GRAIN_TEX, angle: Phaser.Math.Between(0, 359), tint: (shade << 16) | (shade << 8) | shade, skipBatch: true,
+    });
+    i++;
+  }
+  dt.endDraw();
+}
+
+function freshTexture(scene, key, W, H) {
+  if (scene.textures.exists(key)) scene.textures.remove(key);
+  return scene.textures.addDynamicTexture(key, W, H);
+}
+
+// Текстуры под размеры текущего уровня:
+// pile_<цвет>_<вариант> — порция в банке: ширина w (во всю банку), сверху высота ph, снизу «язык» крупинок,
+// который заходит на порцию ниже — граница порций неровная и без щели;
+// heap_<цвет> — горка в миске (верхняя половина эллипса).
+export function makeFoodTextures(scene, w, ph, scale, heapW, heapH) {
   const P = CONFIG.pile;
   makeGrainTextures(scene);
   const W = Math.ceil(w);
-  const H = Math.ceil(h * (1 + P.overlap * 2));
+  const H = Math.ceil(ph * (1 + P.overlap));
   const gs = P.grain * scale;
   const count = Math.round(((W * H) / (gs * gs)) * P.density);
-  CONFIG.colors.forEach((_, c) => {
+  const g = scene.make.graphics({ add: false });
+  CONFIG.colors.forEach(({ fill }, c) => {
     for (let v = 0; v < P.variants; v++) {
-      const key = `pile_${c}_${v}`;
-      if (scene.textures.exists(key)) scene.textures.remove(key);
-      const dt = scene.textures.addDynamicTexture(key, W, H);
-      dt.beginDraw();
-      for (let i = 0; i < count; i++) {
-        const k = gs * Phaser.Math.FloatBetween(1 - P.grainJitter, 1 + P.grainJitter);
-        const x = Phaser.Math.FloatBetween(k * 0.4, W - k * 0.4);
-        const y = Phaser.Math.FloatBetween(k * 0.4, H - k * 0.4);
-        // объём: нарисованные раньше — «в глубине», они темнее; у стенок банки темнее, как у цилиндра
-        const dx = (x / W - 0.5) * 2;
-        const shade = Math.round(255 * (1 - P.shade * (1 - i / count)) * (1 - P.sideShade * dx * dx));
-        dt.stamp(grainKey(c), null, x, y, {
-          scale: k / GRAIN_TEX, angle: Phaser.Math.Between(0, 359), tint: (shade << 16) | (shade << 8) | shade, skipBatch: true,
-        });
-      }
-      dt.endDraw();
+      const dt = freshTexture(scene, `pile_${c}_${v}`, W, H);
+      g.clear().fillStyle(darken(fill, 0.45), 1).fillRect(0, gs * 0.5, W, ph - gs * 0.5);
+      dt.draw(g);
+      stampGrains(dt, c, W, H, gs, count, () => true);
     }
+    const hw = Math.ceil(heapW);
+    const hh = Math.ceil(heapH);
+    const dt = freshTexture(scene, `heap_${c}`, hw, hh);
+    const inEllipse = (x, y) => ((x - hw / 2) / (hw / 2)) ** 2 + ((y - hh) / (hh - gs * 0.4)) ** 2 <= 1;
+    g.clear().fillStyle(darken(fill, 0.45), 1).fillEllipse(hw / 2, hh, hw - gs, (hh - gs * 0.5) * 2);
+    dt.draw(g);
+    stampGrains(dt, c, hw, hh, gs, Math.round(((hw * hh * 0.8) / (gs * gs)) * P.density), inEllipse);
   });
+  g.destroy();
 }
 
-// Порция-горка: контейнер с одной картинкой. pile.cut — сколько пикселей сверху срезано (0 — полная).
-function makePilePortion(scene, colorIndex) {
+// Порция-горка: контейнер с одной картинкой. Точка (0, 0) — центр порции (без нижнего «языка»).
+// pile.cut — сколько пикселей сверху срезано (0 — полная).
+export function makePortion(scene, colorIndex, ph) {
   const img = scene.add.image(0, 0, `pile_${colorIndex}_${Math.floor(Math.random() * CONFIG.pile.variants)}`);
-  img.setFlipX(Math.random() < 0.5);
+  img.setOrigin(0.5, ph / 2 / img.height).setFlipX(Math.random() < 0.5);
   img.cut = 0;
   const p = scene.add.container(0, 0, [img]);
   p.color = colorIndex;
@@ -228,13 +218,40 @@ export function setPileCut(img, cut) {
 
 // Вернуть горку целиком (кот её «съел», а ход отменили).
 export function resetPile(scene, p) {
-  if (!p.pile) return;
   scene.tweens.killTweensOf(p.pile);
   setPileCut(p.pile, 0);
 }
 
-function luminance(c) {
-  return (0.299 * ((c >> 16) & 255) + 0.587 * ((c >> 8) & 255) + 0.114 * (c & 255)) / 255;
+// Миска для кормления: (0, 0) — центр ободка. heap — горка корма (по умолчанию пустая, cut = высота).
+export function makeFoodBowl(scene, colorIndex, bw, scale) {
+  const B = CONFIG.foodBowl;
+  const W = bw * B.width;
+  const BH = bw * B.height;
+  const rimH = W * 0.24;
+  const lw = CONFIG.outlineWidth * Math.max(0.6, scale);
+  const color = CONFIG.colors[colorIndex].fill;
+  const back = scene.add.graphics();
+  back.fillStyle(B.inside, 1).fillEllipse(0, 0, W, rimH);
+  back.lineStyle(lw, CONFIG.outline, 1).strokeEllipse(0, 0, W, rimH);
+  const heap = scene.add.image(0, rimH * 0.15, `heap_${colorIndex}`).setOrigin(0.5, 1);
+  setPileCut(heap, heap.height);
+  // передняя стенка: корпус-трапеция, сверху вырезана нижняя половина ободка (сквозь неё видно горку)
+  const body = [{ x: -W / 2, y: 0 }, { x: -W * 0.36, y: BH }, { x: W * 0.36, y: BH }, { x: W / 2, y: 0 }];
+  for (let i = 1; i < 16; i++) {
+    const a = (i / 16) * Math.PI;
+    body.push({ x: (W / 2) * Math.cos(a), y: (rimH / 2) * Math.sin(a) });
+  }
+  const lip = rimH / 2;
+  const front = scene.add.graphics();
+  front.fillStyle(B.color, 1).fillPoints(body, true);
+  front.fillStyle(color, 1).fillRect(-W * 0.38, lip + (BH - lip) * 0.3, W * 0.76, BH * B.band); // полоска цвета кота
+  front.fillStyle(0x000000, 0.14).fillRect(-W * 0.37, BH * 0.8, W * 0.74, BH * 0.2); // тень снизу
+  front.fillStyle(0xffffff, 0.5).fillRoundedRect(-W * 0.36, lip + BH * 0.05, W * 0.1, BH * 0.16, BH * 0.06); // блик
+  front.lineStyle(lw, CONFIG.outline, 1).strokePoints(body, true);
+  const c = scene.add.container(0, 0, [back, heap, front]);
+  c.heap = heap;
+  c.rimH = rimH;
+  return c;
 }
 
 function darken(c, k) {

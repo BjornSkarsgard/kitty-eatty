@@ -1,7 +1,9 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { Board } from '../core/Board.js';
-import { makePortion, makeFxTextures, makeJuteWrap, makePileTextures, setPileCut, resetPile, grainKey } from '../view/draw.js';
+import {
+  makePortion, makeFxTextures, makeJuteWrap, makeFoodTextures, makeFoodBowl, setPileCut, resetPile, grainKey, grainScale,
+} from '../view/draw.js';
 import { CatView } from '../view/CatView.js';
 import { sfx, sfxRandom, music } from '../audio.js';
 import LEVELS from '../levels/levels.json';
@@ -50,11 +52,24 @@ export class GameScene extends Phaser.Scene {
       stroke: '#1b1426', strokeThickness: 8,
     }).setOrigin(0.5).setDepth(15);
 
+    this.locked = new Set(); // банки, которые сейчас летят или наполняются — их не трогаем
+    this.feeding = {};       // банка → миска, пока кот ест
+    this.dimBackground();
     this.layoutBowls();
     this.createBowls();
     this.createPortions();
     this.createCats();
     this.createButtons();
+    this.scheduleGlint();
+  }
+
+  // Затемнение стены за банками: цвета корма ярче.
+  dimBackground() {
+    const D = CONFIG.bgDim;
+    const top = L.bowlsTop - 40;
+    this.add.graphics()
+      .fillGradientStyle(D.color, D.color, D.color, D.color, D.top, D.top, D.bottom, D.bottom)
+      .fillRect(0, top, CONFIG.width, L.bowlsBottom - top);
   }
 
   // ---------- раскладка ----------
@@ -80,6 +95,7 @@ export class GameScene extends Phaser.Scene {
       pad: L.bowlPadding * scale,
       gx: L.bowlGapX * scale,
       gy: L.bowlGapY * scale,
+      lw: CONFIG.outlineWidth * Math.max(0.6, scale),
       scale,
     });
     const bh = this.board.capacity * d.ph + d.pad * 2;
@@ -98,70 +114,82 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  slotPos(bowl, slot) {
-    const r = this.bowlRects[bowl];
+  // Центр порции в координатах банки (0, 0 — центр банки). Нижняя порция стоит на подставке.
+  slotY(jar, slot) {
     const d = this.dim;
-    return { x: r.x, y: r.bottom - d.pad - d.ph / 2 - slot * d.ph };
+    return jar.h / 2 - CONFIG.jar.baseHeight * d.scale * 0.4 - d.ph / 2 - slot * d.ph;
   }
 
   // ---------- создание объектов ----------
 
+  // Банка — контейнер: свечение (выбрана), стекло, корм, передний слой (тень, блики, контур, подставка, горлышко).
+  // Контур и подставка рисуются поверх корма, поэтому горка уходит под стекло без просветов у стенок.
   createBowls() {
-    // Банка из двух слоёв: задний (стекло, горлышко, подставка) под кормом, передний (блик) над ним.
-    this.jarFront = this.bowlRects.map((r) => this.add.graphics({ x: r.x, y: 0 }).setDepth(1));
-    this.wraps = this.bowlRects.map(() => null); // обмотка-когтеточка съеденной банки
-    this.bowlGfx = this.bowlRects.map((r, i) => {
-      const g = this.add.graphics({ x: r.x, y: 0 });
-      const zone = this.add.zone(r.x, (r.top + r.bottom) / 2, this.dim.bw + this.dim.gx * 0.9, r.bottom - r.top + this.dim.gy * 0.9)
-        .setInteractive();
+    this.jars = this.bowlRects.map((r, i) => {
+      const h = r.bottom - r.top;
+      const home = { x: r.x, y: r.top + h / 2 };
+      const glow = this.add.graphics().setAlpha(0);
+      const back = this.add.graphics();
+      const content = this.add.container(0, 0);
+      const front = this.add.graphics();
+      const jar = this.add.container(home.x, home.y, [glow, back, content, front]).setDepth(1);
+      Object.assign(jar, { glow, back, content, front, home, h, wrap: null });
+      const zone = this.add.zone(r.x, home.y, this.dim.bw + this.dim.gx * 0.9, h + this.dim.gy * 0.9).setInteractive();
       zone.on('pointerdown', () => this.onBowlTap(i));
-      return g;
+      return jar;
     });
-    this.bowlGfx.forEach((_, i) => this.drawBowl(i));
+    this.jars.forEach((_, i) => this.drawJar(i));
   }
 
-  drawBowl(i) {
+  drawJar(i) {
     const J = CONFIG.jar;
-    const g = this.bowlGfx[i];
-    const front = this.jarFront[i];
-    const r = this.bowlRects[i];
-    const s = this.dim.scale;
-    const done = this.board.isComplete(i);
-    const bw = this.dim.bw;
-    const h = r.bottom - r.top;
+    const jar = this.jars[i];
+    const { bw, lw, scale: s } = this.dim;
+    const h = jar.h;
+    const top = -h / 2;
     const rad = J.radius * s;
-    const lw = CONFIG.outlineWidth * Math.max(0.6, s);
+    const rh = J.rimHeight * s;
+    const done = this.board.isComplete(i);
 
-    g.clear();
-    // подставка-миска
-    const bo = J.baseOverhang * s;
-    const by = r.bottom - J.baseHeight * s * 0.4;
-    g.fillStyle(J.base, 1).fillRoundedRect(-bw / 2 - bo, by, bw + bo * 2, J.baseHeight * s, rad * 0.6);
-    g.lineStyle(lw, CONFIG.outline, 1).strokeRoundedRect(-bw / 2 - bo, by, bw + bo * 2, J.baseHeight * s, rad * 0.6);
+    const glowPad = 8 * s;
+    jar.glow.clear().fillStyle(J.glow, 1).fillRoundedRect(-bw / 2 - glowPad, top - glowPad, bw + glowPad * 2, h + glowPad * 2, rad + glowPad);
+
+    jar.back.clear().fillStyle(J.glass, J.glassAlpha).fillRoundedRect(-bw / 2, top, bw, h, rad);
+
+    const f = jar.front.clear();
+    // объём цилиндра: справа тень, слева светлее
+    const k = 0x000000;
+    f.fillGradientStyle(k, k, k, k, 0, J.shadeAlpha, 0, J.shadeAlpha).fillRect(0, top + rad * 0.5, bw / 2 - lw / 2, h - rad);
+    const w = 0xffffff;
+    f.fillGradientStyle(w, w, w, w, 0.14, 0, 0.14, 0).fillRect(-bw / 2 + lw / 2, top + rad * 0.5, bw * 0.3, h - rad);
+    // блики: широкий и тонкий слева, тонкий справа, искорка внизу
+    f.fillStyle(0xffffff, J.highlightAlpha).fillRoundedRect(-bw / 2 + 7 * s, top + rh, 9 * s, h - rh * 2, 4 * s);
+    f.fillStyle(0xffffff, J.highlightAlpha * 0.5).fillRoundedRect(-bw / 2 + 20 * s, top + rh * 1.5, 3 * s, h * 0.45, 1.5 * s);
+    f.fillStyle(0xffffff, J.highlightAlpha * 0.4).fillRoundedRect(bw / 2 - 9 * s, top + rh * 1.5, 3 * s, h - rh * 3, 1.5 * s);
+    f.fillStyle(0xffffff, J.highlightAlpha).fillCircle(-bw / 2 + 11.5 * s, h / 2 - rh * 1.2, 4.5 * s);
     // стекло
-    g.fillStyle(J.glass, J.glassAlpha).fillRoundedRect(-bw / 2, r.top, bw, h, rad);
-    g.lineStyle(lw, CONFIG.outline, 1).strokeRoundedRect(-bw / 2, r.top, bw, h, rad);
+    f.lineStyle(lw, CONFIG.outline, 1).strokeRoundedRect(-bw / 2, top, bw, h, rad);
+    // подставка
+    const bo = J.baseOverhang * s;
+    const by = h / 2 - J.baseHeight * s * 0.4;
+    f.fillStyle(J.base, 1).fillRoundedRect(-bw / 2 - bo, by, bw + bo * 2, J.baseHeight * s, rad * 0.6);
+    f.fillStyle(0xffffff, 0.25).fillRoundedRect(-bw / 2 - bo + 4 * s, by + 3 * s, bw * 0.5, 4 * s, 2 * s);
+    f.lineStyle(lw, CONFIG.outline, 1).strokeRoundedRect(-bw / 2 - bo, by, bw + bo * 2, J.baseHeight * s, rad * 0.6);
     // горлышко
     const ro = J.rimOverhang * s;
-    const rh = J.rimHeight * s;
-    g.fillStyle(done ? CONFIG.bowlDoneStroke : J.rim, 1).fillRoundedRect(-bw / 2 - ro, r.top - rh / 2, bw + ro * 2, rh, rh / 2);
-    g.lineStyle(lw, CONFIG.outline, 1).strokeRoundedRect(-bw / 2 - ro, r.top - rh / 2, bw + ro * 2, rh, rh / 2);
-
-    // блик поверх корма
-    front.clear();
-    front.fillStyle(0xffffff, J.highlightAlpha);
-    front.fillRoundedRect(-bw / 2 + 7 * s, r.top + rh, 9 * s, h - rh * 2, 4 * s);
-    front.fillCircle(-bw / 2 + 11.5 * s, r.bottom - rh * 0.6, 4.5 * s);
+    f.fillStyle(done ? CONFIG.bowlDoneStroke : J.rim, 1).fillRoundedRect(-bw / 2 - ro, top - rh / 2, bw + ro * 2, rh, rh / 2);
+    f.fillStyle(0xffffff, 0.4).fillRoundedRect(-bw / 2 - ro + rh * 0.4, top - rh / 2 + rh * 0.2, bw * 0.45, rh * 0.25, rh * 0.12);
+    f.lineStyle(lw, CONFIG.outline, 1).strokeRoundedRect(-bw / 2 - ro, top - rh / 2, bw + ro * 2, rh, rh / 2);
   }
 
   createPortions() {
-    const w = this.dim.bw - this.dim.pad * 2 - 4;
-    const h = this.dim.ph - 6 * this.dim.scale;
-    if (CONFIG.portion.style === 'pile') makePileTextures(this, w, this.dim.ph, this.dim.scale);
+    const d = this.dim;
+    const fb = CONFIG.foodBowl;
+    makeFoodTextures(this, d.bw - d.lw * 0.5, d.ph, d.scale, d.bw * fb.width * 0.86, d.bw * fb.width * 0.3);
     this.portions = this.board.bowls.map((bowl, i) => bowl.map((color, slot) => {
-      const p = makePortion(this, color, w, h);
-      const pos = this.slotPos(i, slot);
-      p.setPosition(pos.x, pos.y);
+      const p = makePortion(this, color, d.ph);
+      p.setPosition(0, this.slotY(this.jars[i], slot));
+      this.jars[i].content.add(p);
       return p;
     }));
   }
@@ -208,10 +236,32 @@ export class GameScene extends Phaser.Scene {
     return btn;
   }
 
+  // Время от времени по стеклу случайной банки пробегает блик.
+  scheduleGlint() {
+    const G = CONFIG.glint;
+    this.time.delayedCall(Phaser.Math.Between(G.minDelay, G.maxDelay), () => {
+      const free = this.jars.filter((j, i) => !this.locked.has(i) && !j.wrap);
+      if (free.length) this.glint(Phaser.Utils.Array.GetRandom(free));
+      this.scheduleGlint();
+    });
+  }
+
+  glint(jar) {
+    const G = CONFIG.glint;
+    const { bw, scale: s } = this.dim;
+    const rh = CONFIG.jar.rimHeight * s;
+    const w = G.width * s;
+    const g = this.add.graphics().fillStyle(0xffffff, 1).fillRoundedRect(-w / 2, -jar.h / 2 + rh, w, jar.h - rh * 2, w / 2);
+    g.setAlpha(0).setX(-bw / 2 + w);
+    jar.add(g);
+    this.tweens.add({ targets: g, x: bw / 2 - w, duration: G.duration, ease: 'Sine.easeInOut', onComplete: () => g.destroy() });
+    this.tweens.add({ targets: g, alpha: G.alpha, duration: G.duration / 2, yoyo: true, ease: 'Sine.easeInOut' });
+  }
+
   // ---------- ввод ----------
 
   onBowlTap(i) {
-    if (this.won) return;
+    if (this.won || this.locked.has(i)) return;
     if (this.selected === null) {
       if (this.board.canPick(i)) this.select(i);
       else this.shake(i);
@@ -231,43 +281,40 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  // Выбранная банка приподнимается и светится.
   select(i) {
     sfx(this, 'sfx_pick');
     this.selected = i;
-    const run = this.board.topRun(i);
-    this.portions[i].slice(-run).forEach((p, k, arr) => {
-      const slot = this.portions[i].length - arr.length + k;
-      this.tweens.killTweensOf(p);
-      this.tweens.add({ targets: p, y: this.slotPos(i, slot).y - A.liftY * this.dim.scale, duration: A.liftDuration, ease: 'Quad.easeOut' });
-    });
+    const jar = this.jars[i];
+    this.tweens.killTweensOf(jar);
+    this.tweens.add({ targets: jar, y: jar.home.y - A.liftY * this.dim.scale, duration: A.liftDuration, ease: 'Quad.easeOut' });
+    this.tweens.killTweensOf(jar.glow);
+    jar.glow.setAlpha(CONFIG.jar.glowAlpha);
+    this.tweens.add({ targets: jar.glow, alpha: CONFIG.jar.glowAlpha * 0.4, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
   }
 
   deselect() {
     if (this.selected === null) return;
-    const i = this.selected;
+    const jar = this.jars[this.selected];
     this.selected = null;
-    this.settleBowl(i);
+    this.glowOff(jar);
+    this.tweens.killTweensOf(jar);
+    this.tweens.add({ targets: jar, x: jar.home.x, y: jar.home.y, angle: 0, duration: A.liftDuration, ease: 'Quad.easeOut' });
   }
 
-  // Плавно ставит все порции банки на свои места.
-  settleBowl(i) {
-    this.portions[i].forEach((p, slot) => {
-      const pos = this.slotPos(i, slot);
-      this.tweens.killTweensOf(p);
-      p.setScale(1).setAlpha(1);
-      this.tweens.add({ targets: p, x: pos.x, y: pos.y, duration: A.liftDuration, ease: 'Quad.easeOut' });
-    });
+  glowOff(jar) {
+    this.tweens.killTweensOf(jar.glow);
+    jar.glow.setAlpha(0);
   }
 
   shake(i) {
     sfx(this, 'sfx_invalid');
-    const layers = [this.bowlGfx[i], this.jarFront[i], this.wraps[i]].filter(Boolean);
-    const x = this.bowlRects[i].x;
-    this.tweens.killTweensOf(layers);
-    layers.forEach((l) => { l.x = x; });
+    const jar = this.jars[i];
+    this.tweens.killTweensOf(jar);
+    jar.setPosition(jar.home.x, jar.home.y);
     this.tweens.add({
-      targets: layers, x: x + A.shakeDistance, duration: A.shakeDuration, yoyo: true, repeat: 1,
-      onComplete: () => layers.forEach((l) => { l.x = x; }),
+      targets: jar, x: jar.home.x + A.shakeDistance, duration: A.shakeDuration, yoyo: true, repeat: 1,
+      onComplete: () => jar.setX(jar.home.x),
     });
   }
 
@@ -279,14 +326,13 @@ export class GameScene extends Phaser.Scene {
     const moved = this.portions[from].splice(-n);
     this.portions[to].push(...moved);
     this.selected = null;
+    this.glowOff(this.jars[from]);
 
-    this.fly(moved, to, startSlot);
-    this.settleBowl(from); // если серия влезла не вся — остаток опускается обратно
-
-    if (this.board.isComplete(to)) {
-      this.drawBowl(to);
-      this.feed(this.board.bowls[to][0], to);
-    }
+    const complete = this.board.isComplete(to);
+    if (complete) this.drawJar(to);
+    this.pourJar(from, to, moved, startSlot, () => {
+      if (complete && this.board.isComplete(to)) this.feed(this.board.bowls[to][0], to);
+    });
     if (this.board.isSolved()) {
       this.won = true;
       this.time.delayedCall(A.winDelay, () => this.showWin());
@@ -294,7 +340,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   undo() {
-    if (this.won) return;
+    if (this.won || this.locked.size) return;
     this.deselect();
     const last = this.board.history[this.board.history.length - 1];
     if (!last) return;
@@ -305,119 +351,104 @@ export class GameScene extends Phaser.Scene {
     const rec = this.board.undo();
     const moved = this.portions[rec.to].splice(-rec.n);
     this.portions[rec.from].push(...moved);
-    this.fly(moved, rec.from, startSlot);
-    this.settleBowl(rec.to);
-    this.drawBowl(rec.to);
+    this.drawJar(rec.to);
+    this.pourJar(rec.to, rec.from, moved, startSlot);
   }
 
-  // Полёт порций из банки в банку почти по прямой, с лёгким выгибом вверх (moveArc).
-  // Твинится свойство самой порции flyT, чтобы killTweensOf(p) останавливал и полёт.
-  fly(sprites, to, startSlot) {
-    if (sprites[0].pile) return this.pour(sprites, to, startSlot);
-    // верхняя порция летит первой
-    sprites.slice().reverse().forEach((p, k) => {
-      const slot = startSlot + sprites.length - 1 - k;
-      const dst = this.slotPos(to, slot);
-      this.tweens.killTweensOf(p);
-      p.setScale(1).setAlpha(1).setDepth(5);
-      const x0 = p.x;
-      const y0 = p.y;
-      const arc = A.moveArc * this.dim.scale;
-      p.flyT = 0;
-      this.tweens.add({
-        targets: p, flyT: 1, delay: k * A.moveStagger, duration: A.moveDuration, ease: 'Sine.easeInOut',
-        onUpdate: () => {
-          const t = p.flyT;
-          p.setPosition(x0 + (dst.x - x0) * t, y0 + (dst.y - y0) * t - arc * 4 * t * (1 - t));
-        },
-        onComplete: () => {
-          p.setDepth(0);
-          if (k === sprites.length - 1) sfx(this, 'sfx_drop');
-        },
-      });
-    });
+  // Поза наклонённой банки: горлышко в точке (mx, my), наклон angle (градусы, + — горлышком вправо).
+  pourPose(jar, mx, my, angle) {
+    const a = Phaser.Math.DegToRad(angle);
+    const m = jar.h / 2 + CONFIG.jar.rimHeight * this.dim.scale * 0.3; // от центра до горлышка
+    return { x: mx - m * Math.sin(a), y: my + m * Math.cos(a), angle };
   }
 
-  // Пересыпание горки: в банке A горка стаивает сверху, между банками летит струйка крупинок,
-  // в банке B горка насыпается снизу вверх. Порция-контейнер сразу встаёт на новое место.
-  pour(sprites, to, startSlot) {
-    const P = CONFIG.pile;
+  // Банка A поднимается, летит к банке B, наклоняется и пересыпает: горка в A стаивает сверху,
+  // струйка крупинок падает в B, там горка насыпается снизу вверх. Потом A возвращается на место.
+  // Обе банки на это время заблокированы; onDone — когда B наполнилась.
+  pourJar(from, to, moved, startSlot, onDone) {
+    const P = CONFIG.pour;
     const s = this.dim.scale;
-    const arc = A.moveArc * s;
-    const order = sprites.slice().reverse();
+    const S = this.jars[from];
+    const T = this.jars[to];
+    this.locked.add(from).add(to);
+    const dir = S.home.x < T.home.x ? 1 : S.home.x > T.home.x ? -1 : T.home.x < CONFIG.width / 2 ? -1 : 1;
+    const mouth = { x: T.home.x, y: T.home.y - T.h / 2 - P.gap * s };
+    const pose = this.pourPose(S, mouth.x, mouth.y, dir * P.tilt);
+    this.tweens.killTweensOf(S);
+    S.setDepth(8);
+    this.tweens.add({ targets: S, ...pose, duration: P.flyDuration, ease: 'Sine.easeInOut' });
+
     // серия всегда одного цвета, поэтому первая высыпанная порция может лечь в нижний слот
+    const order = moved.slice().reverse();
     this.portions[to].splice(startSlot, order.length, ...order);
+    const pd = P.portionDuration;
     order.forEach((p, k) => {
       const img = p.pile;
-      const H = img.height;
-      const t0 = k * P.pourDuration;
-      const src = { x: p.x, y: p.y };
-      const dst = this.slotPos(to, startSlot + k);
-      this.tweens.killTweensOf(p);
+      const t0 = P.flyDuration + k * pd;
       this.tweens.killTweensOf(img);
-
-      // банка A: копия горки стаивает сверху
-      const ghost = this.add.image(src.x, src.y, img.texture.key).setFlipX(img.flipX);
+      // в A остаётся копия горки, она стаивает сверху (со стороны горлышка)
+      const ghost = this.add.image(p.x, p.y, img.texture.key).setOrigin(img.originX, img.originY).setFlipX(img.flipX);
       setPileCut(ghost, img.cut);
+      S.content.add(ghost);
       this.tweens.add({
-        targets: ghost, cut: H, delay: t0, duration: P.pourDuration,
+        targets: ghost, cut: img.height, delay: t0, duration: pd,
         onUpdate: () => setPileCut(ghost, ghost.cut), onComplete: () => ghost.destroy(),
       });
-
-      // банка B: горка насыпается снизу вверх
-      p.setPosition(dst.x, dst.y).setScale(1).setAlpha(1).setDepth(0);
-      setPileCut(img, H);
+      // сама порция переезжает в B и насыпается снизу вверх
+      S.content.remove(p);
+      T.content.add(p);
+      const y = this.slotY(T, startSlot + k);
+      p.setPosition(0, y);
+      setPileCut(img, img.height);
+      const last = k === order.length - 1;
       this.tweens.add({
-        targets: img, cut: 0, delay: t0 + P.flyDuration * 0.7, duration: P.pourDuration,
+        targets: img, cut: 0, delay: t0 + P.fallDuration, duration: pd,
         onUpdate: () => setPileCut(img, img.cut),
-        onComplete: () => { if (k === order.length - 1) sfx(this, 'sfx_drop'); },
+        onComplete: () => {
+          if (!last) return;
+          sfx(this, 'sfx_drop');
+          this.locked.delete(to);
+          if (onDone) onDone();
+        },
       });
-
-      // струйка: крупинки с поверхности горки A на поверхность B
+      // струйка: из горлышка на растущую горку
       for (let i = 0; i < P.streamGrains; i++) {
         const f = i / P.streamGrains;
-        const x0 = src.x + (Math.random() - 0.5) * this.dim.bw * 0.4;
-        const y0 = src.y - H / 2 + H * f;
-        const x1 = dst.x + (Math.random() - 0.5) * this.dim.bw * 0.5;
-        const y1 = dst.y + H / 2 - H * f;
-        this.flyGrain(p.color, x0, y0, x1, y1, arc, t0 + f * P.pourDuration, P.flyDuration);
+        const y1 = T.home.y + y + this.dim.ph / 2 - this.dim.ph * f;
+        this.flyGrain(p.color, mouth.x + (Math.random() - 0.5) * 6 * s, mouth.y,
+          T.home.x + (Math.random() - 0.5) * this.dim.bw * 0.5, y1, t0 + f * pd, P.fallDuration);
       }
+    });
+
+    // банка A возвращается
+    const back = P.flyDuration + order.length * pd;
+    this.tweens.add({
+      targets: S, x: S.home.x, y: S.home.y, angle: 0, delay: back, duration: P.returnDuration, ease: 'Sine.easeInOut',
+      onComplete: () => {
+        S.setDepth(1);
+        this.locked.delete(from);
+      },
     });
   }
 
-  // Одна летящая крупинка (объект живёт только на время полёта).
-  flyGrain(color, x0, y0, x1, y1, arc, delay, duration, shrink = false) {
-    const g = this.add.image(x0, y0, grainKey(color)).setDepth(6).setVisible(false)
-      .setScale((CONFIG.pile.grain * this.dim.scale) / 24).setAngle(Phaser.Math.Between(0, 359));
+  // Одна летящая крупинка (объект живёт только на время полёта). Падает с ускорением.
+  flyGrain(color, x0, y0, x1, y1, delay, duration, shrink = false) {
+    const g = this.add.image(x0, y0, grainKey(color)).setDepth(9).setVisible(false)
+      .setScale(grainScale(this.dim.scale)).setAngle(Phaser.Math.Between(0, 359));
     g.t = 0;
     const s0 = g.scale;
     const spin = Phaser.Math.Between(-240, 240);
     return this.tweens.add({
-      targets: g, t: 1, delay, duration, ease: 'Sine.easeIn',
+      targets: g, t: 1, delay, duration, ease: 'Quad.easeIn',
       onStart: () => g.setVisible(true),
       onUpdate: () => {
         const t = g.t;
-        g.setPosition(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t - arc * 4 * t * (1 - t));
+        g.setPosition(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t);
         g.angle += spin / 60;
         if (shrink) g.setScale(s0 * (1 - t));
       },
       onComplete: () => g.destroy(),
     });
-  }
-
-  // Кот ест порцию-горку: она стаивает сверху, несколько крупинок летят ко рту (x, y — точка в мире).
-  // Крупинки не привязаны к коту: при отмене хода они просто долетают и исчезают.
-  eatPile(p, x, y, duration, track) {
-    const P = CONFIG.pile;
-    const img = p.pile;
-    track(this.tweens.add({
-      targets: img, cut: img.height, duration: duration * 0.6,
-      onUpdate: () => setPileCut(img, img.cut),
-    }));
-    for (let i = 0; i < P.eatGrains; i++) {
-      const x0 = p.x + (Math.random() - 0.5) * this.dim.bw * 0.5;
-      this.flyGrain(p.color, x0, p.y - img.height * 0.3, x, y, 0, (i / P.eatGrains) * duration * 0.5, duration * 0.4, true);
-    }
   }
 
   // ---------- коты ----------
@@ -443,71 +474,138 @@ export class GameScene extends Phaser.Scene {
     }).setDepth(22);
   }
 
-  // Банка собрана: кот мяукает, прыгает к банке, ест (голова ныряет, крошки, хруст),
-  // радуется (сердечки) и прыгает обратно. Ввод всё это время не блокируется.
-  feed(color, bowl) {
+  // Банка собрана: перед ней появляется миска, банка поднимается и высыпает в неё весь корм, возвращается.
+  // Кот тем временем мяукает и идёт к миске; когда и корм насыпан, и кот пришёл — ест (горка в миске
+  // уменьшается, хруст, крошки), радуется, миска исчезает, банку обматывает джут. Ввод не блокируется.
+  feed(color, j) {
     const cat = this.cats[color];
-    const r = this.bowlRects[bowl];
-    cat.fedBowl = bowl;
+    const jar = this.jars[j];
+    const P = CONFIG.pour;
+    const FB = CONFIG.foodBowl;
+    const { bw, scale: s } = this.dim;
+    const r = this.bowlRects[j];
+    const track = (t) => cat.track(t);
+    cat.fedBowl = j;
     cat.stopActions().setMood('open');
 
     sfx(this, 'sfx_complete');
-    this.fxStars.explode(10, r.x, r.top);
+    this.fxStars.explode(10, jar.home.x, jar.home.y - jar.h / 2);
     // в конце уровня банки собираются одна за другой — мяукает только первый кот, остальные молча
     if (this.time.now - this.lastFeedMeow >= CONFIG.audio.feedMeowCooldown) {
       this.lastFeedMeow = this.time.now;
       cat.meow();
     }
-    cat.disableInteractive(); // пока кот у банки, он не перехватывает тапы по соседним банкам
+    cat.disableInteractive(); // пока кот у миски, он не перехватывает тапы по банкам
 
-    const eatY = r.top - CONFIG.jar.rimHeight * this.dim.scale - A.catEatOffsetY * cat.baseScale;
-    cat.walkTo(r.x, eatY, () => {
-      cat.setMood('happy');
-      const food = this.portions[bowl].slice().reverse(); // сверху вниз
-      cat.eat(food.length, (k) => {
-        if (k === 0) sfx(this, `sfx_chew_${this.chewOrder[this.chewNext++ % this.chewOrder.length]}`, 0.8);
-        // порция подлетает ко рту и исчезает (горка — стаивает, крупинки летят ко рту)
-        if (food[k].pile) this.eatPile(food[k], r.x, r.top, A.eatPerPortion, (t) => cat.track(t));
-        else cat.track(this.tweens.add({
-          targets: food[k], y: r.top, scale: 0, alpha: 0, duration: A.eatPerPortion * 0.5, ease: 'Back.easeIn',
-        }));
-        this.fxCrumbs.setParticleTint(CONFIG.colors[color].fill);
-        this.fxCrumbs.explode(A.crumbs, r.x, r.top);
-      }, () => {
-        sfxRandom(this, 'sfx_purr', 3);
-        this.wrapJar(bowl, color);
-        this.fxHearts.explode(A.hearts, cat.x, cat.y - 60 * cat.baseScale);
-        cat.track(this.time.delayedCall(A.catReturnDelay, () => cat.walkTo(cat.home.x, cat.home.y, () => cat.setInteractive())));
-      });
+    // миска стоит на столе перед банкой
+    const bowl = makeFoodBowl(this, color, bw, s);
+    const rimY = r.bottom - bw * FB.height + 6 * s;
+    bowl.setPosition(r.x, rimY).setDepth(11).setScale(0);
+    this.feeding[j] = bowl;
+    track(this.tweens.add({ targets: bowl, scale: 1, duration: FB.popDuration, ease: 'Back.easeOut' }));
+
+    let ready = 0;
+    const go = () => { if (++ready === 2) this.eatFromBowl(cat, color, j, bowl); };
+
+    // банка высыпает корм в миску
+    this.locked.add(j);
+    const heap = bowl.heap;
+    const dir = r.x < CONFIG.width / 2 ? -1 : 1; // банка уходит к середине экрана, а не за край
+    const mouth = { x: r.x, y: rimY - heap.height - P.gap * s };
+    jar.setDepth(8);
+    track(this.tweens.add({ targets: jar, ...this.pourPose(jar, mouth.x, mouth.y, dir * P.bowlTilt), duration: P.flyDuration, ease: 'Sine.easeInOut' }));
+    const food = this.portions[j].slice().reverse(); // сверху вниз
+    const pd = P.portionDuration;
+    food.forEach((p, k) => {
+      const t0 = P.flyDuration + k * pd;
+      track(this.tweens.add({ targets: p.pile, cut: p.pile.height, delay: t0, duration: pd, onUpdate: () => setPileCut(p.pile, p.pile.cut) }));
+      for (let i = 0; i < P.streamGrains; i++) {
+        const f = (k + i / P.streamGrains) / food.length;
+        this.flyGrain(color, mouth.x + (Math.random() - 0.5) * 6 * s, mouth.y,
+          r.x + (Math.random() - 0.5) * heap.width * 0.6, rimY - heap.height * f, t0 + (i / P.streamGrains) * pd, P.fallDuration);
+      }
+    });
+    track(this.tweens.add({
+      targets: heap, cut: 0, delay: P.flyDuration + P.fallDuration, duration: food.length * pd,
+      onUpdate: () => setPileCut(heap, heap.cut),
+    }));
+    track(this.tweens.add({
+      targets: jar, x: jar.home.x, y: jar.home.y, angle: 0, delay: P.flyDuration + food.length * pd, duration: P.returnDuration, ease: 'Sine.easeInOut',
+      onComplete: () => {
+        jar.setDepth(1);
+        this.locked.delete(j);
+        go();
+      },
+    }));
+
+    // кот идёт к миске
+    cat.walkTo(r.x, rimY - A.catEatOffsetY * cat.baseScale, go);
+  }
+
+  eatFromBowl(cat, color, j, bowl) {
+    const heap = bowl.heap;
+    const n = this.board.capacity;
+    const mx = bowl.x;
+    const my = bowl.y - heap.height * 0.4;
+    cat.setMood('happy');
+    cat.eat(n, (k) => {
+      if (k === 0) sfx(this, `sfx_chew_${this.chewOrder[this.chewNext++ % this.chewOrder.length]}`, 0.8);
+      cat.track(this.tweens.add({
+        targets: heap, cut: (heap.height * (k + 1)) / n, duration: A.eatPerPortion * 0.6,
+        onUpdate: () => setPileCut(heap, heap.cut),
+      }));
+      for (let i = 0; i < CONFIG.pile.eatGrains; i++) {
+        this.flyGrain(color, mx + (Math.random() - 0.5) * heap.width * 0.4, my, mx, bowl.y - 20 * this.dim.scale,
+          (i / CONFIG.pile.eatGrains) * A.eatPerPortion * 0.5, A.eatPerPortion * 0.4, true);
+      }
+      this.fxCrumbs.setParticleTint(CONFIG.colors[color].fill);
+      this.fxCrumbs.explode(A.crumbs, mx, my);
+    }, () => {
+      sfxRandom(this, 'sfx_purr', 3);
+      this.wrapJar(j, color);
+      this.fxHearts.explode(A.hearts, cat.x, cat.y - 60 * cat.baseScale);
+      cat.track(this.tweens.add({
+        targets: bowl, scale: 0, delay: A.catReturnDelay, duration: CONFIG.foodBowl.hideDuration, ease: 'Back.easeIn',
+        onComplete: () => {
+          bowl.destroy();
+          if (this.feeding[j] === bowl) delete this.feeding[j];
+        },
+      }));
+      cat.track(this.time.delayedCall(A.catReturnDelay, () => cat.walkTo(cat.home.x, cat.home.y, () => cat.setInteractive())));
     });
   }
 
-  // Отмена хода «разобрала» банку: кот бросает есть и, ворча, возвращается. Корм на место.
+  // Отмена хода «разобрала» банку: кот бросает есть и, ворча, возвращается. Миска исчезает, корм — в банку.
   unfeed(color) {
     const cat = this.cats[color];
     if (cat.fedBowl === null) return;
-    const bowl = cat.fedBowl;
+    const j = cat.fedBowl;
+    const jar = this.jars[j];
     cat.fedBowl = null;
     cat.stopActions().setMood('grumpy');
-    this.portions[bowl].forEach((p) => {
-      this.tweens.killTweensOf(p);
-      p.setScale(1).setAlpha(1);
-      resetPile(this, p);
-    });
-    this.unwrapJar(bowl);
+    if (this.feeding[j]) {
+      this.feeding[j].destroy();
+      delete this.feeding[j];
+    }
+    this.tweens.killTweensOf(jar);
+    jar.setPosition(jar.home.x, jar.home.y).setAngle(0).setDepth(1);
+    this.locked.delete(j);
+    this.portions[j].forEach((p) => resetPile(this, p));
+    this.unwrapJar(j);
     cat.walkTo(cat.home.x, cat.home.y, () => cat.setMood('open').setInteractive());
   }
 
   // Банку снизу вверх обматывает джут: каждый виток натягивается от центра к краям, затем выскакивает картинка корма.
-  wrapJar(bowl, color) {
-    this.unwrapJar(bowl, true);
+  wrapJar(j, color) {
+    this.unwrapJar(j, true);
     const J = CONFIG.jute;
-    const r = this.bowlRects[bowl];
+    const jar = this.jars[j];
     const s = this.dim.scale;
-    const top = r.top + CONFIG.jar.rimHeight * s / 2;
-    const bottom = r.bottom - CONFIG.jar.baseHeight * s * 0.4;
-    const wrap = makeJuteWrap(this, color, this.dim.bw, top, bottom, s).setPosition(r.x, 0).setDepth(2);
-    this.wraps[bowl] = wrap;
+    const top = -jar.h / 2 + CONFIG.jar.rimHeight * s / 2;
+    const bottom = jar.h / 2 - CONFIG.jar.baseHeight * s * 0.4;
+    const wrap = makeJuteWrap(this, color, this.dim.bw, top, bottom, s);
+    jar.add(wrap);
+    jar.wrap = wrap;
     wrap.bands.forEach((b, k) => {
       b.setScale(0, 1);
       this.tweens.add({ targets: b, scaleX: 1, delay: k * J.bandStagger, duration: J.bandDuration, ease: 'Quad.easeOut' });
@@ -519,13 +617,12 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  unwrapJar(bowl, instant = false) {
-    const wrap = this.wraps[bowl];
+  unwrapJar(j, instant = false) {
+    const jar = this.jars[j];
+    const wrap = jar.wrap;
     if (!wrap) return;
-    this.wraps[bowl] = null;
-    const parts = [...wrap.bands, wrap.icon];
-    this.tweens.killTweensOf(parts);
-    this.tweens.killTweensOf(wrap);
+    jar.wrap = null;
+    this.tweens.killTweensOf([...wrap.bands, wrap.icon, wrap]);
     if (instant) return wrap.destroy();
     this.tweens.add({ targets: wrap, alpha: 0, duration: CONFIG.jute.unwrapDuration, onComplete: () => wrap.destroy() });
   }

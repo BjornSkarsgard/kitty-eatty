@@ -137,7 +137,7 @@ Meow... (hsss)
 | `sfx_meow_1.mp3` | 1 с | Single short cute kitten meow, curious and friendly, rising intonation "mew?" |
 | `sfx_meow_2.mp3` | 1 с | Single short happy cat meow, cheerful and excited, bright "meow!" |
 | `sfx_meow_3.mp3` | 1 с | Single short soft cat chirp-meow, sweet trilling "mrrp", like greeting its owner |
-| `sfx_chew.mp3` | 1 с | Small cat eating dry kibble, a few quick crunchy bites, cute close-up chewing, no slurping |
+| `sfx_chew.mp3` | 1,5 с | Small cat eating dry kibble, four separate crunchy bites with short pauses between them, cute close-up chewing, no slurping |
 | `sfx_purr.mp3` | 2 с | Content cat purring close up, warm soft steady rumble, happy and relaxed, ends with a fade |
 | `music_win.mp3` | 2,5 с | Short cheerful victory jingle, xylophone and bells playing a quick rising arpeggio ending on a happy major chord, cartoon style |
 

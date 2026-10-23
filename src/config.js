@@ -296,7 +296,7 @@ export const CONFIG = {
   // Главный экран — комната кота (открывается после загрузки с map.homeFromLevel). Пока без арта.
   home: {
     titleY: 190,
-    floorY: 840,         // где стоят лапы кота; ниже — пол
+    floorY: 800,         // где стоят лапы кота (на ковре в bg_room_home); ниже — пол
     catScale: 2.6,
     catColor: 2,
     playY: 1020,

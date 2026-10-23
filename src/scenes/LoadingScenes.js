@@ -38,7 +38,7 @@ export class PreloadScene extends Phaser.Scene {
 
     // Объёмная надпись: заливка светлеет кверху, толстая обводка и тень вниз (свет сверху).
     const T = Lc.title;
-    const title = this.add.text(this.center.x, this.center.y - 10, 'Загрузка…', {
+    const title = this.add.text(this.center.x, this.center.y + T.y, 'Загрузка…', {
       fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: `${T.size}px`,
       stroke: T.stroke, strokeThickness: T.strokeWidth,
       shadow: { offsetX: 0, offsetY: T.shadowY, color: T.shadow, blur: 0, stroke: true, fill: true },
@@ -101,7 +101,8 @@ export class PreloadScene extends Phaser.Scene {
     const Lc = CONFIG.loading;
     // кот на ободке в точке catAngle, поверх надписи и полосы; локальная +y — к центру миски
     const a = Phaser.Math.DegToRad(Lc.catAngle);
-    this.peek = this.add.container(this.center.x + Math.cos(a) * Lc.radius, this.center.y + Math.sin(a) * Lc.radius)
+    const r = Lc.radius - Lc.catLift;
+    this.peek = this.add.container(this.center.x + Math.cos(a) * r, this.center.y + Math.sin(a) * r)
       .setRotation(a + Math.PI / 2).setDepth(10);
 
     let head;

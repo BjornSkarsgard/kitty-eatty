@@ -6,7 +6,6 @@ import { beatPulse, beatPhase } from '../beat.js';
 import { CatView } from '../view/CatView.js';
 import { sfx, sfxRandom, music } from '../audio.js';
 import LEVELS from '../levels/levels.json';
-import PAWS from '../../tools/bg-paws.json';
 
 const L = CONFIG.layout;
 
@@ -43,7 +42,7 @@ export class GameScene extends Phaser.Scene {
     if (this.textures.exists('bg_game')) {
       const bg = this.add.image(CONFIG.width / 2, CONFIG.height / 2, 'bg_game');
       bg.setScale(Math.max(CONFIG.width / bg.width, CONFIG.height / bg.height));
-      this.createWallGlow(bg);
+      this.createWallPaws(bg);
     }
     makeFxTextures(this);
     this.createEffects();
@@ -62,23 +61,32 @@ export class GameScene extends Phaser.Scene {
     this.createButtons();
   }
 
-  // Лапки на обоях в разнобой чуть светлеют в своём же цвете (не больше fx.wallGlow.max за раз).
-  // Каждая лапка — свой кусок атласа paw_glow (вырезан из фона по её форме, tools/bg-paws.mjs), лежит ровно
-  // на своём месте и рисуется сложением цветов: прозрачность = насколько светлее.
-  createWallGlow(bg) {
-    const G = CONFIG.fx.wallGlow;
-    if (!CONFIG.fx.enabled || !G.enabled || !this.textures.exists('paw_glow')) return;
-    const tex = this.textures.get('paw_glow');
+  // Лапки на обоях: штамп paw.png ровной сеткой по стене (ряды через dy, соседние сдвинуты на полшага dx).
+  // Каждая — тёмный отпечаток и поверх него светлый слой, который в разнобой плавно проявляется и гаснет
+  // (не больше glow.max за раз; это эффект — без fx.enabled только отпечатки).
+  createWallPaws(bg) {
+    const P = CONFIG.wallPaws;
+    if (!this.textures.exists('paw')) return;
     const s = bg.scaleX;
-    const [bw, bh] = PAWS.bg;
-    const paws = PAWS.paws.map(([x0, y0, w, h, ax, ay], k) => {
-      if (!tex.has(`p${k}`)) tex.add(`p${k}`, 0, ax, ay, w, h);
-      return this.add.image(bg.x + (x0 - bw / 2) * s, bg.y + (y0 - bh / 2) * s, 'paw_glow', `p${k}`)
-        .setOrigin(0, 0).setScale(s).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
-    });
+    const src = bg.texture.getSourceImage();
+    const toScreen = (x, y) => ({ x: bg.x + (x - src.width / 2) * s, y: bg.y + (y - src.height / 2) * s });
+    const scale = (P.size * s) / this.textures.get('paw').getSourceImage().width;
+    const half = P.size / 2;
+    const lit = [];
+    for (let k = Math.ceil((P.top + half - P.y0) / P.dy); P.y0 + k * P.dy <= P.bottom - half; k++) {
+      const y = P.y0 + k * P.dy;
+      const shift = Math.abs(k) % 2 ? P.dx / 2 : 0;
+      for (let x = P.x0 + shift - Math.floor((P.x0 + shift - half) / P.dx) * P.dx; x <= src.width - half; x += P.dx) {
+        const pos = toScreen(x, y);
+        this.add.image(pos.x, pos.y, 'paw').setScale(scale).setTint(P.color).setAlpha(P.alpha);
+        lit.push(this.add.image(pos.x, pos.y, 'paw').setScale(scale).setTint(P.glow.color).setAlpha(0));
+      }
+    }
+    if (!CONFIG.fx.enabled) return;
+    const G = P.glow;
     let active = 0;
     const next = () => {
-      const idle = paws.filter((p) => !p.glowing);
+      const idle = lit.filter((p) => !p.glowing);
       if (active < G.max && idle.length) {
         const p = Phaser.Utils.Array.GetRandom(idle);
         p.glowing = true;

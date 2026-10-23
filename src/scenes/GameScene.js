@@ -409,7 +409,7 @@ export class GameScene extends Phaser.Scene {
     cat.walkTo(cat.home.x, cat.home.y, () => cat.setMood('open').setInteractive());
   }
 
-  // Банку снизу вверх обматывает джут: каждый виток натягивается от центра к краям, затем выскакивает картинка корма.
+  // Банку снизу вверх обматывает джутовая верёвка цвета корма, затем выскакивает картинка корма.
   wrapJar(bowl, color) {
     this.unwrapJar(bowl, true);
     const J = CONFIG.jute;
@@ -419,22 +419,18 @@ export class GameScene extends Phaser.Scene {
     const bottom = r.bottom - this.dim.base;
     const wrap = makeJuteWrap(this, color, this.dim.bw, top, bottom, s).setPosition(r.x, 0).setDepth(2);
     this.wraps[bowl] = wrap;
-    wrap.bands.forEach((b, k) => {
-      b.setScale(0, 1);
-      this.tweens.add({ targets: b, scaleX: 1, delay: k * J.bandStagger, duration: J.bandDuration, ease: 'Quad.easeOut' });
-    });
+    wrap.reveal(0);
+    wrap.t = 0;
+    this.tweens.add({ targets: wrap, t: 1, duration: J.wrapDuration, ease: 'Sine.easeInOut', onUpdate: () => wrap.reveal(wrap.t) });
     wrap.icon.setScale(0);
-    this.tweens.add({
-      targets: wrap.icon, scale: wrap.iconScale, delay: wrap.bands.length * J.bandStagger + J.bandDuration,
-      duration: J.iconDuration, ease: 'Back.easeOut',
-    });
+    this.tweens.add({ targets: wrap.icon, scale: wrap.iconScale, delay: J.wrapDuration, duration: J.iconDuration, ease: 'Back.easeOut' });
   }
 
   unwrapJar(bowl, instant = false) {
     const wrap = this.wraps[bowl];
     if (!wrap) return;
     this.wraps[bowl] = null;
-    const parts = [...wrap.bands, wrap.icon];
+    const parts = [wrap.rope, wrap.icon];
     this.tweens.killTweensOf(parts);
     this.tweens.killTweensOf(wrap);
     if (instant) return wrap.destroy();

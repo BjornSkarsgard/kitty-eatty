@@ -101,28 +101,21 @@ function makeLayer(scene, w, h, fill, g) {
   return [left, mid, right].map((img) => img.setTint(fill));
 }
 
-// Когтеточка: витки джута цвета корма вокруг банки от bottom до top (центр по x = 0) и картинка корма поверх.
-// Витки — отдельные графики (container.bands, снизу вверх), чтобы их можно было наматывать по одному.
+// Когтеточка: джутовая верёвка jute_wrap вокруг банки от bottom до top (центр по x = 0), покрашенная tint'ом
+// в цвет корма, и картинка корма поверх. Верёвка не растягивается (витки не сплющиваются): лишняя высота
+// обрезается сверху. container.reveal(t) — показать нижнюю долю t (0…1): так верёвка «наматывается» снизу вверх.
 export function makeJuteWrap(scene, colorIndex, w, top, bottom, s) {
   const J = CONFIG.jute;
-  const color = mix(CONFIG.colors[colorIndex].fill, J.natural, J.naturalMix);
-  const bh = J.band * s;
-  const step = bh * J.overlap;
-  const bw = w + J.overhang * s * 2;
-  const n = Math.max(1, Math.round((bottom - top - bh) / step) + 1);
-  const bands = [];
-  for (let i = 0; i < n; i++) {
-    const y = bottom - bh / 2 - i * ((bottom - top - bh) / Math.max(1, n - 1));
-    const g = scene.add.graphics({ x: 0, y });
-    g.fillStyle(color, 1).fillRoundedRect(-bw / 2, -bh / 2, bw, bh, bh / 2);
-    // волокна — короткие косые штрихи, как у скрученной верёвки
-    g.lineStyle(Math.max(1.5, 2 * s), darken(color, J.strandDarken), 1);
-    const ss = J.strandStep * s;
-    for (let x = -bw / 2 + bh * 0.4; x < bw / 2 - bh * 0.9; x += ss) g.lineBetween(x, bh * 0.35, x + bh * 0.5, -bh * 0.35);
-    g.fillStyle(0xffffff, 0.25).fillRoundedRect(-bw / 2 + bh * 0.4, -bh * 0.38, bw - bh * 0.8, bh * 0.2, bh * 0.1);
-    g.lineStyle(Math.max(2, 3 * s), CONFIG.outline, 1).strokeRoundedRect(-bw / 2, -bh / 2, bw, bh, bh / 2);
-    bands.push(g);
-  }
+  const color = lighten(CONFIG.colors[colorIndex].fill, J.tintLighten);
+  const rope = scene.add.image(0, bottom, 'jute_wrap').setOrigin(0.5, 1).setTint(color);
+  const k = (w * J.width) / rope.width;
+  rope.setScale(k);
+  const full = Math.min(rope.height, (bottom - top) / k); // высота видимой части в пикселях картинки
+  const reveal = (t) => {
+    const hh = full * t;
+    rope.setCrop(0, rope.height - hh, rope.width, hh);
+  };
+  reveal(1);
   // картинка корма поверх джута
   const cy = (top + bottom) / 2;
   const size = Math.min(w * J.iconSize, (bottom - top) * 0.6);
@@ -139,17 +132,12 @@ export function makeJuteWrap(scene, colorIndex, w, top, bottom, s) {
     icon.fillStyle(lighten(color, 0.6), 1);
     drawShape(icon, CONFIG.colors[colorIndex].shape, size * 0.42);
   }
-  const c = scene.add.container(0, 0, [...bands, icon]);
-  c.bands = bands;
+  const c = scene.add.container(0, 0, [rope, icon]);
+  c.rope = rope;
+  c.reveal = reveal;
   c.icon = icon;
   c.iconScale = iconScale;
   return c;
-}
-
-// Смешать два цвета: k = 0 — a, 1 — b.
-function mix(a, b, k) {
-  const ch = (sh) => Math.round(((a >> sh) & 255) * (1 - k) + ((b >> sh) & 255) * k);
-  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
 }
 
 function luminance(c) {

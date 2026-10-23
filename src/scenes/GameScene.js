@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { Board } from '../core/Board.js';
-import { makePortion, makeFxTextures, makeJuteWrap } from '../view/draw.js';
+import { makePortion, makeFxTextures, makeJuteWrap, resetKibbles } from '../view/draw.js';
 import { CatView } from '../view/CatView.js';
 import { sfx, sfxRandom, music } from '../audio.js';
 import LEVELS from '../levels/levels.json';
@@ -312,6 +312,7 @@ export class GameScene extends Phaser.Scene {
   // Полёт порций из банки в банку почти по прямой, с лёгким выгибом вверх (moveArc).
   // Твинится свойство самой порции flyT, чтобы killTweensOf(p) останавливал и полёт.
   fly(sprites, to, startSlot) {
+    if (sprites[0].kibbles) return this.pour(sprites, to, startSlot);
     // верхняя порция летит первой
     sprites.slice().reverse().forEach((p, k) => {
       const slot = startSlot + sprites.length - 1 - k;
@@ -333,6 +334,65 @@ export class GameScene extends Phaser.Scene {
           if (k === sprites.length - 1) sfx(this, 'sfx_drop');
         },
       });
+    });
+  }
+
+  // Кусочки пересыпаются струйкой. Улетает верхняя порция, в ней — верхние кусочки; ложатся снизу вверх.
+  // Порция-контейнер сразу встаёт на новое место, летят только кусочки внутри неё.
+  pour(sprites, to, startSlot) {
+    const K = CONFIG.kibble;
+    const s = this.dim.scale;
+    const arc = A.moveArc * s;
+    const order = sprites.slice().reverse();
+    // серия всегда одного цвета, поэтому первая улетевшая порция может лечь в нижний слот
+    this.portions[to].splice(startSlot, order.length, ...order);
+    let delay = 0;
+    order.forEach((p, k) => {
+      const dst = this.slotPos(to, startSlot + k);
+      const ox = p.x - dst.x;
+      const oy = p.y - dst.y;
+      this.tweens.killTweensOf(p);
+      this.tweens.killTweensOf(p.kibbles);
+      p.setPosition(dst.x, dst.y).setScale(1).setAlpha(1).setDepth(5);
+      const leaving = p.kibbles.slice().sort((a, b) => a.y - b.y);
+      const places = p.kibbles.map((kb) => ({ x: kb.restX, y: kb.restY })).sort((a, b) => b.y - a.y);
+      leaving.forEach((kb, i) => {
+        const x0 = kb.x + ox;
+        const y0 = kb.y + oy;
+        const { x: x1, y: y1 } = places[i];
+        const a0 = kb.angle;
+        kb.restX = x1;
+        kb.restY = y1;
+        kb.restAngle = a0 + Phaser.Math.Between(-K.spin, K.spin);
+        kb.setPosition(x0, y0).setScale(kb.restScale).setAlpha(1);
+        kb.flyT = 0;
+        const last = k === order.length - 1 && i === leaving.length - 1;
+        this.tweens.add({
+          targets: kb, flyT: 1, delay, duration: K.flyDuration, ease: 'Sine.easeInOut',
+          onUpdate: () => {
+            const t = kb.flyT;
+            kb.setPosition(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t - arc * 4 * t * (1 - t));
+            kb.angle = a0 + (kb.restAngle - a0) * t;
+          },
+          onComplete: () => {
+            this.tweens.add({ targets: kb, y: y1 - K.bounce * s, duration: K.bounceDuration, yoyo: true, ease: 'Quad.easeOut' });
+            if (i === leaving.length - 1) p.setDepth(0);
+            if (last) sfx(this, 'sfx_drop');
+          },
+        });
+        delay += K.stagger;
+      });
+    });
+  }
+
+  // Кот ест порцию: кусочки сверху вниз по одному улетают ко рту (x, y — точка в мире) и исчезают.
+  eatKibbles(p, x, y, duration, track) {
+    const list = p.kibbles.slice().sort((a, b) => a.y - b.y);
+    list.forEach((kb, i) => {
+      track(this.tweens.add({
+        targets: kb, x: x - p.x, y: y - p.y, scale: 0, delay: (i / list.length) * duration * 0.6,
+        duration: duration * 0.4, ease: 'Back.easeIn',
+      }));
     });
   }
 
@@ -382,8 +442,9 @@ export class GameScene extends Phaser.Scene {
       const food = this.portions[bowl].slice().reverse(); // сверху вниз
       cat.eat(food.length, (k) => {
         if (k === 0) sfx(this, `sfx_chew_${this.chewOrder[this.chewNext++ % this.chewOrder.length]}`, 0.8);
-        // порция подлетает ко рту и исчезает
-        cat.track(this.tweens.add({
+        // порция подлетает ко рту и исчезает (кусочки — по одному)
+        if (food[k].kibbles) this.eatKibbles(food[k], r.x, r.top, A.eatPerPortion, (t) => cat.track(t));
+        else cat.track(this.tweens.add({
           targets: food[k], y: r.top, scale: 0, alpha: 0, duration: A.eatPerPortion * 0.5, ease: 'Back.easeIn',
         }));
         this.fxCrumbs.setParticleTint(CONFIG.colors[color].fill);
@@ -407,6 +468,7 @@ export class GameScene extends Phaser.Scene {
     this.portions[bowl].forEach((p) => {
       this.tweens.killTweensOf(p);
       p.setScale(1).setAlpha(1);
+      resetKibbles(this, p);
     });
     this.unwrapJar(bowl);
     cat.walkTo(cat.home.x, cat.home.y, () => cat.setMood('open').setInteractive());

@@ -1,4 +1,5 @@
 // Временная отрисовка фигурами Phaser.Graphics. На этапе 4 заменится векторным артом.
+import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 
 // Значок формы корма с центром в (0, 0), s — «радиус».
@@ -50,8 +51,14 @@ export function drawShape(g, shape, s) {
   }
 }
 
-// Порция корма: цветной слой + иконка корма (картинка food_N, если есть, иначе значок формы).
+// Порция корма. portion.style = 'kibbles' — горстка мелких кусочков, 'blocks' — цветной слой с иконкой.
 export function makePortion(scene, colorIndex, w, h) {
+  if (CONFIG.portion.style === 'kibbles') return makeKibblePortion(scene, colorIndex, w, h);
+  return makeBlockPortion(scene, colorIndex, w, h);
+}
+
+// Цветной слой + иконка корма (картинка food_N, если есть, иначе значок формы).
+function makeBlockPortion(scene, colorIndex, w, h) {
   const { fill: color, shape } = CONFIG.colors[colorIndex];
   const key = `food_${colorIndex}`;
   const hasArt = scene.textures.exists(key);
@@ -133,6 +140,81 @@ export function makeJuteWrap(scene, colorIndex, w, top, bottom, s) {
 function mix(a, b, k) {
   const ch = (sh) => Math.round(((a >> sh) & 255) * (1 - k) + ((b >> sh) & 255) * k);
   return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+}
+
+// Текстуры кусочков: по одной на цвет, форма — из colors[].shape (для дальтоников).
+// Контур, тёмный низ, светлый верх и блик — как у остального арта.
+const KIBBLE_TEX = 64;
+
+export function makeKibbleTextures(scene) {
+  if (scene.textures.exists('kibble_0')) return;
+  const g = scene.make.graphics({ add: false });
+  const T = KIBBLE_TEX;
+  const r = T * 0.36;
+  CONFIG.colors.forEach(({ fill, shape }, i) => {
+    g.clear();
+    g.save();
+    g.translateCanvas(T / 2, T / 2);
+    g.fillStyle(CONFIG.outline, 1);
+    drawShape(g, shape, r + T * 0.08);
+    g.fillStyle(darken(fill, 0.25), 1);
+    drawShape(g, shape, r);
+    g.translateCanvas(0, -T * 0.025);
+    g.fillStyle(fill, 1);
+    drawShape(g, shape, r * 0.84);
+    g.restore();
+    g.fillStyle(0xffffff, 0.6).fillCircle(T / 2 - r * 0.32, T / 2 - r * 0.38, r * 0.17);
+    g.generateTexture(`kibble_${i}`, T, T);
+  });
+  g.destroy();
+}
+
+// Горстка кусочков в полосе w×h: рядами внахлёст, со сдвигами и поворотами, как насыпанный корм.
+// У каждого кусочка restX/restY/restAngle — место в порции; порция-контейнер двигается как раньше.
+function makeKibblePortion(scene, colorIndex, w, h) {
+  const K = CONFIG.kibble;
+  makeKibbleTextures(scene);
+  const size = h * K.size;
+  const stepX = size * K.spacingX;
+  const cols = Math.max(1, Math.floor((w - size) / stepX) + 1);
+  // ряды растянуты на всю высоту порции, чтобы соседние порции смыкались без щели
+  const minY = -h / 2 + size * 0.35;
+  const maxY = h / 2 - size * 0.35;
+  const rows = Math.max(2, Math.round((maxY - minY) / (size * K.spacingY)) + 1);
+  const stepY = (maxY - minY) / (rows - 1);
+  const spread = (w - size) / 2;
+  const kibbles = [];
+  for (let row = 0; row < rows; row++) {
+    const n = row % 2 ? Math.max(1, cols - 1) : cols; // нечётные ряды короче на один и сдвинуты на полшага
+    const rowW = (n - 1) * stepX;
+    for (let c = 0; c < n; c++) {
+      const j = () => (Math.random() * 2 - 1) * K.jitter * size;
+      const x = Phaser.Math.Clamp(-rowW / 2 + c * stepX + j(), -spread, spread);
+      const y = Phaser.Math.Clamp(maxY - row * stepY + j(), minY, maxY);
+      const img = scene.add.image(x, y, `kibble_${colorIndex}`);
+      img.restX = x;
+      img.restY = y;
+      img.restAngle = Phaser.Math.Between(-K.rotate, K.rotate);
+      img.restScale = (size / KIBBLE_TEX) * Phaser.Math.FloatBetween(1 - K.sizeJitter, 1 + K.sizeJitter);
+      img.setAngle(img.restAngle).setScale(img.restScale);
+      // кусочки в глубине чуть темнее — горстка выглядит объёмной
+      const shade = Math.round(255 * Phaser.Math.FloatBetween(1 - K.shadeJitter, 1));
+      img.setTint((shade << 16) | (shade << 8) | shade);
+      kibbles.push(img);
+    }
+  }
+  Phaser.Utils.Array.Shuffle(kibbles); // порядок отрисовки вперемешку — кусочки перекрывают друг друга случайно
+  const p = scene.add.container(0, 0, kibbles);
+  p.color = colorIndex;
+  p.kibbles = kibbles;
+  return p;
+}
+
+// Вернуть кусочки порции на места (после того как кот их «съел», а ход отменили).
+export function resetKibbles(scene, p) {
+  if (!p.kibbles) return;
+  scene.tweens.killTweensOf(p.kibbles);
+  p.kibbles.forEach((k) => k.setPosition(k.restX, k.restY).setAngle(k.restAngle).setScale(k.restScale).setAlpha(1));
 }
 
 function luminance(c) {

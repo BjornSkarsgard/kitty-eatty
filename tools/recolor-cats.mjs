@@ -12,7 +12,6 @@ import { CONFIG } from '../src/config.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ASSETS = join(ROOT, 'src', 'assets');
-export const CAT_NAMES = ['red', 'blue', 'yellow', 'green', 'purple', 'orange', 'teal', 'white', 'brown', 'pink'];
 const PARTS = ['head', 'body', 'tail', 'leg_l', 'leg_r', 'eyes_grumpy', 'eyes_closed'];
 const HUE_RANGE = 32;   // градусы: насколько далеко от оттенка шерсти ещё перекрашиваем в полную силу
 const HUE_FADE = 18;    // и за сколько градусов после этого сходит на нет
@@ -64,8 +63,7 @@ function furColor() {
 const [h0, s0, v0] = furColor();
 console.log(`шерсть синего кота: оттенок ${h0.toFixed(0)}°, насыщенность ${s0.toFixed(2)}, яркость ${v0.toFixed(2)}`);
 
-CONFIG.colors.forEach(({ fill }, c) => {
-  const name = CAT_NAMES[c];
+CONFIG.colors.forEach(({ fill, name }) => {
   if (name === 'blue') return;
   const [h1, s1, v1] = rgb2hsv((fill >> 16) & 255, (fill >> 8) & 255, fill & 255);
   for (const part of PARTS) {

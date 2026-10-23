@@ -1,119 +1,88 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { sfx, sfxRandom } from '../audio.js';
+import LAYOUT from '../../tools/cat-layout.json';
 
 const C = CONFIG.cat;
+const P = C.pivots;
+const U = C.unit;
 
-// Кот из частей: хвост, тело, голова (с глазами, ртом, пятном). Если в src/assets есть картинки частей —
-// используются они (тело/голова/хвост перекрашиваются tint'ом), иначе — временные фигуры.
+// Точка референса → координаты кота (0, 0 — центр кота, y = origin[2] — низ лап).
+const loc = ([x, y]) => ({ x: (x - C.origin[0]) * U, y: (y - C.origin[1]) * U + C.origin[2] });
+
+// Кот из частей: хвост, туловище, две передние лапы, голова (с глазами и ртом). У каждого цвета свои
+// картинки cat_<name>_*.png, без перекраски tint'ом. Глаза open/happy и рот — общие для всех котов.
+// Каждая часть — в своём контейнере, точка контейнера — ось вращения (основание хвоста, плечо лапы…).
+// Если картинок нет — временные фигуры.
 export class CatView extends Phaser.GameObjects.Container {
   constructor(scene, x, y, colorIndex, { headOnly = false } = {}) {
     super(scene, x, y);
     scene.add.existing(this);
     this.fill = CONFIG.colors[colorIndex].fill;
+    this.name = CONFIG.colors[colorIndex].name;
     this.baseScale = 1;
     this.mood = 'open';
     this.actions = [];
     this.idle = [];
-    this.useArt = scene.textures.exists('cat_head');
+    this.useArt = scene.textures.exists(`cat_${this.name}_head`);
 
     if (!headOnly) {
-      this.tail = this.part('tail', C.tail);
-      this.body = this.part('body', C.body);
-      // пятно на грудке — внутри контейнера тела, чтобы «дышало» вместе с ним
-      if (this.scene.textures.exists('cat_body') && this.useArt && !this.image('cat_spots_body', C.body, false, this.body)) {
-        const g = this.scene.add.graphics();
-        drawFallback.chest(g);
-        this.body.add(g);
-      }
-      this.legs = [-1, 1].map((side) => this.makeLeg(side));
+      this.tail = this.part('tail');
+      this.body = this.part('body');
+      this.legs = ['leg_l', 'leg_r'].map((name) => this.part(name));
+      this.legY = this.legs[0].y;
     }
-    this.head = scene.add.container(C.head.x, C.head.y);
-    this.add(this.head);
-    this.headY = C.head.y;
-    this.buildHead();
+    this.head = this.part('head');
+    this.headY = this.head.y;
+    this.eyes = this.part('eyes', this.head, 'head');
+    this.mouth = this.part('mouth', this.head, 'head');
     this.setMood('open');
     this.setMouth(false);
   }
 
   // ---------- сборка ----------
 
-  image(key, cfg, tint, parent = this) {
-    if (!this.scene.textures.exists(key)) return null;
-    const img = this.scene.add.image(cfg.artX ?? 0, cfg.artY ?? 0, key).setScale(cfg.artScaleX ?? cfg.artScale, cfg.artScale);
-    if (cfg.originX !== undefined) img.setOrigin(cfg.originX, cfg.originY);
-    if (tint) img.setTint(this.fill);
-    parent.add(img);
-    return img;
-  }
-
-  // Часть тела в своём контейнере: точка контейнера — ось вращения (основание хвоста и т.п.).
-  part(name, cfg) {
-    const box = this.scene.add.container(cfg.x, cfg.y);
-    this.add(box);
-    if (this.useArt && this.image(`cat_${name}`, cfg, true, box)) return box;
-    const g = this.scene.add.graphics();
-    drawFallback[name](g, this.fill);
-    box.add(g);
-    return box;
-  }
-
-  // Передняя лапа: контейнер в «плече» (ось шага), лапа свисает вниз. Правая — зеркальная копия левой.
-  makeLeg(side) {
-    const box = this.scene.add.container(side * C.leg.x, C.leg.y);
-    this.add(box);
-    const img = this.useArt ? this.image('cat_leg', C.leg, true, box) : null;
-    if (img) {
-      if (side > 0) img.setFlipX(true);
-    } else {
+  // Контейнер части в её оси вращения; parentPivot — если часть внутри другой (глаза в голове).
+  part(name, parent = this, parentPivot = null) {
+    const p = loc(P[name]);
+    const o = parentPivot ? loc(P[parentPivot]) : { x: 0, y: 0 };
+    const box = this.scene.add.container(p.x - o.x, p.y - o.y);
+    parent.add(box);
+    if (name === 'eyes' || name === 'mouth') return box; // заполняются в setMood / setMouth
+    if (!this.useArt || !this.image(box, name, `cat_${this.name}_${name}`)) {
       const g = this.scene.add.graphics();
-      drawFallback.leg(g, this.fill);
-      if (side > 0) g.setScale(-1, 1);
+      drawFallback[name.startsWith('leg') ? 'leg' : name](g, this.fill);
+      if (name === 'leg_r') g.setScale(-1, 1);
       box.add(g);
     }
     return box;
   }
 
+  // Картинка в контейнере части: левый верхний угол — из tools/cat-layout.json (layoutKey).
+  image(box, layoutKey, key, pivot = layoutKey) {
+    if (!this.scene.textures.exists(key)) return null;
+    const [x0, y0] = LAYOUT[layoutKey];
+    const [px, py] = P[pivot];
+    const img = this.scene.add.image((x0 - px) * U, (y0 - py) * U, key).setOrigin(0, 0).setScale(U / LAYOUT.scale);
+    box.add(img);
+    return img;
+  }
+
   resetLegs() {
     if (!this.legs) return;
     this.legs.forEach((leg) => {
-      leg.y = C.leg.y;
+      leg.y = this.legY;
       leg.angle = 0;
     });
   }
 
-  buildHead() {
-    const h = this.head;
-    if (this.useArt) {
-      this.image('cat_head', C.head, true, h);
-      // пятно на морде: картинка, если есть, иначе временное белое пятно
-      if (!this.image('cat_spots_head', C.head, false, h)) {
-        const g = this.scene.add.graphics();
-        drawFallback.muzzle(g);
-        h.add(g);
-      }
-    } else {
-      const g = this.scene.add.graphics();
-      drawFallback.head(g, this.fill);
-      h.add(g);
-    }
-    this.eyes = this.scene.add.container(C.eyes.x, C.eyes.y);
-    this.mouth = this.scene.add.container(C.mouth.x, C.mouth.y);
-    h.add([this.eyes, this.mouth]);
-  }
-
   // Слой с вариантами (глаза, рот): картинка, если есть, иначе фигура.
-  // variant — имя варианта (open, grumpy…): у каждого может быть свой множитель в cfg.variantScale
-  swapLayer(layer, key, cfg, fallback, variant) {
-    layer.removeAll(true);
-    if (this.useArt && this.scene.textures.exists(key)) {
-      const k = cfg.variantScale?.[variant] ?? 1;
-      layer.add(this.scene.add.image(0, 0, key).setScale(cfg.artScale * k));
-    } else {
-      const g = this.scene.add.graphics();
-      fallback(g);
-      layer.add(g);
-    }
+  swapLayer(box, layoutKey, key, pivot, fallback) {
+    box.removeAll(true);
+    if (this.useArt && this.image(box, layoutKey, key, pivot)) return;
+    const g = this.scene.add.graphics();
+    fallback(g);
+    box.add(g);
   }
 
   // mood: 'open' — ждёт, 'happy' — ест/сыт, 'grumpy' — ворчит, 'closed' — моргает/спит.
@@ -123,12 +92,14 @@ export class CatView extends Phaser.GameObjects.Container {
     return this;
   }
 
+  // Открытые и довольные глаза общие; у ворчливых и закрытых веко в цвет шерсти — свои у каждого кота.
   showEyes(kind) {
-    this.swapLayer(this.eyes, `cat_eyes_${kind}`, C.eyes, (g) => drawEyes(g, kind), kind);
+    const key = kind === 'open' || kind === 'happy' ? `eyes_${kind}` : `cat_${this.name}_eyes_${kind}`;
+    this.swapLayer(this.eyes, 'eyes', key, 'eyes', (g) => drawEyes(g, kind));
   }
 
   setMouth(open) {
-    this.swapLayer(this.mouth, open ? 'cat_mouth_open' : 'cat_mouth_closed', C.mouth, (g) => drawMouth(g, open));
+    this.swapLayer(this.mouth, open ? 'mouth_open' : 'mouth', open ? 'mouth_open' : 'mouth_closed', 'mouth', (g) => drawMouth(g, open));
     return this;
   }
 
@@ -359,7 +330,7 @@ export class CatView extends Phaser.GameObjects.Container {
         const k = Math.floor(ph) % 2; // какая лапа сейчас в воздухе
         this.legs?.forEach((leg, i) => {
           const up = i === k ? lift : 0;
-          leg.y = C.leg.y - up * A.stepLift;
+          leg.y = this.legY - up * A.stepLift;
           leg.angle = (i ? 1 : -1) * up * A.stepAngle;
         });
       },

@@ -4,18 +4,18 @@ export const CONFIG = {
   height: 1280,
   background: '#2b2140',
 
-  // Цвет корма = цвет кота. Форма дублирует цвет для дальтоников.
+  // Цвет корма = цвет кота. Форма дублирует цвет для дальтоников. name — в именах файлов котов (cat_<name>_head.png).
   colors: [
-    { fill: 0xff6b6b, shape: 'circle' },
-    { fill: 0x4dabf7, shape: 'triangle' },
-    { fill: 0xffd43b, shape: 'star' },
-    { fill: 0x69db7c, shape: 'square' },
-    { fill: 0xcc5de8, shape: 'diamond' },
-    { fill: 0xff922b, shape: 'cross' },
-    { fill: 0x3bc9db, shape: 'heart' },
-    { fill: 0xf8f9fa, shape: 'ring' },
-    { fill: 0xa47148, shape: 'drop' },
-    { fill: 0xf783ac, shape: 'hourglass' },
+    { fill: 0xff6b6b, shape: 'circle', name: 'red' },
+    { fill: 0x4dabf7, shape: 'triangle', name: 'blue' },
+    { fill: 0xffd43b, shape: 'star', name: 'yellow' },
+    { fill: 0x69db7c, shape: 'square', name: 'green' },
+    { fill: 0xcc5de8, shape: 'diamond', name: 'purple' },
+    { fill: 0xff922b, shape: 'cross', name: 'orange' },
+    { fill: 0x3bc9db, shape: 'heart', name: 'teal' },
+    { fill: 0xf8f9fa, shape: 'ring', name: 'white' },
+    { fill: 0xa47148, shape: 'drop', name: 'brown' },
+    { fill: 0xf783ac, shape: 'hourglass', name: 'pink' },
   ],
 
   // Генерация уровней (tools/generate-levels.mjs). После правки: npm run levels
@@ -153,15 +153,21 @@ export const CONFIG = {
     confetti: 60,
   },
 
-  // Части кота. x/y — где часть на коте; artScale/artX/artY — подгонка картинок из src/assets
-  // (artScaleX — если ширину нужно масштабировать отдельно от высоты).
+  // Кот из частей (src/assets/cat_<name>_*.png). Где лежит каждая картинка — tools/cat-layout.json (в пикселях
+  // референса art-src/cat_ref.png). Здесь — как референс переводится в координаты кота и где оси вращения.
   cat: {
-    tail: { x: 22, y: 50, artScale: 0.12, originX: 0.22, originY: 0.95 }, // x/y — основание хвоста
-    body: { x: 0, y: 58, artScale: 0.13, originX: 0.5, originY: 1 }, // y — низ лап
-    leg: { x: 11, y: 29, artScale: 0.065, artScaleX: 0.09, originX: 0.5, originY: 0.06 },  // x/y — «плечо» левой лапы, правая зеркально
-    head: { x: 0, y: -22, artScale: 0.16, artY: -12 },
-    eyes: { x: 0, y: -6, artScale: 0.146, variantScale: { grumpy: 1.15 } },  // глаза и рты — без обрезки полей (cutout --notrim), чтобы варианты совпадали
-    mouth: { x: 0, y: 9, artScale: 0.19 },
+    unit: 0.1145,               // единиц кота на 1 px референса (размер кота)
+    origin: [627, 1210, 58],    // точка референса (низ лап по центру), которая у кота имеет y = 58
+    // оси вращения и масштабирования частей, в пикселях референса
+    pivots: {
+      body: [627, 1185],        // низ туловища — «дыхание» растягивает тело вверх от него
+      head: [626, 420],         // центр головы
+      tail: [760, 1110],        // основание хвоста (спрятано за телом)
+      leg_l: [526, 885],        // «плечи» передних лап — ось шага
+      leg_r: [724, 885],
+      eyes: [623, 468],
+      mouth: [622, 575],
+    },
   },
 
   audio: {

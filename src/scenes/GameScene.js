@@ -173,7 +173,7 @@ export class GameScene extends Phaser.Scene {
     this.cats = [];
     for (let c = 0; c < n; c++) {
       const scale = Math.min(1, spacing / L.catSpacing);
-      const cat = new CatView(this, x0 + c * spacing, L.catsFloorY - CONFIG.cat.body.y * scale, c);
+      const cat = new CatView(this, x0 + c * spacing, L.catsFloorY - CONFIG.cat.origin[2] * scale, c);
       cat.setDepth(10).setBaseScale(scale).startIdle();
       cat.home = { x: cat.x, y: cat.y };
       cat.fedBowl = null;

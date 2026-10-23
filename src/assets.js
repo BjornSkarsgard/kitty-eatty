@@ -1,3 +1,5 @@
+import { CONFIG } from './config.js';
+
 // Список ассетов собирается при сборке: Vite видит, какие файлы лежат в src/assets.
 // Чего нет — того нет в списке, игра рисует временную фигуру или молчит.
 const files = import.meta.glob('./assets/**/*.{png,webp,jpg,svg,mp3,ogg}', {
@@ -16,12 +18,12 @@ for (const [path, url] of Object.entries(files)) {
 }
 
 // Что нужно экрану загрузки — грузится первым.
+const LOADING_CAT = CONFIG.colors[CONFIG.loading.color].name;
 export const LOADING_KEYS = [
   'loading_head', 'music_loading',
   // кот на загрузке собирается из тех же частей, если отдельной loading_head нет
-  'cat_head', 'cat_spots_head', 'cat_paw_grip',
-  'cat_eyes_open', 'cat_eyes_happy', 'cat_eyes_grumpy', 'cat_eyes_closed',
-  'cat_mouth_open', 'cat_mouth_closed',
+  `cat_${LOADING_CAT}_head`, `cat_${LOADING_CAT}_eyes_grumpy`, `cat_${LOADING_CAT}_eyes_closed`, 'cat_paw_grip',
+  'eyes_open', 'eyes_happy', 'mouth_open', 'mouth_closed',
 ];
 
 export function queueAssets(load, filter = () => true) {

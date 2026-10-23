@@ -13,7 +13,6 @@ const T = () => CONFIG.transition;
 
 // Начать поворот из сцены from в сцену toKey: новая запускается параллельно и сама доводит переход (turnIn).
 export function turnTo(from, toKey, data, dir) {
-  sfx(from, 'sfx_whoosh', T().volume);
   from.input.enabled = false;
   from.scene.launch(toKey, { ...data, turn: { from: from.scene.key, dir } });
 }
@@ -37,6 +36,10 @@ export function turnIn(scene, { from, dir }) {
   const to = cam.scrollX;
   const span = (old.turnExit ? old.turnExit(dir) : W) + (scene.turnEnter ? scene.turnEnter(dir) : 0);
   const ms = T().duration + T().perScreen * Math.max(0, span / W - 1);
+  // звук ветра — серединой на середину поворота (там камера быстрее всего)
+  const whoosh = scene.cache.audio.get('sfx_whoosh');
+  const soundMs = whoosh?.duration ? whoosh.duration * 1000 : ms;
+  scene.time.delayedCall(Math.max(0, (ms - soundMs) / 2), () => sfx(scene, 'sfx_whoosh', T().volume));
   const bounds = cam.useBounds ? Phaser.Geom.Rectangle.Clone(cam.getBounds()) : null;
   cam.removeBounds();
   oldCam.removeBounds();

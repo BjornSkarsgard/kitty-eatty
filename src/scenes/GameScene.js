@@ -5,7 +5,7 @@ import { makePortion, makeFxTextures, makeJuteWrap, makePortionHalo, makeSoftTex
 import { beatPulse, beatPhase } from '../beat.js';
 import { CatView } from '../view/CatView.js';
 import { sfx, sfxRandom, music } from '../audio.js';
-import { currentLevel, setCurrentLevel, recordWin } from '../save.js';
+import { currentLevel, setCurrentLevel, recordWin, starsFor } from '../save.js';
 import LEVELS from '../levels/levels.json';
 
 const L = CONFIG.layout;
@@ -556,14 +556,39 @@ export class GameScene extends Phaser.Scene {
     for (let k = 0; k < 5; k++) this.fxConfetti.explode(Math.round(A.confetti / 5), W * (0.1 + k * 0.2), H);
     const isLast = this.levelIndex === LEVELS.length - 1;
     this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.55).setDepth(20).setInteractive();
-    this.add.text(W / 2, H * 0.4, 'Все котики сыты!', {
+    this.add.text(W / 2, H * 0.36, 'Все котики сыты!', {
       fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '56px', color: '#ffffff',
     }).setOrigin(0.5).setDepth(21);
-    this.add.text(W / 2, H * 0.47, `Ходов: ${this.board.history.length} (минимум ${LEVELS[this.levelIndex].minMoves})`, {
+    this.showStars(W / 2, H * 0.45, starsFor(this.board.history.length, LEVELS[this.levelIndex].minMoves));
+    this.add.text(W / 2, H * 0.535, `Ходов: ${this.board.history.length} (минимум ${LEVELS[this.levelIndex].minMoves})`, {
       fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '34px', color: '#cfc6e0',
     }).setOrigin(0.5).setDepth(21);
-    this.makeButton(W / 2, H * 0.58, isLast ? 'С начала' : 'Дальше', () => {
+    this.makeButton(W / 2, H * 0.62, isLast ? 'С начала' : 'Дальше', () => {
       this.scene.restart({ levelIndex: isLast ? 0 : this.levelIndex + 1 });
     }, 21);
+  }
+
+  // Три звезды в ряд: заработанные по очереди выпрыгивают со вспышкой, остальные — бледные.
+  // Картинки ui_star / ui_star_empty; пока их нет — растянутая искорка fx_star.
+  showStars(x, y, count) {
+    const S = CONFIG.stars;
+    const full = this.textures.exists('ui_star') ? 'ui_star' : 'fx_star';
+    const hasEmpty = this.textures.exists('ui_star_empty');
+    const fit = (img) => img.setScale(S.size / Math.max(img.width, img.height));
+    for (let i = 0; i < 3; i++) {
+      const sx = x + (i - 1) * (S.size + S.gap);
+      const sy = y + (i === 1 ? 0 : S.size * 0.12); // средняя чуть выше — дугой
+      fit(this.add.image(sx, sy, hasEmpty ? 'ui_star_empty' : full)).setDepth(21)
+        .setAlpha(hasEmpty ? 1 : S.emptyAlpha);
+      if (i >= count) continue;
+      const star = fit(this.add.image(sx, sy, full)).setDepth(22);
+      const target = star.scale;
+      star.setScale(0);
+      this.tweens.add({
+        targets: star, scale: target, duration: 380, ease: 'Back.easeOut', delay: 400 + i * S.popDelay,
+        onStart: () => sfx(this, 'sfx_pick'),
+        onComplete: () => this.fxStars.setDepth(23).explode(10, sx, sy),
+      });
+    }
   }
 }

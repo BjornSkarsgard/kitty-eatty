@@ -19,6 +19,17 @@ export const CONFIG = {
     { fill: 0xf783ac, shape: 'hourglass', name: 'pink' },
   ],
 
+  // Звёзды за уровень: ходов не больше minMoves + запас (доля от minMoves, округляется вверх, то есть хотя бы 1 ход).
+  // Меньше two — одна звезда (просто прошёл). Отменённые ходы не считаются.
+  stars: {
+    three: 0.1,
+    two: 0.5,
+    size: 120,        // звезда в окне победы, px
+    gap: 24,
+    popDelay: 280,    // мс между появлением звёзд
+    emptyAlpha: 0.35, // незаработанная звезда (пока нет картинки ui_star_empty)
+  },
+
   // Генерация уровней (tools/generate-levels.mjs). После правки: npm run levels
   levelGen: {
     seed: 20261022,

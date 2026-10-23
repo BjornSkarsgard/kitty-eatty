@@ -5,6 +5,8 @@
 //   current  — индекс уровня, который открыть при запуске (последний начатый);
 //   unlocked — сколько уровней открыто (индекс самого дальнего доступного);
 //   best     — { id уровня: лучшее число ходов } — из него считаются звёзды.
+import { CONFIG } from './config.js';
+
 const KEY = 'kittyeatty.save';
 const VERSION = 1;
 
@@ -60,4 +62,18 @@ export function recordWin(index, id, moves, count) {
 
 export function bestMoves(id) {
   return get().best[id];
+}
+
+// Сколько звёзд за прохождение: 3, 2 или 1 (правило — CONFIG.stars).
+export function starsFor(moves, minMoves) {
+  const S = CONFIG.stars;
+  if (moves <= minMoves + Math.ceil(minMoves * S.three)) return 3;
+  if (moves <= minMoves + Math.ceil(minMoves * S.two)) return 2;
+  return 1;
+}
+
+// Лучшие звёзды уровня (0 — не пройден) — для карты уровней.
+export function levelStars(level) {
+  const best = bestMoves(level.id);
+  return best === undefined ? 0 : starsFor(best, level.minMoves);
 }

@@ -1,4 +1,5 @@
 // Вырезает картинку с зелёного фона (chroma key): node tools/cutout.mjs файл.png [ещё.png ...] [--max=512] [--notrim] [--align=образец.png]
+// [--holes] [--key=magenta]
 // - фон убирается заливкой от краёв картинки, поэтому белое внутри контура (морда) не трогается;
 // - на сглаженном контуре убирается зелёная кайма (полупрозрачность восстанавливается);
 // - пустые поля обрезаются, картинка уменьшается до --max по большей стороне;
@@ -18,6 +19,10 @@ const NOTRIM = args.includes('--notrim');
 const ALIGN = (args.find((a) => a.startsWith('--align=')) || '').slice(8);
 // --split-pink: розовое (подушечки лап) — отдельным файлом <имя>_pink.png, чтобы перекраска кота его не трогала
 const SPLIT_PINK = args.includes('--split-pink');
+// --holes: фон и в замкнутых дырках (пончик) — убирается весь цвет фона, а не только связанный с краями
+const HOLES = args.includes('--holes');
+// --key=magenta: фон пурпурный #FF00FF — для зелёных предметов (кошачья мята), которые зелёный фон съел бы
+const MAGENTA = (args.find((a) => a.startsWith('--key=')) || '').slice(6) === 'magenta';
 const files = args.filter((a) => !a.startsWith('--'));
 if (!files.length) {
   console.log('Использование: node tools/cutout.mjs src/assets/cat_head.png [--max=512]');
@@ -26,8 +31,10 @@ if (!files.length) {
 
 // ---------- обработка ----------
 
-// «Зелёность»: насколько зелёный канал выше остальных (0..255).
-const greenness = (d, i) => d[i + 1] - Math.max(d[i], d[i + 2]);
+// «Зелёность» (или «пурпурность» при --key=magenta): насколько цвет фона выделяется в пикселе (0..255).
+const greenness = MAGENTA
+  ? (d, i) => Math.min(d[i], d[i + 2]) - d[i + 1]
+  : (d, i) => d[i + 1] - Math.max(d[i], d[i + 2]);
 let alphaOnly = false; // фон уже прозрачный — зелёное не трогаем (корм может быть зелёным)
 const isKey = (d, i) => d[i + 3] < 16 || (!alphaOnly && greenness(d, i) > 90);
 
@@ -43,6 +50,7 @@ function cutout({ w, h, rgba }) {
   };
   for (let x = 0; x < w; x++) { push(x, 0); push(x, h - 1); }
   for (let y = 0; y < h; y++) { push(0, y); push(w - 1, y); }
+  if (HOLES) for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) push(x, y);
   while (stack.length) {
     const p = stack.pop();
     const x = p % w, y = (p - x) / w;
@@ -67,8 +75,17 @@ function cutout({ w, h, rgba }) {
     const gr = greenness(d, i);
     if (alphaOnly || gr <= 10 || !near(x, y)) continue;
     const a = Math.max(0, Math.min(1, 1 - gr / 255));
-    d[i + 1] = Math.max(0, Math.min(255, Math.round((d[i + 1] - (1 - a) * 255) / Math.max(a, 0.05))));
-    d[i + 1] = Math.min(d[i + 1], Math.max(d[i], d[i + 2])); // убрать остаток зелёного
+    const unmix = (c) => Math.max(0, Math.min(255, Math.round((d[i + c] - (1 - a) * 255) / Math.max(a, 0.05))));
+    if (MAGENTA) {
+      d[i] = unmix(0);
+      d[i + 2] = unmix(2);
+      const m = Math.max(d[i + 1], Math.min(d[i], d[i + 2])); // убрать остаток пурпурного
+      d[i] = Math.min(d[i], m + 40);
+      d[i + 2] = Math.min(d[i + 2], m + 40);
+    } else {
+      d[i + 1] = unmix(1);
+      d[i + 1] = Math.min(d[i + 1], Math.max(d[i], d[i + 2])); // убрать остаток зелёного
+    }
     d[i + 3] = Math.round(a * 255);
   }
   return { w, h, rgba: d };

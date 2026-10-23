@@ -1,4 +1,4 @@
-// Временная отрисовка фигурами Phaser.Graphics. На этапе 4 заменится векторным артом.
+// Отрисовка корма, когтеточки, света и частиц: где есть картинки из src/assets — спрайты, где нет — фигуры Phaser.Graphics.
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 

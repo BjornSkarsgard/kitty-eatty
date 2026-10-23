@@ -59,17 +59,8 @@ export function makePortion(scene, colorIndex, w, h) {
   // у очень светлых цветов (белый) — наоборот, чуть темнее
   const fill = !hasArt ? color
     : luminance(color) > 0.85 ? darken(color, CONFIG.portion.layerDarken) : lighten(color, CONFIG.portion.layerLighten);
-  const r = Math.min(12, h * 0.25);
   const g = scene.add.graphics();
-  g.fillStyle(fill, 1);
-  g.fillRoundedRect(-w / 2, -h / 2, w, h, r);
-  g.fillStyle(0x000000, 0.12); // один тон тени снизу
-  g.fillRoundedRect(-w / 2, h * 0.15, w, h * 0.35, { tl: 0, tr: 0, bl: r, br: r });
-  g.fillStyle(0xffffff, 0.35); // белый блик
-  g.fillRoundedRect(-w / 2 + 6, -h / 2 + 5, w * 0.3, h * 0.16, h * 0.08);
-  g.lineStyle(4, CONFIG.outline, 1);
-  g.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
-  const parts = [g];
+  const parts = [...makeLayer(scene, w, h, fill, g), g];
   if (hasArt) {
     const img = scene.add.image(0, 0, key);
     // вписываем в рамку внутри слоя, чтобы корм не упирался в края
@@ -82,6 +73,32 @@ export function makePortion(scene, colorIndex, w, h) {
   const p = scene.add.container(0, 0, parts);
   p.color = colorIndex;
   return p;
+}
+
+// Слой порции: глянцевая белая плитка portion_layer, покрашенная tint'ом в цвет корма. Плитка режется на три
+// куска: закруглённые края сохраняют форму, середина растягивается под ширину банки. Без картинки — фигура в g.
+function makeLayer(scene, w, h, fill, g) {
+  const key = 'portion_layer';
+  if (!scene.textures.exists(key)) {
+    const r = Math.min(12, h * 0.25);
+    g.fillStyle(fill, 1).fillRoundedRect(-w / 2, -h / 2, w, h, r);
+    g.fillStyle(0xffffff, 0.35).fillRoundedRect(-w / 2 + 6, -h / 2 + 5, w * 0.3, h * 0.16, h * 0.08);
+    return [];
+  }
+  const tex = scene.textures.get(key);
+  const { width: W, height: H } = tex.getSourceImage();
+  const cap = CONFIG.portion.layerCap;
+  if (!tex.has('l')) {
+    tex.add('l', 0, 0, 0, cap, H);
+    tex.add('m', 0, cap, 0, W - cap * 2, H);
+    tex.add('r', 0, W - cap, 0, cap, H);
+  }
+  const k = h / H;
+  const cw = Math.min(cap * k, w / 2);
+  const left = scene.add.image(-w / 2, 0, key, 'l').setOrigin(0, 0.5).setDisplaySize(cw, h);
+  const mid = scene.add.image(-w / 2 + cw, 0, key, 'm').setOrigin(0, 0.5).setDisplaySize(Math.max(0, w - cw * 2), h);
+  const right = scene.add.image(w / 2 - cw, 0, key, 'r').setOrigin(0, 0.5).setDisplaySize(cw, h);
+  return [left, mid, right].map((img) => img.setTint(fill));
 }
 
 // Когтеточка: витки джута цвета корма вокруг банки от bottom до top (центр по x = 0) и картинка корма поверх.

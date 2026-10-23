@@ -3,7 +3,7 @@ import { CONFIG } from '../config.js';
 import { Board } from '../core/Board.js';
 import { makePortion, makeFxTextures } from '../view/draw.js';
 import { CatView } from '../view/CatView.js';
-import { sfx, music } from '../audio.js';
+import { sfx, sfxRandom, music } from '../audio.js';
 import LEVELS from '../levels/levels.json';
 
 const L = CONFIG.layout;
@@ -375,7 +375,7 @@ export class GameScene extends Phaser.Scene {
         this.fxCrumbs.setParticleTint(CONFIG.colors[color].fill);
         this.fxCrumbs.explode(A.crumbs, r.x, r.top);
       }, () => {
-        sfx(this, 'sfx_purr');
+        sfxRandom(this, 'sfx_purr', 3);
         this.fxHearts.explode(A.hearts, cat.x, cat.y - 60 * cat.baseScale);
         cat.track(this.time.delayedCall(A.catReturnDelay, () => cat.walkTo(cat.home.x, cat.home.y)));
       });

@@ -2,8 +2,6 @@
 
 music_game.mp3 — Suno (указать тариф и дату генерации)
 
-Синтезированы скриптом tools/sfx.mjs, сэмплов нет, лицензия не нужна:
-sfx_pick.mp3, sfx_drop.mp3, sfx_invalid.mp3, sfx_complete.mp3, sfx_button.mp3,
-sfx_undo.mp3, sfx_chew.mp3, sfx_purr.mp3, music_win.mp3
-
-Нет пока: sfx_meow_1.mp3, sfx_meow_2.mp3, sfx_meow_3.mp3
+ElevenLabs Sound Effects (указать тариф и дату генерации), импорт скриптом tools/sound-import.mjs:
+sfx_pick.mp3, sfx_drop.mp3, sfx_invalid.mp3, sfx_complete.mp3, sfx_button.mp3, sfx_undo.mp3,
+sfx_chew_1..3.mp3, sfx_purr_1..3.mp3, sfx_meow_1..3.mp3, music_win.mp3

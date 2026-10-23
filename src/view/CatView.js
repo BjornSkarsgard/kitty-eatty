@@ -266,7 +266,7 @@ export class CatView extends Phaser.GameObjects.Container {
   react_purr(done) {
     const P = CONFIG.anim.poke;
     this.setMood('happy');
-    sfx(this.scene, 'sfx_purr');
+    sfxRandom(this.scene, 'sfx_purr', 3);
     const s = this.baseScale;
     this.track(this.scene.tweens.add({
       targets: this, scaleX: s * 1.08, scaleY: s * 0.92,
@@ -419,7 +419,7 @@ export class CatView extends Phaser.GameObjects.Container {
         ease: 'Sine.easeInOut',
         onYoyo: () => {
           this.setMouth(true);
-          sfx(this.scene, 'sfx_chew', 0.8);
+          sfxRandom(this.scene, 'sfx_chew', 3, 0.8);
           onBite(k);
         },
         onComplete: () => {

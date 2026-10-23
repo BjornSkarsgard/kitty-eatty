@@ -60,39 +60,45 @@ export function setupAudioFocus(game) {
     const snd = game.sound;
     if (!snd.context) return; // HTML5 Audio (без WebAudio) — оставляем как есть
     snd.pauseOnBlur = false;
-    const ctx = () => snd.context;
+    const ctx = snd.context;
     const gain = snd.masterVolumeNode.gain;
+    const GESTURES = ['touchend', 'click', 'pointerup', 'keydown'];
     let timer = null;
-    // iOS может не дать включить звук без касания (InvalidStateError: Failed to start the audio device) —
-    // тогда ждём первого касания экрана и включаем по нему; до этого игра просто без звука.
+
     const fadeIn = () => {
-      const now = ctx().currentTime;
+      const now = ctx.currentTime;
       gain.cancelScheduledValues(now);
       gain.setValueAtTime(0, now);
       gain.linearRampToValueAtTime(snd.volume, now + A.focusFadeIn / 1000);
     };
-    const onTouch = () => {
-      document.removeEventListener('pointerdown', onTouch, true);
-      document.removeEventListener('touchend', onTouch, true);
-      ctx().resume().then(fadeIn).catch(() => {});
-    };
-    const resume = () => {
-      ctx().resume().then(fadeIn).catch(() => {
-        document.addEventListener('pointerdown', onTouch, true);
-        document.addEventListener('touchend', onTouch, true);
-      });
-    };
+    // iOS включает звук только по завершённому касанию (touchend / click), а иногда — не с первого раза.
+    // Пробуем на каждом, пока аудиосистема не заработает.
+    const tryResume = () => ctx.resume().catch(() => {});
+    const listen = (on) => GESTURES.forEach((e) => (on ? document.addEventListener : document.removeEventListener)
+      .call(document, e, tryResume, true));
+    // Громкость возвращаем, когда аудиосистема сама сообщила, что работает, — неважно, что её запустило.
+    ctx.addEventListener('statechange', () => {
+      if (ctx.state !== 'running' || document.hidden) return;
+      listen(false);
+      fadeIn();
+    });
+
     document.addEventListener('visibilitychange', () => {
-      const t = ctx().currentTime;
+      const t = ctx.currentTime;
       clearTimeout(timer);
       gain.cancelScheduledValues(t);
       gain.setValueAtTime(gain.value, t);
       if (document.hidden) {
+        listen(false);
         gain.linearRampToValueAtTime(0, t + A.focusFadeOut / 1000);
-        timer = setTimeout(() => ctx().suspend().catch(() => {}), A.focusFadeOut + A.focusSuspendDelay);
+        timer = setTimeout(() => ctx.suspend().catch(() => {}), A.focusFadeOut + A.focusSuspendDelay);
       } else {
         gain.setValueAtTime(0, t);
-        resume();
+        if (ctx.state === 'running') fadeIn(); // пауза ещё не успела наступить
+        else {
+          listen(true);
+          tryResume();
+        }
       }
     });
   });

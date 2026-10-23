@@ -51,6 +51,39 @@ export function music(scene, key) {
   startCopy();
 }
 
+// Сворачивание и возврат в игру. Phaser сам мгновенно приостанавливает звук, и на iOS при возврате на долю
+// секунды проигрывается оборванный кусок буфера — «писк». Поэтому паузу делаем сами: сначала плавно в тишину,
+// и только когда тишина дошла до динамика — пауза; при возврате — запуск и плавное возвращение громкости.
+export function setupAudioFocus(game) {
+  const A = CONFIG.audio;
+  game.events.once('ready', () => {
+    const snd = game.sound;
+    if (!snd.context) return; // HTML5 Audio (без WebAudio) — оставляем как есть
+    snd.pauseOnBlur = false;
+    const gain = snd.masterVolumeNode.gain;
+    let timer = null;
+    document.addEventListener('visibilitychange', () => {
+      const ctx = snd.context;
+      const t = ctx.currentTime;
+      clearTimeout(timer);
+      gain.cancelScheduledValues(t);
+      gain.setValueAtTime(gain.value, t);
+      if (document.hidden) {
+        gain.linearRampToValueAtTime(0, t + A.focusFadeOut / 1000);
+        timer = setTimeout(() => ctx.suspend(), A.focusFadeOut + A.focusSuspendDelay);
+      } else {
+        gain.setValueAtTime(0, t);
+        ctx.resume().then(() => {
+          const now = ctx.currentTime;
+          gain.cancelScheduledValues(now);
+          gain.setValueAtTime(0, now);
+          gain.linearRampToValueAtTime(snd.volume, now + A.focusFadeIn / 1000);
+        });
+      }
+    });
+  });
+}
+
 // Что играет и с какой секунды трека (у свежей копии петли) — для часов такта (beat.js).
 export function musicPosition() {
   const snd = current?.sound;

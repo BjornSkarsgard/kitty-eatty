@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { CONFIG } from './config.js';
 import { GameScene } from './scenes/GameScene.js';
 import { BootScene, PreloadScene } from './scenes/LoadingScenes.js';
+import { setupAudioFocus } from './audio.js';
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -15,6 +16,7 @@ const game = new Phaser.Game({
   },
   scene: [BootScene, PreloadScene, GameScene],
 });
+setupAudioFocus(game);
 
 // Для отладки из консоли браузера в режиме разработки.
 if (import.meta.env.DEV) window.__game = game;

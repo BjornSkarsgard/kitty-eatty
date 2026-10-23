@@ -295,7 +295,7 @@ export class GameScene extends Phaser.Scene {
     this.deselect();
     const last = this.board.history[this.board.history.length - 1];
     if (!last) return;
-    sfx(this, 'sfx_undo');
+    sfx(this, 'sfx_undo', CONFIG.audio.undo);
     if (this.board.isComplete(last.to)) this.unfeed(this.board.bowls[last.to][0]);
 
     const startSlot = this.portions[last.from].length;

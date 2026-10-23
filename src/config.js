@@ -27,7 +27,7 @@ export const CONFIG = {
     size: 120,        // звезда в окне победы, px
     gap: 24,
     popDelay: 280,    // мс между появлением звёзд
-    emptyAlpha: 0.35, // незаработанная звезда (пока нет картинки ui_star_empty)
+    emptyAlpha: 0.35, // незаработанная звезда, если нет картинки ui_star_empty
   },
 
   // Генерация уровней (tools/generate-levels.mjs). После правки: npm run levels

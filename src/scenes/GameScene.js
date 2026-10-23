@@ -31,6 +31,9 @@ export class GameScene extends Phaser.Scene {
     this.board = new Board(level);
     this.selected = null;
     this.won = false;
+    // Порядок хрустов на уровень, например 2 1 3: каждый кот берёт следующий, по кругу (2 1 3 2 1 …)
+    this.chewOrder = Phaser.Utils.Array.Shuffle([1, 2, 3]);
+    this.chewNext = 0;
 
     if (this.textures.exists('bg_game')) {
       const bg = this.add.image(CONFIG.width / 2, CONFIG.height / 2, 'bg_game');
@@ -368,6 +371,7 @@ export class GameScene extends Phaser.Scene {
       cat.setMood('happy');
       const food = this.portions[bowl].slice().reverse(); // сверху вниз
       cat.eat(food.length, (k) => {
+        if (k === 0) sfx(this, `sfx_chew_${this.chewOrder[this.chewNext++ % this.chewOrder.length]}`, 0.8);
         // порция подлетает ко рту и исчезает
         cat.track(this.tweens.add({
           targets: food[k], y: r.top, scale: 0, alpha: 0, duration: A.eatPerPortion * 0.5, ease: 'Back.easeIn',

@@ -419,7 +419,6 @@ export class CatView extends Phaser.GameObjects.Container {
         ease: 'Sine.easeInOut',
         onYoyo: () => {
           this.setMouth(true);
-          sfxRandom(this.scene, 'sfx_chew', 3, 0.8);
           onBite(k);
         },
         onComplete: () => {

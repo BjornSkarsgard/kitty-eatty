@@ -8,7 +8,7 @@ import { makeButton } from '../view/Button.js';
 import { sfx, sfxRandom, music } from '../audio.js';
 import { currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo } from '../save.js';
 import { showPopup } from '../view/Popup.js';
-import { iconButton, counterPill, plate, tray } from '../view/ui.js';
+import { iconButton, counterPill, plate, tray, makeIcon } from '../view/ui.js';
 import { addSettingsMenu } from '../view/settings.js';
 import LEVELS from '../levels/levels.json';
 
@@ -247,10 +247,6 @@ export class GameScene extends Phaser.Scene {
     this.undoBtn = iconButton(this, W / 2 - step / 2, U.trayY, 'undo', () => this.undo());
     iconButton(this, W / 2 + step / 2, U.trayY, 'restart', () => this.scene.restart({ levelIndex: this.levelIndex }));
     this.refreshUndo();
-  }
-
-  makeButton(x, y, label, onTap, depth = 0, w = 220) {
-    return makeButton(this, x, y, label, onTap, { depth, w });
   }
 
   // ---------- ввод ----------
@@ -566,34 +562,78 @@ export class GameScene extends Phaser.Scene {
 
   // ---------- победа ----------
 
+  // Окно победы (как в референсе): панель с табличкой «Уровень N» и крестиком, звёзды, похвала по звёздам,
+  // «Награды:» на подставке, зелёная «Продолжить». Крестик — домой.
   showWin() {
     const W = CONFIG.width;
     const H = CONFIG.height;
+    const WC = CONFIG.win;
     sfx(this, 'music_win');
     const level = LEVELS[this.levelIndex];
     const reward = recordWin(level, this.levelIndex, this.board.history.length, LEVELS.length);
     this.refreshUndo();
     for (let k = 0; k < 5; k++) this.fxConfetti.explode(Math.round(A.confetti / 5), W * (0.1 + k * 0.2), H);
     const isLast = this.levelIndex === LEVELS.length - 1;
-    this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.55).setDepth(20).setInteractive();
-    this.add.text(W / 2, H * 0.36, 'Все котики сыты!', {
-      fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '56px', color: '#ffffff',
-    }).setOrigin(0.5).setDepth(21);
-    this.showStars(W / 2, H * 0.45, reward.stars);
-    this.add.text(W / 2, H * 0.535, `Ходов: ${this.board.history.length} (минимум ${LEVELS[this.levelIndex].minMoves})`, {
-      fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '34px', color: '#cfc6e0',
-    }).setOrigin(0.5).setDepth(21);
-    const gains = [reward.coins && `+${reward.coins} монет`, reward.undos && `+${reward.undos} отмена`].filter(Boolean);
-    if (gains.length) {
-      this.add.text(W / 2, H * 0.585, gains.join('   '), {
-        fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '40px', color: '#ffd43b',
-        stroke: '#6b3d1f', strokeThickness: 8,
-      }).setOrigin(0.5).setDepth(21);
+    const font = `"${CONFIG.font}", sans-serif`;
+    this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.6).setDepth(20).setInteractive();
+
+    // всё, кроме звёзд, — в одном контейнере, он «выпрыгивает»; звёзды появляются следом
+    const cy = H / 2 + WC.offsetY;
+    const box = this.add.container(W / 2, cy).setDepth(21);
+    const pw = WC.width;
+    const ph = WC.height;
+    const g = this.add.graphics();
+    g.fillStyle(0x000000, 0.35).fillRoundedRect(-pw / 2 + 6, -ph / 2 + 14, pw, ph, 48);
+    g.fillStyle(0xd48a00, 1).fillRoundedRect(-pw / 2 - 10, -ph / 2 - 10, pw + 20, ph + 20, 56);
+    g.fillStyle(0xf5b301, 1).fillRoundedRect(-pw / 2 - 10, -ph / 2 - 10, pw + 20, ph + 12, 56);
+    g.fillStyle(0x5b3fd6, 1).fillRoundedRect(-pw / 2, -ph / 2, pw, ph, 46);
+    g.fillStyle(0x6d52e8, 1).fillRoundedRect(-pw / 2 + 12, -ph / 2 + 12, pw - 24, ph * 0.45, 38);
+    // подставка под награды
+    g.fillStyle(0x3b27a0, 1).fillEllipse(0, WC.rewardsY + 58, 380, 70);
+    g.fillStyle(0x4a33c0, 1).fillEllipse(0, WC.rewardsY + 46, 380, 64);
+    box.add(g);
+    box.add(plate(this, 0, -ph / 2 + 4, `Уровень ${level.id}`, { depth: 0, color: 0x4b33a8 }).setScale(1.25));
+
+    const praise = this.add.text(0, WC.praiseY, WC.praise[reward.stars - 1], {
+      fontFamily: font, fontStyle: 'bold', fontSize: '84px', stroke: '#7a3a00', strokeThickness: 14,
+      shadow: { offsetX: 0, offsetY: 6, color: '#4a2000', blur: 0, stroke: true, fill: true },
+    }).setOrigin(0.5);
+    const grad = praise.context.createLinearGradient(0, 0, 0, praise.height);
+    grad.addColorStop(0.25, '#fff3a0');
+    grad.addColorStop(0.75, '#ffa800');
+    praise.setFill(grad);
+    box.add(praise);
+
+    box.add(this.add.text(0, WC.rewardsY - 92, 'Награды:', {
+      fontFamily: font, fontStyle: 'bold', fontSize: '36px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 7,
+    }).setOrigin(0.5));
+    const items = [['coin', reward.coins], ['undo', reward.undos]].filter(([, n]) => n > 0);
+    items.forEach(([icon, n], i) => {
+      const x = (i - (items.length - 1) / 2) * 170;
+      const ic = makeIcon(this, icon, 104).setPosition(x, WC.rewardsY);
+      if (icon !== 'coin') ic.setScale(ic.scale * 0.8);
+      box.add(icon === 'coin' ? ic : [this.add.circle(x, WC.rewardsY, 48, 0x7b5cf0), ic]);
+      box.add(this.add.text(x + 40, WC.rewardsY + 38, String(n), {
+        fontFamily: font, fontStyle: 'bold', fontSize: '50px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 9,
+      }).setOrigin(0.5));
+    });
+    if (!items.length) {
+      box.add(this.add.text(0, WC.rewardsY, 'Уровень уже пройден', {
+        fontFamily: font, fontStyle: 'bold', fontSize: '32px', color: '#d9cfff',
+      }).setOrigin(0.5));
     }
-    this.makeButton(W / 2, H * 0.67, isLast ? 'С начала' : 'Дальше', () => {
-      this.scene.restart({ levelIndex: isLast ? 0 : this.levelIndex + 1 });
-    }, 21);
+
+    const next = () => this.scene.restart({ levelIndex: isLast ? 0 : this.levelIndex + 1 });
+    box.add(makeButton(this, 0, WC.buttonY, isLast ? 'С начала' : 'Продолжить', next, { w: 440, h: 120, size: 52, color: 0x43c43a }));
+    box.add(iconButton(this, pw / 2 - 6, -ph / 2 + 4, 'close', () => this.scene.start('Home'), {
+      size: 92, shape: 'round', color: CONFIG.ui.exitColor, depth: 0,
+    }));
+
+    box.setScale(0.5).setAlpha(0);
+    this.tweens.add({ targets: box, scale: 1, alpha: 1, duration: 320, ease: 'Back.easeOut' });
+    this.showStars(W / 2, cy + WC.starsY, reward.stars);
   }
+
 
   // Три звезды в ряд: заработанные по очереди выпрыгивают со вспышкой, остальные — бледные.
   // Картинки ui_star / ui_star_empty; пока их нет — растянутая искорка fx_star.

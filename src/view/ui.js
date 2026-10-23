@@ -99,6 +99,9 @@ const ICONS = {
     g.fillTriangle(-s * 0.2, -s * 0.22, -s * 0.12, -s * 0.38, -s * 0.03, -s * 0.27).fillTriangle(s * 0.2, -s * 0.22, s * 0.12, -s * 0.38, s * 0.03, -s * 0.27);
     g.fillEllipse(0, s * 0.27, s * 0.56, s * 0.3);
   },
+  close(g, s) {
+    g.lineStyle(s * 0.16, 0xffffff, 1).lineBetween(-s * 0.24, -s * 0.24, s * 0.24, s * 0.24).lineBetween(s * 0.24, -s * 0.24, -s * 0.24, s * 0.24);
+  },
   coin(g, s) {
     g.fillStyle(0xc77d0a, 1).fillCircle(0, s * 0.03, s * 0.46);
     g.fillStyle(0xffc531, 1).fillCircle(0, 0, s * 0.44);

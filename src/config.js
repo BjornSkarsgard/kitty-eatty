@@ -59,6 +59,13 @@ export const CONFIG = {
     undoPrice: 50,       // цена отмены в монетах
   },
 
+  // Окно победы: размеры панели и положения внутри неё (от центра панели); похвала — по числу звёзд (1, 2, 3).
+  win: {
+    width: 600, height: 700, offsetY: -20,
+    starsY: -210, praiseY: -90, rewardsY: 90, buttonY: 260,
+    praise: ['Неплохо!', 'Отлично!', 'Идеально!'],
+  },
+
   // Генерация уровней (tools/generate-levels.mjs). После правки: npm run levels
   levelGen: {
     seed: 20261022,

@@ -84,6 +84,57 @@ export function makePortion(scene, colorIndex, w, h) {
   return p;
 }
 
+// Когтеточка: витки джута цвета корма вокруг банки от bottom до top (центр по x = 0) и картинка корма поверх.
+// Витки — отдельные графики (container.bands, снизу вверх), чтобы их можно было наматывать по одному.
+export function makeJuteWrap(scene, colorIndex, w, top, bottom, s) {
+  const J = CONFIG.jute;
+  const color = mix(CONFIG.colors[colorIndex].fill, J.natural, J.naturalMix);
+  const bh = J.band * s;
+  const step = bh * J.overlap;
+  const bw = w + J.overhang * s * 2;
+  const n = Math.max(1, Math.round((bottom - top - bh) / step) + 1);
+  const bands = [];
+  for (let i = 0; i < n; i++) {
+    const y = bottom - bh / 2 - i * ((bottom - top - bh) / Math.max(1, n - 1));
+    const g = scene.add.graphics({ x: 0, y });
+    g.fillStyle(color, 1).fillRoundedRect(-bw / 2, -bh / 2, bw, bh, bh / 2);
+    // волокна — короткие косые штрихи, как у скрученной верёвки
+    g.lineStyle(Math.max(1.5, 2 * s), darken(color, J.strandDarken), 1);
+    const ss = J.strandStep * s;
+    for (let x = -bw / 2 + bh * 0.4; x < bw / 2 - bh * 0.9; x += ss) g.lineBetween(x, bh * 0.35, x + bh * 0.5, -bh * 0.35);
+    g.fillStyle(0xffffff, 0.25).fillRoundedRect(-bw / 2 + bh * 0.4, -bh * 0.38, bw - bh * 0.8, bh * 0.2, bh * 0.1);
+    g.lineStyle(Math.max(2, 3 * s), CONFIG.outline, 1).strokeRoundedRect(-bw / 2, -bh / 2, bw, bh, bh / 2);
+    bands.push(g);
+  }
+  // картинка корма поверх джута
+  const cy = (top + bottom) / 2;
+  const size = Math.min(w * J.iconSize, (bottom - top) * 0.6);
+  let icon;
+  let iconScale = 1;
+  if (scene.textures.exists(`food_${colorIndex}`)) {
+    icon = scene.add.image(0, cy, `food_${colorIndex}`);
+    iconScale = Math.min(size / icon.width, size / icon.height);
+    icon.setScale(iconScale);
+  } else {
+    icon = scene.add.graphics({ x: 0, y: cy });
+    icon.fillStyle(CONFIG.outline, 1);
+    drawShape(icon, CONFIG.colors[colorIndex].shape, size * 0.55);
+    icon.fillStyle(lighten(color, 0.6), 1);
+    drawShape(icon, CONFIG.colors[colorIndex].shape, size * 0.42);
+  }
+  const c = scene.add.container(0, 0, [...bands, icon]);
+  c.bands = bands;
+  c.icon = icon;
+  c.iconScale = iconScale;
+  return c;
+}
+
+// Смешать два цвета: k = 0 — a, 1 — b.
+function mix(a, b, k) {
+  const ch = (sh) => Math.round(((a >> sh) & 255) * (1 - k) + ((b >> sh) & 255) * k);
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+}
+
 function luminance(c) {
   return (0.299 * ((c >> 16) & 255) + 0.587 * ((c >> 8) & 255) + 0.114 * (c & 255)) / 255;
 }

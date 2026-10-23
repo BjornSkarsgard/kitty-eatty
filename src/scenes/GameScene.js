@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { Board } from '../core/Board.js';
-import { makePortion, makeFxTextures } from '../view/draw.js';
+import { makePortion, makeFxTextures, makeJuteWrap } from '../view/draw.js';
 import { CatView } from '../view/CatView.js';
 import { sfx, sfxRandom, music } from '../audio.js';
 import LEVELS from '../levels/levels.json';
@@ -108,6 +108,7 @@ export class GameScene extends Phaser.Scene {
   createBowls() {
     // Банка из двух слоёв: задний (стекло, горлышко, подставка) под кормом, передний (блик) над ним.
     this.jarFront = this.bowlRects.map((r) => this.add.graphics({ x: r.x, y: 0 }).setDepth(1));
+    this.wraps = this.bowlRects.map(() => null); // обмотка-когтеточка съеденной банки
     this.bowlGfx = this.bowlRects.map((r, i) => {
       const g = this.add.graphics({ x: r.x, y: 0 });
       const zone = this.add.zone(r.x, (r.top + r.bottom) / 2, this.dim.bw + this.dim.gx * 0.9, r.bottom - r.top + this.dim.gy * 0.9)
@@ -258,7 +259,7 @@ export class GameScene extends Phaser.Scene {
 
   shake(i) {
     sfx(this, 'sfx_invalid');
-    const layers = [this.bowlGfx[i], this.jarFront[i]];
+    const layers = [this.bowlGfx[i], this.jarFront[i], this.wraps[i]].filter(Boolean);
     const x = this.bowlRects[i].x;
     this.tweens.killTweensOf(layers);
     layers.forEach((l) => { l.x = x; });
@@ -380,6 +381,7 @@ export class GameScene extends Phaser.Scene {
         this.fxCrumbs.explode(A.crumbs, r.x, r.top);
       }, () => {
         sfxRandom(this, 'sfx_purr', 3);
+        this.wrapJar(bowl, color);
         this.fxHearts.explode(A.hearts, cat.x, cat.y - 60 * cat.baseScale);
         cat.track(this.time.delayedCall(A.catReturnDelay, () => cat.walkTo(cat.home.x, cat.home.y)));
       });
@@ -397,7 +399,40 @@ export class GameScene extends Phaser.Scene {
       this.tweens.killTweensOf(p);
       p.setScale(1).setAlpha(1);
     });
+    this.unwrapJar(bowl);
     cat.walkTo(cat.home.x, cat.home.y, () => cat.setMood('open'));
+  }
+
+  // Банку снизу вверх обматывает джут: каждый виток натягивается от центра к краям, затем выскакивает картинка корма.
+  wrapJar(bowl, color) {
+    this.unwrapJar(bowl, true);
+    const J = CONFIG.jute;
+    const r = this.bowlRects[bowl];
+    const s = this.dim.scale;
+    const top = r.top + CONFIG.jar.rimHeight * s / 2;
+    const bottom = r.bottom - CONFIG.jar.baseHeight * s * 0.4;
+    const wrap = makeJuteWrap(this, color, this.dim.bw, top, bottom, s).setPosition(r.x, 0).setDepth(2);
+    this.wraps[bowl] = wrap;
+    wrap.bands.forEach((b, k) => {
+      b.setScale(0, 1);
+      this.tweens.add({ targets: b, scaleX: 1, delay: k * J.bandStagger, duration: J.bandDuration, ease: 'Quad.easeOut' });
+    });
+    wrap.icon.setScale(0);
+    this.tweens.add({
+      targets: wrap.icon, scale: wrap.iconScale, delay: wrap.bands.length * J.bandStagger + J.bandDuration,
+      duration: J.iconDuration, ease: 'Back.easeOut',
+    });
+  }
+
+  unwrapJar(bowl, instant = false) {
+    const wrap = this.wraps[bowl];
+    if (!wrap) return;
+    this.wraps[bowl] = null;
+    const parts = [...wrap.bands, wrap.icon];
+    this.tweens.killTweensOf(parts);
+    this.tweens.killTweensOf(wrap);
+    if (instant) return wrap.destroy();
+    this.tweens.add({ targets: wrap, alpha: 0, duration: CONFIG.jute.unwrapDuration, onComplete: () => wrap.destroy() });
   }
 
   // ---------- победа ----------

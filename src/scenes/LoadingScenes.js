@@ -163,10 +163,8 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   // Новичок — сразу в уровень; дошёл до map.homeFromLevel — на главный экран.
-  // Комнаты кота пока нет — вместо неё карта.
   firstScene() {
-    if (unlockedLevel(LEVELS.length) + 1 < CONFIG.map.homeFromLevel) return 'Game';
-    return this.scene.manager.keys.Home ? 'Home' : 'Map';
+    return unlockedLevel(LEVELS.length) + 1 < CONFIG.map.homeFromLevel ? 'Game' : 'Home';
   }
 
   drawBar(p) {

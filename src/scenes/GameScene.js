@@ -4,6 +4,7 @@ import { Board } from '../core/Board.js';
 import { makePortion, makeFxTextures, makeJuteWrap, makePortionHalo, makeSoftTexture } from '../view/draw.js';
 import { beatPulse, beatPhase } from '../beat.js';
 import { CatView } from '../view/CatView.js';
+import { makeButton } from '../view/Button.js';
 import { sfx, sfxRandom, music } from '../audio.js';
 import { currentLevel, setCurrentLevel, recordWin, starsFor } from '../save.js';
 import LEVELS from '../levels/levels.json';
@@ -240,20 +241,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   makeButton(x, y, label, onTap, depth = 0, w = 220) {
-    const h = 84;
-    const g = this.add.graphics();
-    g.fillStyle(0x5f4b8b, 1);
-    g.fillRoundedRect(-w / 2, -h / 2, w, h, 20);
-    g.lineStyle(CONFIG.outlineWidth, CONFIG.outline, 1);
-    g.strokeRoundedRect(-w / 2, -h / 2, w, h, 20);
-    const t = this.add.text(0, 0, label, { fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '34px', color: '#ffffff' }).setOrigin(0.5);
-    const btn = this.add.container(x, y, [g, t]).setDepth(depth).setSize(w, h).setInteractive();
-    btn.on('pointerdown', () => {
-      sfx(this, 'sfx_button');
-      this.tweens.add({ targets: btn, scale: 0.92, duration: 60, yoyo: true });
-      onTap();
-    });
-    return btn;
+    return makeButton(this, x, y, label, onTap, { depth, w });
   }
 
   // ---------- ввод ----------

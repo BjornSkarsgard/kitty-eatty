@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { CatView } from '../view/CatView.js';
 import { sfx, music } from '../audio.js';
+import { makeButton } from '../view/Button.js';
 import { unlockedLevel, levelStars } from '../save.js';
 import LEVELS from '../levels/levels.json';
 
@@ -34,6 +35,7 @@ export class MapScene extends Phaser.Scene {
     this.cameras.main.scrollY = Phaser.Math.Clamp(cy - H * M.currentAt, 0, worldH - H);
     this.refresh();
     this.setupInput();
+    makeButton(this, 105, 70, 'Домой', () => this.scene.start('Home'), { depth: 10, w: 170 }).setScrollFactor(0);
     music(this, 'music_game');
   }
 
@@ -41,7 +43,8 @@ export class MapScene extends Phaser.Scene {
 
   setupInput() {
     const cam = this.cameras.main;
-    this.input.on('pointerdown', (p) => {
+    this.input.on('pointerdown', (p, over) => {
+      if (over.length) return; // нажали кнопку поверх карты
       this.drag = { startY: p.y, lastY: p.y, lastT: p.event.timeStamp, moved: false };
       this.velocity = 0;
     });

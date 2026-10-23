@@ -200,37 +200,30 @@ function lighten(c, k) {
   return (mix((c >> 16) & 255) << 16) | (mix((c >> 8) & 255) << 8) | mix(c & 255);
 }
 
-// Текстуры для частиц: крошка, сердечко, звёздочка, конфетти.
+// Текстуры для частиц: крошка, сердечко, звёздочка, конфетти. Если в src/assets есть картинка (fx_*.png) —
+// берётся она, фигура кодом рисуется только для недостающих.
 export function makeFxTextures(scene) {
-  if (scene.textures.exists('fx_dot')) return;
   const g = scene.make.graphics({ add: false });
-  const centered = (size, draw) => {
+  const make = (key, size, draw) => {
+    if (scene.textures.exists(key)) return;
     g.clear();
     g.save();
-    g.translateCanvas(size / 2, size / 2);
+    g.translateCanvas(size[0] / 2, size[1] / 2);
     draw();
     g.restore();
+    g.generateTexture(key, size[0], size[1]);
   };
-
-  centered(16, () => g.fillStyle(0xffffff, 1).fillCircle(0, 0, 8));
-  g.generateTexture('fx_dot', 16, 16);
-
-  centered(40, () => {
+  make('fx_dot', [16, 16], () => g.fillStyle(0xffffff, 1).fillCircle(0, 0, 8));
+  make('fx_heart', [40, 40], () => {
     g.fillStyle(CONFIG.outline, 1);
     drawShape(g, 'heart', 19);
     g.fillStyle(0xff6b9a, 1);
     drawShape(g, 'heart', 14);
   });
-  g.generateTexture('fx_heart', 40, 40);
-
-  centered(32, () => {
+  make('fx_star', [32, 32], () => {
     g.fillStyle(0xffffff, 1);
     drawShape(g, 'star', 15);
   });
-  g.generateTexture('fx_star', 32, 32);
-
-  g.clear();
-  g.fillStyle(0xffffff, 1).fillRect(0, 0, 10, 16);
-  g.generateTexture('fx_confetti', 10, 16);
+  make('fx_confetti', [10, 16], () => g.fillStyle(0xffffff, 1).fillRect(-5, -8, 10, 16));
   g.destroy();
 }

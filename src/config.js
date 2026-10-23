@@ -40,6 +40,13 @@ export const CONFIG = {
     minMovesPerColor: 1.5, // отсев слишком коротких уровней: минимум ходов ≥ цвета × это
   },
 
+  // Эффекты WebGL (postFX). На этапе 5 — переключатель «Эффекты» в настройках; без WebGL их нет вовсе.
+  fx: {
+    enabled: true,
+    selectGlow: 0xfff3b0,     // свечение серии, которая полетит
+    selectGlowStrength: 4,
+  },
+
   outline: 0x1b1426,     // толстый тёмный контур
   outlineWidth: 6,
   bowlDoneStroke: 0xffd43b, // цвет звёздочек, когда банка собрана
@@ -91,8 +98,10 @@ export const CONFIG = {
   },
 
   anim: {
-    liftY: 34,            // насколько поднимается выбранная серия
-    liftDuration: 110,
+    liftY: 22,            // насколько поднимается выбранная банка
+    liftDuration: 140,
+    selectPulse: 1.06,    // серия, которая полетит, пульсирует: до какого масштаба
+    selectPulseDuration: 380,
     moveDuration: 280,    // полёт порции из банки в банку
     moveArc: 40,          // насколько полёт выгибается вверх от прямой (0 — строго по прямой)
     moveStagger: 45,      // задержка между порциями одной серии

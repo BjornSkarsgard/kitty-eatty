@@ -230,15 +230,47 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  // Выбранная банка приподнимается целиком (с кормом), а серия, которая полетит, пульсирует и светится.
   select(i) {
     sfx(this, 'sfx_pick');
     this.selected = i;
-    const run = this.board.topRun(i);
-    this.portions[i].slice(-run).forEach((p, k, arr) => {
-      const slot = this.portions[i].length - arr.length + k;
+    this.liftJar(i, -A.liftY * this.dim.scale, 'Back.easeOut');
+    this.portions[i].slice(-this.board.topRun(i)).forEach((p) => this.pulse(p));
+  }
+
+  // Сдвинуть банку по вертикали вместе с кормом и обмоткой (dy = 0 — на место).
+  liftJar(i, dy, ease = 'Quad.easeOut') {
+    const layers = [this.jarBack[i], this.jarFront[i], this.wraps[i]].filter(Boolean);
+    this.tweens.killTweensOf(layers);
+    this.tweens.add({ targets: layers, y: dy, duration: A.liftDuration, ease });
+    this.portions[i].forEach((p, slot) => {
+      const pos = this.slotPos(i, slot);
       this.tweens.killTweensOf(p);
-      this.tweens.add({ targets: p, y: this.slotPos(i, slot).y - A.liftY * this.dim.scale, duration: A.liftDuration, ease: 'Quad.easeOut' });
+      this.stopPulse(p);
+      this.tweens.add({ targets: p, x: pos.x, y: pos.y + dy, duration: A.liftDuration, ease });
     });
+  }
+
+  // Пульсация порции из выбранной серии: чуть увеличивается, на WebGL ещё и мягко светится (если эффекты включены).
+  pulse(p) {
+    this.tweens.add({
+      targets: p, scale: A.selectPulse, delay: A.liftDuration, duration: A.selectPulseDuration,
+      yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
+    if (!CONFIG.fx.enabled || !p.postFX || this.renderer.type !== Phaser.WEBGL) return;
+    p.glowFx = p.postFX.addGlow(CONFIG.fx.selectGlow, 0, 0, false, 0.1, 10);
+    this.tweens.add({
+      targets: p.glowFx, outerStrength: CONFIG.fx.selectGlowStrength, delay: A.liftDuration,
+      duration: A.selectPulseDuration, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
+  }
+
+  stopPulse(p) {
+    p.setScale(1);
+    if (!p.glowFx) return;
+    this.tweens.killTweensOf(p.glowFx);
+    p.postFX.remove(p.glowFx);
+    p.glowFx = null;
   }
 
   deselect() {
@@ -248,14 +280,10 @@ export class GameScene extends Phaser.Scene {
     this.settleBowl(i);
   }
 
-  // Плавно ставит все порции банки на свои места.
+  // Плавно ставит банку и все её порции на свои места.
   settleBowl(i) {
-    this.portions[i].forEach((p, slot) => {
-      const pos = this.slotPos(i, slot);
-      this.tweens.killTweensOf(p);
-      p.setScale(1).setAlpha(1);
-      this.tweens.add({ targets: p, x: pos.x, y: pos.y, duration: A.liftDuration, ease: 'Quad.easeOut' });
-    });
+    this.portions[i].forEach((p) => p.setAlpha(1));
+    this.liftJar(i, 0);
   }
 
   shake(i) {
@@ -315,7 +343,8 @@ export class GameScene extends Phaser.Scene {
       const slot = startSlot + sprites.length - 1 - k;
       const dst = this.slotPos(to, slot);
       this.tweens.killTweensOf(p);
-      p.setScale(1).setAlpha(1).setDepth(5);
+      this.stopPulse(p);
+      p.setAlpha(1).setDepth(5);
       const x0 = p.x;
       const y0 = p.y;
       const arc = A.moveArc * this.dim.scale;

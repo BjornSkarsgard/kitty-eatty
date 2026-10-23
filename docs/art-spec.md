@@ -6,7 +6,7 @@
 
 ## Общие требования ко всем файлам
 
-- **PNG с прозрачным фоном** (кроме фона уровня — он JPG/WebP без прозрачности). Если генератор не умеет прозрачность, делай на ровном однотонном фоне — его уберёт `tools/cutout.mjs`.
+- **Генерировать на ровном ярко-зелёном фоне #00FF00**, а не с прозрачностью: встроенная прозрачность генераторов оставляет дымку вокруг силуэта. Зелёный фон убирает `tools/cutout.mjs` (чистый край, без зелёной каймы), в игру идёт PNG с прозрачностью. Фон уровня — JPG/WebP без прозрачности.
 - **Свет один для всех: сверху слева.** Блик — вверху слева, тень на объекте — внизу справа.
 - **Ракурс один:** вид спереди, камера на уровне объекта, без перспективы «сверху» и без поворота в три четверти.
 - **Без тени на полу.** Мягкая тень под объектом — отдельный спрайт `shadow_soft.png`: так она остаётся на земле, когда объект прыгает.
@@ -34,7 +34,7 @@
 
 ## Префикс стиля (вставлять в начало каждого запроса)
 
-> Stylized 3D cartoon game asset for a cozy mobile puzzle game, in the style of Royal Match and Magic Sort. Soft clay-like 3D render, smooth rounded shapes, soft studio lighting from the top-left, gentle glossy highlights on the top-left, soft ambient occlusion, warm saturated colors, no outline, no text, no ground shadow, isolated on a transparent background, centered, front view, orthographic camera at eye level.
+> Stylized 3D cartoon game asset for a cozy mobile puzzle game, in the style of Royal Match and Magic Sort. Soft clay-like 3D render, smooth rounded shapes, soft studio lighting from the top-left, gentle glossy highlights on the top-left, soft ambient occlusion, warm saturated colors, no outline, no text, no ground shadow, crisp clean silhouette edges with no glow and no halo, on a flat solid pure green (#00FF00) background with no gradient and no shadow on it, centered, front view, orthographic camera at eye level.
 
 ## 1. Коты
 
@@ -87,11 +87,11 @@
 
 Потом **каждая часть отдельно**, с этим референсом во вложении. Пример для головы:
 
-> [префикс стиля] Using the attached kitten as the exact reference (same style, same orange fur color, same lighting from the top-left), draw ONLY the head of this kitten: the round head with both ears, the white muzzle and the pink nose. NO eyes and NO mouth — leave the face smooth where the eyes and mouth would be. No body, no neck. Front view, centered, transparent background. Square image 1024×1024.
+> [префикс стиля] Using the attached kitten as the exact reference (same style, same orange fur color, same lighting from the top-left), draw ONLY the head of this kitten: the round head with both ears, the white muzzle and the pink nose. NO eyes and NO mouth — leave the face smooth where the eyes and mouth would be. No body, no neck. Front view, centered, flat pure green (#00FF00) background. Square image 1024×1024.
 
 Для тела:
 
-> [префикс стиля] Using the attached kitten as the exact reference, draw ONLY the sitting torso of this kitten: the round body with the white chest patch, the haunches at the bottom. NO head, NO front legs, NO tail. At the top, extend a short neck stub that will be hidden under the head. Front view, centered, transparent background. Square image 1024×1024.
+> [префикс стиля] Using the attached kitten as the exact reference, draw ONLY the sitting torso of this kitten: the round body with the white chest patch, the haunches at the bottom. NO head, NO front legs, NO tail. At the top, extend a short neck stub that will be hidden under the head. Front view, centered, flat pure green (#00FF00) background. Square image 1024×1024.
 
 Хвост, лапа, глаза и рот — по тому же шаблону: «draw ONLY the …», и списком перечислить, чего на картинке быть не должно.
 

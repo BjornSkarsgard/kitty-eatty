@@ -68,7 +68,8 @@ export class GameScene extends Phaser.Scene {
     const art = CONFIG.jar.art;
     const neck = (bw) => (art.top * bw) / tex.width;
     const base = (bw) => ((tex.height - art.bottom) * bw) / tex.width;
-    const bh0 = this.board.capacity * L.portionHeight + L.bowlPadding + base(L.bowlWidth);
+    const floor = (bw) => ((tex.height - art.floor) * bw) / tex.width;
+    const bh0 = this.board.capacity * L.portionHeight + L.bowlPadding + floor(L.bowlWidth);
     const availW = CONFIG.width - L.sideMargin * 2;
     const availH = L.bowlsBottom - L.bowlsTop - neck(L.bowlWidth);
     let best = null;
@@ -88,11 +89,12 @@ export class GameScene extends Phaser.Scene {
       gx: L.bowlGapX * scale,
       gy: L.bowlGapY * scale,
       neck: neck(bw),   // высота горлышка над верхом стенок
-      base: base(bw),   // высота донышка
+      base: base(bw),   // высота донышка (от него вверх растягиваются стенки)
+      floor: floor(bw), // от низа банки до пола, на котором лежит корм
       k: bw / tex.width, // пикселей экрана на пиксель картинки банки
       scale,
     });
-    const bh = this.board.capacity * d.ph + d.pad + d.base;
+    const bh = this.board.capacity * d.ph + d.pad + d.floor;
     const totalH = rows * bh + (rows - 1) * d.gy;
     const top0 = L.bowlsBottom - totalH; // нижний ряд стоит на столе
 
@@ -111,7 +113,7 @@ export class GameScene extends Phaser.Scene {
   slotPos(bowl, slot) {
     const r = this.bowlRects[bowl];
     const d = this.dim;
-    return { x: r.x, y: r.bottom - d.base - d.ph / 2 - slot * d.ph };
+    return { x: r.x, y: r.bottom - d.floor - d.ph / 2 - slot * d.ph };
   }
 
   // Верх горлышка банки — сюда кот наклоняется есть.

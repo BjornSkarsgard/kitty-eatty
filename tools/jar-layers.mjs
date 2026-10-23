@@ -1,6 +1,7 @@
 // Передний слой банки из целой банки: node tools/jar-layers.mjs
 // Берёт src/assets/jar_back.png (вся банка: стенки, тёмное нутро, горлышко, донышко) и пишет jar_front.png:
-// - горлышко сверху и донышко снизу — как есть, непрозрачные (корм уходит под них);
+// - горлышко сверху и кольцо донышка снизу (от CONFIG.jar.art.floor) — как есть, непрозрачные (корм уходит под них);
+//   пол банки над кольцом — как стенки: корм лежит на нём;
 // - тонкий внешний край стекла — как есть;
 // - всё между стенками — только блики: насколько пиксель светлее тёмного нутра в этой строке, настолько
 //   он непрозрачен и бел. Поверх корма они лягут как отражение на стекле.
@@ -29,7 +30,7 @@ for (let y = 0; y < h; y++) {
   const base = mid[mid.length >> 1] ?? 0;
   for (let x = 0; x < w; x++) {
     const i = (y * w + x) * 4;
-    const solid = y < A.top || y >= A.bottom || x < A.edge || x >= w - A.edge;
+    const solid = y < A.top || y >= A.floor || x < A.edge || x >= w - A.edge;
     if (solid) {
       for (let k = 0; k < 4; k++) out[i + k] = rgba[i + k];
       continue;
@@ -40,4 +41,4 @@ for (let y = 0; y < h; y++) {
   }
 }
 writeFileSync(join(ASSETS, 'jar_front.png'), encodePNG({ w, h, rgba: out }));
-console.log(`jar_front.png ${w}×${h}: горлышко до y=${A.top}, донышко от y=${A.bottom}, край ${A.edge} px`);
+console.log(`jar_front.png ${w}×${h}: горлышко до y=${A.top}, кольцо донышка от y=${A.floor}, край ${A.edge} px`);

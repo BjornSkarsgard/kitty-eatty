@@ -67,7 +67,7 @@ export class GameScene extends Phaser.Scene {
   // на своём месте и рисуется сложением цветов: прозрачность = насколько светлее.
   createWallGlow(bg) {
     const G = CONFIG.fx.wallGlow;
-    if (!CONFIG.fx.enabled || !this.textures.exists('paw_glow')) return;
+    if (!CONFIG.fx.enabled || !G.enabled || !this.textures.exists('paw_glow')) return;
     const tex = this.textures.get('paw_glow');
     const s = bg.scaleX;
     const [bw, bh] = PAWS.bg;

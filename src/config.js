@@ -296,7 +296,7 @@ export const CONFIG = {
   // Главный экран — комната кота (открывается после загрузки с map.homeFromLevel). Пока без арта.
   home: {
     titleY: 190,
-    floorY: 800,         // где стоят лапы кота (на ковре в bg_room_home); ниже — пол
+    floorY: 685,         // где стоят лапы кота (на ковре в bg_room_home); ниже — пол
     catScale: 2.6,
     catColor: 2,
     playY: 1020,
@@ -310,10 +310,10 @@ export const CONFIG = {
     flick: 9,            // px за кадр: такой быстрый взмах листает, даже если протащили меньше
     // карта на стене: окошко шириной с экран и высотой posterViewH (в координатах карты), уменьшенное в posterScale;
     // центр — на пустой стене bg_room_map
-    posterScale: 0.62,
+    posterScale: 0.56,
     posterViewH: 460,
     posterX: 362,
-    posterY: 278,
+    posterY: 243,
     frameWidth: 18,      // рамка вокруг карты на стене
     zoomDuration: 420,   // мс: карта разворачивается на весь экран и обратно
   },

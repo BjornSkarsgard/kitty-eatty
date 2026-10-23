@@ -122,14 +122,14 @@ export class RoomScene extends Phaser.Scene {
   // Карта висит на стене в рамке и сразу показывает, где сейчас кот. Любое касание — разворачивается на весь экран.
   createMap(x0) {
     const s = R.posterScale;
-    const cx = x0 + W / 2;
+    const cx = x0 + R.posterX;
     const fw = W * s + 2 * R.frameWidth;
-    const fh = H * s + 2 * R.frameWidth;
+    const fh = R.posterViewH * s + 2 * R.frameWidth;
     const frame = this.add.graphics();
     frame.fillStyle(0x000000, 0.25).fillRoundedRect(cx - fw / 2 + 8, R.posterY - fh / 2 + 14, fw, fh, 18);
     frame.fillStyle(0x8a5a33, 1).fillRoundedRect(cx - fw / 2, R.posterY - fh / 2, fw, fh, 18);
     frame.fillStyle(0xb07a52, 1).fillRoundedRect(cx - fw / 2 + 6, R.posterY - fh / 2 + 6, fw - 12, fh - 12, 14);
-    this.map = new MapView(this, cx, R.posterY, s);
+    this.map = new MapView(this, cx, R.posterY, s, R.posterViewH);
     this.mapPlace = { x: cx, y: R.posterY, scale: s };
     this.mapFrame = frame;
     this.mapOpen = false;
@@ -204,6 +204,7 @@ export class RoomScene extends Phaser.Scene {
     sfx(this, 'sfx_swipe', CONFIG.audio.swipe, 1.15);
     this.goTo(1);
     this.tweens.add({ targets: this.map.root, x: W + W / 2, y: H / 2, scale: 1, duration: R.zoomDuration, ease: 'Cubic.easeInOut' });
+    this.tweens.add({ targets: this.map, viewH: H, duration: R.zoomDuration, ease: 'Cubic.easeInOut' });
     this.tweens.add({ targets: this.mapFrame, alpha: 0, duration: R.zoomDuration });
     this.mapBack.setVisible(true).setAlpha(0);
     this.tweens.add({ targets: this.mapBack, alpha: 1, duration: R.zoomDuration });
@@ -216,6 +217,7 @@ export class RoomScene extends Phaser.Scene {
     const P = this.mapPlace;
     this.map.velocity = 0;
     this.tweens.add({ targets: this.map.root, x: P.x, y: P.y, scale: P.scale, duration: R.zoomDuration, ease: 'Cubic.easeInOut' });
+    this.tweens.add({ targets: this.map, viewH: R.posterViewH, duration: R.zoomDuration, ease: 'Cubic.easeInOut' });
     this.tweens.add({ targets: this.mapFrame, alpha: 1, duration: R.zoomDuration });
     this.tweens.add({ targets: this.mapBack, alpha: 0, duration: R.zoomDuration / 2, onComplete: () => this.mapBack.setVisible(false) });
   }

@@ -16,15 +16,17 @@ function nodePos(i) {
   return { x: W / 2 + Math.sin(i * M.wave) * M.amplitude, y: mapH - M.padBottom - i * M.spacing };
 }
 
-// Карта уровней внутри контейнера: окно размером с экран (W×H), которое можно уменьшить (рамка на стене)
-// и плавно развернуть на весь экран — это одна и та же карта, просто другой масштаб, поэтому без скачков.
+// Карта уровней внутри контейнера: окно шириной с экран, высотой viewH, которое можно уменьшить (рамка на стене)
+// и плавно развернуть на весь экран — это одна и та же карта, меняются только масштаб и высота окна, без скачков.
+// Текущий уровень — в середине окна.
 // Тропинка из следов лапок снизу вверх, кружки с номером и звёздами, на самом дальнем открытом сидит кот.
 // На сцене только видимые уровни: 300 штук сразу — тяжело для слабого Android.
 export class MapView {
-  constructor(scene, x, y, scale) {
+  constructor(scene, x, y, scale, viewH = H) {
     this.scene = scene;
     this.current = unlockedLevel(N); // край прогресса: здесь кот, дальше — закрыто
     this.root = scene.add.container(x, y).setScale(scale);
+    this.viewH = viewH; // высота окна в координатах карты; меняется твином при разворачивании
     this.root.add(scene.add.rectangle(0, 0, W, H, M.background));
     this.content = scene.add.container(-W / 2, 0);
     // слои, чтобы следы всегда были под кружками, а звёзды и кот — над ними
@@ -35,7 +37,7 @@ export class MapView {
     this.root.setMask(this.maskShape.createGeometryMask());
     this.views = new Map();
     this.velocity = 0;
-    this.setScroll(nodePos(this.current).y - H * M.currentAt);
+    this.setScroll(nodePos(this.current).y - H / 2);
   }
 
   // scroll — верх окна в координатах карты.
@@ -48,7 +50,7 @@ export class MapView {
   // Прямоугольник окна в мире (для маски и попадания пальцем).
   bounds() {
     const r = this.root;
-    return new Phaser.Geom.Rectangle(r.x - (W / 2) * r.scale, r.y - (H / 2) * r.scale, W * r.scale, H * r.scale);
+    return new Phaser.Geom.Rectangle(r.x - (W / 2) * r.scale, r.y - (this.viewH / 2) * r.scale, W * r.scale, this.viewH * r.scale);
   }
 
   // Каждый кадр: инерция прокрутки и маска по текущему положению и масштабу.

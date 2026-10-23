@@ -2,7 +2,9 @@ import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { CatView } from '../view/CatView.js';
 import { sfx, music } from '../audio.js';
-import { iconButton, counterPill } from '../view/ui.js';
+import { counterPill, tabBar } from '../view/ui.js';
+import { addSettingsMenu } from '../view/settings.js';
+import { mainTabs } from './HomeScene.js';
 import { unlockedLevel, levelStars, coins } from '../save.js';
 import LEVELS from '../levels/levels.json';
 
@@ -36,8 +38,9 @@ export class MapScene extends Phaser.Scene {
     this.refresh();
     this.setupInput();
     const U = CONFIG.ui;
-    iconButton(this, 62, U.topY, 'home', () => this.scene.start('Home'), { size: 84, shape: 'round', depth: 10 }).setScrollFactor(0);
-    counterPill(this, 130 + U.pillWidth / 2, U.topY, 'coin', coins(), { depth: 10 }).setScrollFactor(0);
+    counterPill(this, 30 + U.pillWidth / 2, U.topY, 'coin', coins(), { depth: 10 }).setScrollFactor(0);
+    addSettingsMenu(this);
+    tabBar(this, mainTabs(), 'Map');
     music(this, 'music_game');
   }
 

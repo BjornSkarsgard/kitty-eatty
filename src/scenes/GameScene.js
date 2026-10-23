@@ -9,7 +9,7 @@ import { sfx, sfxRandom, music } from '../audio.js';
 import { currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo } from '../save.js';
 import { showPopup } from '../view/Popup.js';
 import { iconButton, counterPill, plate, tray } from '../view/ui.js';
-import { openSettings } from '../view/settings.js';
+import { addSettingsMenu } from '../view/settings.js';
 import LEVELS from '../levels/levels.json';
 
 const L = CONFIG.layout;
@@ -59,7 +59,7 @@ export class GameScene extends Phaser.Scene {
     const U = CONFIG.ui;
     this.coinPill = counterPill(this, 30 + U.pillWidth / 2, U.topY, 'coin', coins());
     plate(this, CONFIG.width / 2, U.topY, `Уровень ${level.id}`, { color: level.puzzle ? 0x6b2fa8 : undefined });
-    iconButton(this, CONFIG.width - 62, U.topY, 'gear', () => openSettings(this), { size: 84, shape: 'round' });
+    addSettingsMenu(this, { onExit: () => this.scene.start('Home') });
 
     this.layoutBowls();
     this.createBowls();
@@ -237,15 +237,15 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  // Лоток внизу: домой, отмена (с бейджем — сколько осталось), заново.
+  // Лоток внизу — игровые действия: отмена (с бейджем — сколько осталось), заново; на этапе 6 — «+1 банка».
+  // Выход домой — в столбике под шестерёнкой.
   createButtons() {
     const U = CONFIG.ui;
     const W = CONFIG.width;
     const step = U.iconButton + 48;
-    tray(this, W / 2, U.trayY, step * 3 + 30, U.iconButton + 44);
-    iconButton(this, W / 2 - step, U.trayY, 'home', () => this.scene.start('Home'));
-    this.undoBtn = iconButton(this, W / 2, U.trayY, 'undo', () => this.undo());
-    iconButton(this, W / 2 + step, U.trayY, 'restart', () => this.scene.restart({ levelIndex: this.levelIndex }));
+    tray(this, W / 2, U.trayY, step * 2 + 30, U.iconButton + 44);
+    this.undoBtn = iconButton(this, W / 2 - step / 2, U.trayY, 'undo', () => this.undo());
+    iconButton(this, W / 2 + step / 2, U.trayY, 'restart', () => this.scene.restart({ levelIndex: this.levelIndex }));
     this.refreshUndo();
   }
 

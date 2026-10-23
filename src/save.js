@@ -8,14 +8,14 @@
 //   coins    — монеты (за победы; тратятся на отмены, позже — в магазине);
 //   undos    — запас отмен хода, общий на всю игру;
 //   undoProgress — сколько новых уровней пройдено к следующей бесплатной отмене;
-//   settings — { sound, music, fx }: переключатели в окне настроек.
+//   settings — { sound, music, fx, vibro }: переключатели под шестерёнкой.
 import { CONFIG } from './config.js';
 
 const KEY = 'kittyeatty.save';
 const VERSION = 2;
 const E = CONFIG.economy;
 
-const SETTINGS = { sound: true, music: true, fx: true };
+const SETTINGS = { sound: true, music: true, fx: true, vibro: true };
 const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, undoProgress: 0, settings: { ...SETTINGS } });
 
 // Старые версии сохранения дополняем до текущей, прогресс не теряется.

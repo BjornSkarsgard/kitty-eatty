@@ -1,34 +1,27 @@
 import { CONFIG } from '../config.js';
 import { setting, setSetting } from '../save.js';
 import { applyMusicSetting } from '../audio.js';
-import { showPopup } from './Popup.js';
+import { settingsMenu } from './ui.js';
 
-// Переключатели в окне настроек. fx — свечения и пульсации (CONFIG.fx.enabled), для слабых телефонов.
-const ITEMS = [
-  { key: 'sound', name: 'Звуки' },
-  { key: 'music', name: 'Музыка' },
-  { key: 'fx', name: 'Эффекты' },
-];
-
-// Применить сохранённые настройки при запуске.
+// Применить сохранённые настройки при запуске. fx — свечения и пульсации (CONFIG.fx.enabled), для слабых телефонов.
 export function applySettings() {
   CONFIG.fx.enabled = setting('fx');
 }
 
-const label = (it) => `${it.name}: ${setting(it.key) ? 'вкл' : 'выкл'}`;
+const toggle = (key, after) => ({
+  get: () => setting(key),
+  set: (v) => { setSetting(key, v); after?.(); },
+});
 
-export function openSettings(scene) {
-  const buttons = ITEMS.map((it) => ({
-    label: label(it),
-    keep: true,
-    color: 0x7b5cf0,
-    onTap: (btn) => {
-      setSetting(it.key, !setting(it.key));
-      if (it.key === 'music') applyMusicSetting();
-      if (it.key === 'fx') applySettings();
-      btn.setLabel(label(it));
-    },
-  }));
-  buttons.push({ label: 'Готово', color: 0x4caf50 });
-  showPopup(scene, { title: 'Настройки', buttons });
+// Шестерёнка справа сверху со столбиком переключателей. Вибрация — только где телефон её умеет (Android);
+// onExit — красная кнопка «выход» (в игре — домой).
+export function addSettingsMenu(scene, { onExit } = {}) {
+  const items = [
+    { icon: 'sound', ...toggle('sound') },
+    { icon: 'music', ...toggle('music', applyMusicSetting) },
+    { icon: 'fx', ...toggle('fx', applySettings) },
+  ];
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) items.push({ icon: 'vibro', ...toggle('vibro') });
+  const actions = onExit ? [{ icon: 'exit', color: CONFIG.ui.exitColor, onTap: onExit }] : [];
+  return settingsMenu(scene, CONFIG.width - 62, CONFIG.ui.topY, items, actions);
 }

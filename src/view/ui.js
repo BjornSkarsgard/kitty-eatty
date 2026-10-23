@@ -57,6 +57,48 @@ const ICONS = {
     g.fillStyle(0xffffff, 1).fillEllipse(0, s * 0.12, s * 0.42, s * 0.34);
     [[-0.24, -0.12], [-0.09, -0.26], [0.09, -0.26], [0.24, -0.12]].forEach(([x, y]) => g.fillCircle(x * s, y * s, s * 0.09));
   },
+  sound(g, s) {
+    g.fillStyle(0xffffff, 1).fillRect(-s * 0.36, -s * 0.12, s * 0.16, s * 0.24);
+    g.fillTriangle(-s * 0.22, -s * 0.12, -s * 0.22, s * 0.12, s * 0.02, 0).fillTriangle(-s * 0.22, -s * 0.12, s * 0.02, -s * 0.3, s * 0.02, 0);
+    g.fillTriangle(-s * 0.22, s * 0.12, s * 0.02, s * 0.3, s * 0.02, 0);
+    g.lineStyle(s * 0.07, 0xffffff, 1);
+    g.beginPath().arc(s * 0.06, 0, s * 0.16, -0.8, 0.8).strokePath();
+    g.beginPath().arc(s * 0.06, 0, s * 0.3, -0.8, 0.8).strokePath();
+  },
+  music(g, s) {
+    g.fillStyle(0xffffff, 1).fillEllipse(-s * 0.16, s * 0.24, s * 0.22, s * 0.17).fillEllipse(s * 0.2, s * 0.16, s * 0.22, s * 0.17);
+    g.fillRect(-s * 0.08, -s * 0.3, s * 0.07, s * 0.55).fillRect(s * 0.28, -s * 0.38, s * 0.07, s * 0.55);
+    g.fillTriangle(-s * 0.08, -s * 0.3, s * 0.35, -s * 0.38, s * 0.35, -s * 0.24).fillTriangle(-s * 0.08, -s * 0.3, -s * 0.08, -s * 0.16, s * 0.35, -s * 0.24);
+  },
+  vibro(g, s) {
+    g.lineStyle(s * 0.08, 0xffffff, 1).strokeRoundedRect(-s * 0.15, -s * 0.3, s * 0.3, s * 0.6, s * 0.06);
+    g.lineStyle(s * 0.06, 0xffffff, 1);
+    [-1, 1].forEach((d) => {
+      g.lineBetween(d * s * 0.26, -s * 0.18, d * s * 0.34, -s * 0.06).lineBetween(d * s * 0.34, -s * 0.06, d * s * 0.26, s * 0.06);
+      g.lineBetween(d * s * 0.26, s * 0.06, d * s * 0.34, s * 0.18);
+    });
+  },
+  fx(g, s) { // искра
+    g.fillStyle(0xffffff, 1);
+    g.fillTriangle(0, -s * 0.38, -s * 0.09, 0, s * 0.09, 0).fillTriangle(0, s * 0.38, -s * 0.09, 0, s * 0.09, 0);
+    g.fillTriangle(-s * 0.38, 0, 0, -s * 0.09, 0, s * 0.09).fillTriangle(s * 0.38, 0, 0, -s * 0.09, 0, s * 0.09);
+    g.fillCircle(s * 0.26, -s * 0.26, s * 0.06).fillCircle(-s * 0.24, s * 0.26, s * 0.05);
+  },
+  exit(g, s) {
+    g.lineStyle(s * 0.08, 0xffffff, 1).strokeRect(s * 0.02, -s * 0.3, s * 0.28, s * 0.6);
+    g.fillStyle(0xffffff, 1).fillRect(-s * 0.26, -s * 0.05, s * 0.26, s * 0.1);
+    g.fillTriangle(-s * 0.38, 0, -s * 0.2, -s * 0.16, -s * 0.2, s * 0.16);
+  },
+  shop(g, s) {
+    g.fillStyle(0xffffff, 1).fillRect(-s * 0.3, -s * 0.05, s * 0.6, s * 0.36);
+    for (let k = 0; k < 4; k++) g.fillStyle(k % 2 ? 0xffffff : 0xff8fa3, 1).fillRect(-s * 0.36 + k * s * 0.18, -s * 0.32, s * 0.18, s * 0.22);
+    g.fillStyle(0x000000, 0.3).fillRect(-s * 0.1, s * 0.08, s * 0.2, s * 0.23);
+  },
+  profile(g, s) {
+    g.fillStyle(0xffffff, 1).fillCircle(0, -s * 0.12, s * 0.17);
+    g.fillTriangle(-s * 0.2, -s * 0.22, -s * 0.12, -s * 0.38, -s * 0.03, -s * 0.27).fillTriangle(s * 0.2, -s * 0.22, s * 0.12, -s * 0.38, s * 0.03, -s * 0.27);
+    g.fillEllipse(0, s * 0.27, s * 0.56, s * 0.3);
+  },
   coin(g, s) {
     g.fillStyle(0xc77d0a, 1).fillCircle(0, s * 0.03, s * 0.46);
     g.fillStyle(0xffc531, 1).fillCircle(0, 0, s * 0.44);
@@ -83,6 +125,7 @@ export function iconButton(scene, x, y, icon, onTap, {
   const btn = scene.add.container(x, y).setDepth(depth);
   const g = scene.add.graphics();
   drawBlank(g, size, size, color, shape);
+  btn.setColor = (c) => { g.clear(); drawBlank(g, size, size, c, shape); return btn; };
   btn.add([g, makeIcon(scene, icon, size * 0.62).setPosition(0, -3)]);
   if (label) {
     btn.add(scene.add.text(0, size / 2 + 22, label, {
@@ -150,4 +193,76 @@ export function tray(scene, x, y, w, h, { depth = 14 } = {}) {
   g.fillStyle(0x3a2a78, 1).fillRoundedRect(x - w / 2, y - h / 2, w, h, 40);
   g.lineStyle(5, 0x5b46b0, 1).strokeRoundedRect(x - w / 2, y - h / 2, w, h, 40);
   return g;
+}
+
+// Шестерёнка, раскрывающая столбик круглых переключателей вниз (как в референсе): зелёный — включено.
+// items: [{ icon, get(): bool, set(bool) }] — переключатели; actions: [{ icon, color, onTap }] — кнопки (выход).
+// Тап мимо столбика — сворачивает.
+export function settingsMenu(scene, x, y, items, actions = [], { size = 84, depth = 30 } = {}) {
+  const col = [];
+  const catcher = scene.add.rectangle(CONFIG.width / 2, CONFIG.height / 2, CONFIG.width, CONFIG.height, 0x000000, 0.001)
+    .setDepth(depth - 1).setScrollFactor(0).setInteractive().setVisible(false);
+  let open = false;
+  const toggle = (on = !open) => {
+    open = on;
+    catcher.setVisible(open);
+    col.forEach((b, i) => {
+      scene.tweens.killTweensOf(b);
+      if (open) {
+        b.setVisible(true).setScale(0.3).setAlpha(0);
+        scene.tweens.add({ targets: b, y: y + (i + 1) * (size + 24), scale: 1, alpha: 1, duration: 160, delay: i * 30, ease: 'Back.easeOut' });
+      } else {
+        scene.tweens.add({ targets: b, y, scale: 0.3, alpha: 0, duration: 120, onComplete: () => b.setVisible(false) });
+      }
+    });
+  };
+  catcher.on('pointerdown', () => toggle(false));
+  const gear = iconButton(scene, x, y, 'gear', () => toggle(), { size, shape: 'round', depth: depth + 1 }).setScrollFactor(0);
+  items.forEach((it) => {
+    const on = () => (it.get() ? U.onColor : U.offColor);
+    const b = iconButton(scene, x, y, it.icon, () => { it.set(!it.get()); b.setColor(on()); }, { size, shape: 'round', depth, color: on() });
+    col.push(b.setScrollFactor(0).setVisible(false));
+  });
+  actions.forEach((a) => {
+    const b = iconButton(scene, x, y, a.icon, () => { toggle(false); a.onTap(); }, { size, shape: 'round', depth, color: a.color });
+    col.push(b.setScrollFactor(0).setVisible(false));
+  });
+  return gear;
+}
+
+// Нижняя панель вкладок; активная — приподнята, крупнее и с подписью. tabs: [{ icon, label, scene, enabled }].
+export function tabBar(scene, tabs, active, { depth = 20 } = {}) {
+  const W = CONFIG.width;
+  const H = CONFIG.height;
+  const h = U.tabBarHeight;
+  const g = scene.add.graphics().setDepth(depth).setScrollFactor(0);
+  g.fillStyle(0x000000, 0.3).fillRect(0, H - h - 6, W, 6);
+  g.fillStyle(0x4b33a8, 1).fillRect(0, H - h, W, h);
+  g.fillStyle(0xf5b301, 1).fillRect(0, H - h, W, 6);
+  const cell = W / tabs.length;
+  tabs.forEach((t, i) => {
+    const x = cell * i + cell / 2;
+    if (i) g.fillStyle(0x3a2580, 1).fillRect(cell * i - 2, H - h + 6, 4, h - 6);
+    const isActive = t.scene === active;
+    if (isActive) {
+      g.fillStyle(0x000000, 0.25).fillRoundedRect(x - cell / 2 + 4, H - h - 34, cell - 8, h + 40, 26);
+      g.fillStyle(0x7b5cf0, 1).fillRoundedRect(x - cell / 2 + 4, H - h - 40, cell - 8, h + 40, 26);
+      g.lineStyle(5, 0xf5b301, 1).strokeRoundedRect(x - cell / 2 + 4, H - h - 40, cell - 8, h + 40, 26);
+    }
+    const iy = H - h / 2 - (isActive ? 34 : 0);
+    const icon = makeIcon(scene, t.icon, isActive ? 86 : 70).setPosition(x, iy).setDepth(depth + 1).setScrollFactor(0);
+    if (t.enabled === false) icon.setAlpha(0.4);
+    if (isActive) {
+      scene.add.text(x, H - 30, t.label, {
+        fontFamily: font(), fontStyle: 'bold', fontSize: '28px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 6,
+      }).setOrigin(0.5).setDepth(depth + 1).setScrollFactor(0);
+    }
+    const zone = scene.add.zone(x, H - h / 2, cell, h).setDepth(depth + 2).setScrollFactor(0).setInteractive();
+    zone.on('pointerdown', () => {
+      if (isActive) return;
+      sfx(scene, t.enabled === false ? 'sfx_invalid' : 'sfx_button');
+      if (t.enabled === false) return;
+      scene.tweens.add({ targets: icon, scale: icon.scale * 0.85, duration: 70, yoyo: true, onComplete: () => scene.scene.start(t.scene) });
+    });
+  });
 }

@@ -51,6 +51,13 @@ export function music(scene, key) {
   startCopy();
 }
 
+// Что играет и с какой секунды трека (у свежей копии петли) — для часов такта (beat.js).
+export function musicPosition() {
+  const snd = current?.sound;
+  if (!snd || !snd.isPlaying) return null;
+  return { key: current.key, seek: snd.seek };
+}
+
 export function stopMusic() {
   if (!current) return;
   const state = current;

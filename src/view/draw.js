@@ -1,4 +1,5 @@
 // Временная отрисовка фигурами Phaser.Graphics. На этапе 4 заменится векторным артом.
+import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 
 // Значок формы корма с центром в (0, 0), s — «радиус».
@@ -72,7 +73,35 @@ export function makePortion(scene, colorIndex, w, h) {
   }
   const p = scene.add.container(0, 0, parts);
   p.color = colorIndex;
+  p.layerW = w;
+  p.layerH = h;
   return p;
+}
+
+// Свет изнутри плитки: копия её формы, сложение цветов (ADD), прозрачность ведёт сцена. Не выходит за края плитки.
+export function makePortionShine(scene, p, color) {
+  let parts;
+  if (scene.textures.exists('portion_layer')) parts = makeLayer(scene, p.layerW, p.layerH, color, null);
+  else parts = [scene.add.graphics().fillStyle(color, 1).fillRoundedRect(-p.layerW / 2, -p.layerH / 2, p.layerW, p.layerH, 12)];
+  parts.forEach((o) => o.setBlendMode(Phaser.BlendModes.ADD));
+  const shine = scene.add.container(0, 0, parts).setAlpha(0);
+  p.addAt(shine, parts.length && p.list.length > 1 ? p.list.length - 1 : p.list.length); // под иконкой корма
+  return shine;
+}
+
+// Мягкое белое пятно (к краям прозрачное) — свет, рассеянный стеклом. Делается один раз.
+export function makeSoftTexture(scene) {
+  if (scene.textures.exists('fx_soft')) return;
+  const S = 128;
+  const canvas = scene.textures.createCanvas('fx_soft', S, S);
+  const ctx = canvas.getContext();
+  const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.5, 'rgba(255,255,255,0.45)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, S, S);
+  canvas.refresh();
 }
 
 // Слой порции: глянцевая белая плитка portion_layer, покрашенная tint'ом в цвет корма. Плитка режется на три

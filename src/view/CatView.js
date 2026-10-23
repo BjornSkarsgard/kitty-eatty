@@ -114,12 +114,7 @@ export class CatView extends Phaser.GameObjects.Container {
   startIdle() {
     this.stopIdle();
     const A = CONFIG.anim;
-    if (this.body) {
-      this.idle.push(this.scene.tweens.add({
-        targets: this.body, scaleY: 1 + A.idleBreath, duration: A.idleBreathDuration,
-        yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
-      }));
-    }
+    this.breathing = !!this.body; // дыхание ведёт сцена в такт музыке — breathe()
     if (this.tail) {
       this.tail.angle = -A.idleTailAngle;
       this.idle.push(this.scene.tweens.add({
@@ -141,7 +136,14 @@ export class CatView extends Phaser.GameObjects.Container {
     return this;
   }
 
+  // Вдох-выдох в такт: phase 0…1 — фаза цикла дыхания (из часов такта, beat.js).
+  breathe(phase) {
+    if (!this.breathing) return;
+    this.body.scaleY = 1 + CONFIG.anim.idleBreath * (1 - Math.cos(phase * Math.PI * 2)) / 2;
+  }
+
   stopIdle() {
+    this.breathing = false;
     this.idle.forEach(safeRemove);
     this.idle = [];
     [this.blinkTimer, this.blinkBack].forEach((t) => t && safeRemove(t));

@@ -1,7 +1,8 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { Board } from '../core/Board.js';
-import { makePortion, makeFxTextures, makeJuteWrap } from '../view/draw.js';
+import { makePortion, makeFxTextures, makeJuteWrap, makePortionShine, makeSoftTexture } from '../view/draw.js';
+import { beatPulse, beatPhase } from '../beat.js';
 import { CatView } from '../view/CatView.js';
 import { sfx, sfxRandom, music } from '../audio.js';
 import LEVELS from '../levels/levels.json';
@@ -31,6 +32,8 @@ export class GameScene extends Phaser.Scene {
     this.board = new Board(level);
     this.selected = null;
     this.won = false;
+    this.pulsing = new Set(); // порции, которые пульсируют в такт музыке
+    this.glass = null;
     this.lastFeedMeow = -Infinity;
     // Порядок хрустов на уровень, например 2 1 3: каждый кот берёт следующий, по кругу (2 1 3 2 1 …)
     this.chewOrder = Phaser.Utils.Array.Shuffle([1, 2, 3]);
@@ -236,6 +239,7 @@ export class GameScene extends Phaser.Scene {
     this.selected = i;
     this.liftJar(i, -A.liftY * this.dim.scale, 'Back.easeOut');
     this.portions[i].slice(-this.board.topRun(i)).forEach((p) => this.pulse(p));
+    this.glassGlow(i);
   }
 
   // Сдвинуть банку по вертикали вместе с кормом и обмоткой (dy = 0 — на место).
@@ -251,26 +255,53 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  // Пульсация порции из выбранной серии: чуть увеличивается, на WebGL ещё и мягко светится (если эффекты включены).
+  // Порция из выбранной серии пульсирует в такт музыке (update): чуть увеличивается и светится изнутри.
   pulse(p) {
-    this.tweens.add({
-      targets: p, scale: A.selectPulse, delay: A.liftDuration, duration: A.selectPulseDuration,
-      yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
-    });
-    if (!CONFIG.fx.enabled || !p.postFX || this.renderer.type !== Phaser.WEBGL) return;
-    p.glowFx = p.postFX.addGlow(CONFIG.fx.selectGlow, 0, 0, false, 0.1, 10);
-    this.tweens.add({
-      targets: p.glowFx, outerStrength: CONFIG.fx.selectGlowStrength, delay: A.liftDuration,
-      duration: A.selectPulseDuration, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
-    });
+    this.pulsing.add(p);
+    if (CONFIG.fx.enabled && !p.shine) p.shine = makePortionShine(this, p, CONFIG.fx.selectGlow);
   }
 
   stopPulse(p) {
+    this.pulsing.delete(p);
     p.setScale(1);
-    if (!p.glowFx) return;
-    this.tweens.killTweensOf(p.glowFx);
-    p.postFX.remove(p.glowFx);
-    p.glowFx = null;
+    if (p.shine) {
+      p.shine.destroy();
+      p.shine = null;
+    }
+  }
+
+  // Свет, рассеянный стеклом напротив выбранной серии: мягкое пятно внутри банки, к стенкам гаснет.
+  glassGlow(i) {
+    this.clearGlassGlow();
+    if (!CONFIG.fx.enabled) return;
+    makeSoftTexture(this);
+    const run = this.portions[i].slice(-this.board.topRun(i));
+    const ys = run.map((p) => p.y);
+    const d = this.dim;
+    const w = d.bw - CONFIG.jar.art.edge * 2 * d.k;
+    const h = Math.max(...ys) - Math.min(...ys) + d.ph * 1.6;
+    const y = (Math.max(...ys) + Math.min(...ys)) / 2 - A.liftY * d.scale;
+    this.glass = this.add.image(this.bowlRects[i].x, y, 'fx_soft').setDisplaySize(w, h).setDepth(2)
+      .setTint(CONFIG.fx.selectGlow).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
+  }
+
+  clearGlassGlow() {
+    if (this.glass) this.glass.destroy();
+    this.glass = null;
+  }
+
+  // Каждый кадр: всё, что пульсирует, — в такт музыке (beat.js).
+  update() {
+    if (this.pulsing.size || this.glass) {
+      const env = beatPulse(this);
+      for (const p of this.pulsing) {
+        p.setScale(1 + (A.selectPulse - 1) * env);
+        if (p.shine) p.shine.setAlpha(env * CONFIG.fx.shineAlpha);
+      }
+      if (this.glass) this.glass.setAlpha(env * CONFIG.fx.glassAlpha);
+    }
+    const breath = beatPhase(this, A.idleBreathBeats);
+    this.cats.forEach((cat, k) => cat.breathe(breath + (k % 2) * 0.5));
   }
 
   deselect() {
@@ -282,6 +313,7 @@ export class GameScene extends Phaser.Scene {
 
   // Плавно ставит банку и все её порции на свои места.
   settleBowl(i) {
+    this.clearGlassGlow();
     this.portions[i].forEach((p) => p.setAlpha(1));
     this.liftJar(i, 0);
   }

@@ -5,15 +5,16 @@ import { makePortion, makeFxTextures, makeJuteWrap, makePortionHalo, makeSoftTex
 import { beatPulse, beatPhase } from '../beat.js';
 import { CatView } from '../view/CatView.js';
 import { sfx, sfxRandom, music } from '../audio.js';
+import { currentLevel, setCurrentLevel, recordWin } from '../save.js';
 import LEVELS from '../levels/levels.json';
 
 const L = CONFIG.layout;
 
 // В режиме разработки можно открыть любой уровень: http://<адрес>:5173/?level=150
 function levelFromUrl() {
-  if (!import.meta.env.DEV) return 0;
+  if (!import.meta.env.DEV) return null;
   const n = Number(new URLSearchParams(location.search).get('level'));
-  return n >= 1 && n <= LEVELS.length ? n - 1 : 0;
+  return n >= 1 && n <= LEVELS.length ? n - 1 : null;
 }
 
 const A = CONFIG.anim;
@@ -24,7 +25,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   init(data) {
-    this.levelIndex = data.levelIndex ?? levelFromUrl();
+    // по кнопке — переданный уровень, при запуске — из ?level= (разработка) или из сохранения
+    this.levelIndex = data.levelIndex ?? levelFromUrl() ?? currentLevel(LEVELS.length);
+    setCurrentLevel(this.levelIndex);
   }
 
   create() {
@@ -549,6 +552,7 @@ export class GameScene extends Phaser.Scene {
     const W = CONFIG.width;
     const H = CONFIG.height;
     sfx(this, 'music_win');
+    recordWin(this.levelIndex, LEVELS[this.levelIndex].id, this.board.history.length, LEVELS.length);
     for (let k = 0; k < 5; k++) this.fxConfetti.explode(Math.round(A.confetti / 5), W * (0.1 + k * 0.2), H);
     const isLast = this.levelIndex === LEVELS.length - 1;
     this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.55).setDepth(20).setInteractive();

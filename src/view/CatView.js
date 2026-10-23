@@ -273,7 +273,7 @@ export class CatView extends Phaser.GameObjects.Container {
   react_scared(done) {
     const P = CONFIG.anim.poke;
     this.setMood('open');
-    sfxRandom(this.scene, 'sfx_meow', 3, 1.2);
+    sfxRandom(this.scene, 'sfx_meow', 3, 1.2 * CONFIG.audio.meow);
     this.setMouth(true);
     this.eyes.setScale(1.35);
     const s = this.baseScale;
@@ -308,7 +308,7 @@ export class CatView extends Phaser.GameObjects.Container {
   }
 
   meow() {
-    sfxRandom(this.scene, 'sfx_meow', 3);
+    sfxRandom(this.scene, 'sfx_meow', 3, CONFIG.audio.meow);
     this.setMouth(true);
     this.track(this.scene.time.delayedCall(CONFIG.anim.meowDuration, () => this.setMouth(false)));
   }

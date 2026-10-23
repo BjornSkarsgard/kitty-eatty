@@ -21,7 +21,7 @@ export class BootScene extends Phaser.Scene {
 }
 
 // 2) Preload: вид изнутри миски вверх. Кот снаружи заглядывает в миску — голова свешивается
-// внутрь круга, лапы лежат на ободке — и обходит ободок по кругу в ритм музыки.
+// внутрь круга, лапы лежат на ободке. Стоит на месте под полосой загрузки, в ритм музыки качает головой.
 export class PreloadScene extends Phaser.Scene {
   constructor() {
     super('Preload');
@@ -99,7 +99,10 @@ export class PreloadScene extends Phaser.Scene {
   // Контейнер кота повёрнут так, что его локальная ось +y смотрит в центр миски.
   createCat() {
     const Lc = CONFIG.loading;
-    this.peek = this.add.container(0, 0).setDepth(10); // кот поверх надписи и полосы
+    // кот на ободке в точке catAngle, поверх надписи и полосы; локальная +y — к центру миски
+    const a = Phaser.Math.DegToRad(Lc.catAngle);
+    this.peek = this.add.container(this.center.x + Math.cos(a) * Lc.radius, this.center.y + Math.sin(a) * Lc.radius)
+      .setRotation(a + Math.PI / 2).setDepth(10);
 
     let head;
     if (this.textures.exists('loading_head')) {
@@ -175,10 +178,6 @@ export class PreloadScene extends Phaser.Scene {
     const beat = 60000 / Lc.bpm;
     const t = time - this.startedAt;
     this.drawBar(Math.min(this.loadProgress, t / Lc.minDuration));
-    const a = (t / (beat * Lc.beatsPerOrbit)) * Math.PI * 2 - Math.PI / 2; // старт сверху
-    this.peek.x = this.center.x + Math.cos(a) * Lc.radius;
-    this.peek.y = this.center.y + Math.sin(a) * Lc.radius;
-    this.peek.rotation = a + Math.PI / 2; // локальная +y — к центру
 
     // в ритм: голова покачивается, лапы по очереди постукивают по ободку
     const n = Math.floor(t / beat);

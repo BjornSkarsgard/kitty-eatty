@@ -20,7 +20,7 @@ for (const l of levels) {
   if (l.bowls.some((b) => b.length > l.capacity)) err('переполненная миска');
   if (l.bowls.some((b) => isComplete(b, l.capacity))) err('миска собрана на старте');
   if (l.id >= CONFIG.levelGen.noNearCompleteFrom && l.bowls.some((b) => isNearComplete(b, l.capacity)))
-    err('миска собирается одним ходом на старте');
+    err('почти собранная миска на старте');
   const key = keyOf(l.bowls);
   if (seen.has(key)) err('повтор другого уровня');
   seen.add(key);

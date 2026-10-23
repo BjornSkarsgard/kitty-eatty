@@ -6,7 +6,8 @@ import { beatPulse, beatPhase } from '../beat.js';
 import { CatView } from '../view/CatView.js';
 import { makeButton } from '../view/Button.js';
 import { sfx, sfxRandom, music } from '../audio.js';
-import { currentLevel, setCurrentLevel, recordWin, starsFor } from '../save.js';
+import { currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo } from '../save.js';
+import { showPopup } from '../view/Popup.js';
 import LEVELS from '../levels/levels.json';
 
 const L = CONFIG.layout;
@@ -235,7 +236,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   createButtons() {
-    this.makeButton(CONFIG.width * 0.3, L.buttonsY, 'Отмена', () => this.undo());
+    this.undoBtn = this.makeButton(CONFIG.width * 0.3, L.buttonsY, '', () => this.undo());
+    this.refreshUndo();
     this.makeButton(CONFIG.width * 0.7, L.buttonsY, 'Заново', () => this.scene.restart({ levelIndex: this.levelIndex }));
     this.makeButton(L.mapButtonX, L.titleY, 'Карта', () => this.scene.start('Map'), 15, 150);
   }
@@ -385,11 +387,19 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  // Число отмен на кнопке.
+  refreshUndo() {
+    this.undoBtn.list[1].setText(`Отмена · ${undos()}`);
+  }
+
+  // Отмена тратит общий запас; запас кончился — предлагаем купить за монеты (позже — за рекламу).
   undo() {
     if (this.won) return;
     this.deselect();
     const last = this.board.history[this.board.history.length - 1];
     if (!last) return;
+    if (!spendUndo()) return this.offerUndo();
+    this.refreshUndo();
     sfx(this, 'sfx_undo', CONFIG.audio.undo);
     if (this.board.isComplete(last.to)) this.unfeed(this.board.bowls[last.to][0]);
 
@@ -534,24 +544,43 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: wrap, alpha: 0, duration: CONFIG.jute.unwrapDuration, onComplete: () => wrap.destroy() });
   }
 
+  offerUndo() {
+    const price = CONFIG.economy.undoPrice;
+    const buttons = [{
+      label: `Купить за ${price} монет`, color: 0x4caf50, disabled: coins() < price,
+      onTap: () => { if (buyUndo()) { this.refreshUndo(); this.undo(); } },
+    }];
+    if (CONFIG.ads.enabled) buttons.push({ label: 'Смотреть рекламу', color: 0xf0a020, onTap: () => {} }); // этап 6
+    buttons.push({ label: 'Не надо' });
+    showPopup(this, { title: 'Отмены кончились', text: `Монет: ${coins()}`, buttons });
+  }
+
   // ---------- победа ----------
 
   showWin() {
     const W = CONFIG.width;
     const H = CONFIG.height;
     sfx(this, 'music_win');
-    recordWin(this.levelIndex, LEVELS[this.levelIndex].id, this.board.history.length, LEVELS.length);
+    const level = LEVELS[this.levelIndex];
+    const reward = recordWin(level, this.levelIndex, this.board.history.length, LEVELS.length);
     for (let k = 0; k < 5; k++) this.fxConfetti.explode(Math.round(A.confetti / 5), W * (0.1 + k * 0.2), H);
     const isLast = this.levelIndex === LEVELS.length - 1;
     this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.55).setDepth(20).setInteractive();
     this.add.text(W / 2, H * 0.36, 'Все котики сыты!', {
       fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '56px', color: '#ffffff',
     }).setOrigin(0.5).setDepth(21);
-    this.showStars(W / 2, H * 0.45, starsFor(this.board.history.length, LEVELS[this.levelIndex].minMoves));
+    this.showStars(W / 2, H * 0.45, reward.stars);
     this.add.text(W / 2, H * 0.535, `Ходов: ${this.board.history.length} (минимум ${LEVELS[this.levelIndex].minMoves})`, {
       fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '34px', color: '#cfc6e0',
     }).setOrigin(0.5).setDepth(21);
-    this.makeButton(W / 2, H * 0.62, isLast ? 'С начала' : 'Дальше', () => {
+    const gains = [reward.coins && `+${reward.coins} монет`, reward.undos && `+${reward.undos} отмена`].filter(Boolean);
+    if (gains.length) {
+      this.add.text(W / 2, H * 0.585, gains.join('   '), {
+        fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '40px', color: '#ffd43b',
+        stroke: '#6b3d1f', strokeThickness: 8,
+      }).setOrigin(0.5).setDepth(21);
+    }
+    this.makeButton(W / 2, H * 0.67, isLast ? 'С начала' : 'Дальше', () => {
       this.scene.restart({ levelIndex: isLast ? 0 : this.levelIndex + 1 });
     }, 21);
   }

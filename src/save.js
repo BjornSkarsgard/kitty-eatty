@@ -4,13 +4,23 @@
 // Что храним (версия v на случай, если формат поменяется):
 //   current  — индекс уровня, который открыть при запуске (последний начатый);
 //   unlocked — сколько уровней открыто (индекс самого дальнего доступного);
-//   best     — { id уровня: лучшее число ходов } — из него считаются звёзды.
+//   best     — { id уровня: лучшее число ходов } — из него считаются звёзды;
+//   coins    — монеты (за победы; тратятся на отмены, позже — в магазине);
+//   undos    — запас отмен хода, общий на всю игру;
+//   undoProgress — сколько новых уровней пройдено к следующей бесплатной отмене.
 import { CONFIG } from './config.js';
 
 const KEY = 'kittyeatty.save';
-const VERSION = 1;
+const VERSION = 2;
+const E = CONFIG.economy;
 
-const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {} });
+const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, undoProgress: 0 });
+
+// Старые версии сохранения дополняем до текущей, прогресс не теряется.
+function migrate(d) {
+  if (d.v === 1) d = { ...d, v: 2, coins: E.startCoins, undos: E.startUndos, undoProgress: 0 };
+  return d;
+}
 
 let data = null;
 
@@ -19,8 +29,8 @@ let data = null;
 function read() {
   try {
     const raw = window.localStorage.getItem(KEY);
-    const d = raw && JSON.parse(raw);
-    if (d && d.v === VERSION && Number.isInteger(d.current) && Number.isInteger(d.unlocked) && d.best) return d;
+    const d = raw && migrate(JSON.parse(raw));
+    if (d && d.v === VERSION && Number.isInteger(d.coins) && Number.isInteger(d.undos) && Number.isInteger(d.current) && Number.isInteger(d.unlocked) && d.best) return d;
   } catch (e) { /* нет доступа или битые данные — начинаем заново */ }
   return empty();
 }
@@ -55,14 +65,33 @@ export function setCurrentLevel(index) {
 }
 
 // Победа: запоминаем лучший результат, открываем следующий уровень и запускаться будем с него
-// (даже если игру закрыли, не нажав «Дальше»).
-export function recordWin(index, id, moves, count) {
+// (даже если игру закрыли, не нажав «Дальше»). Награда — CONFIG.economy:
+// за первое прохождение монеты за победу и звёзды и шаг к бесплатной отмене;
+// за переигровку — монеты только за новые звёзды (фармить старые уровни невыгодно).
+// Возвращает { stars, coins, undos } — что показать в окне победы.
+export function recordWin(level, index, moves, count) {
   const d = get();
-  if (!(d.best[id] <= moves)) d.best[id] = moves;
+  const prevStars = levelStars(level);
+  const stars = starsFor(moves, level.minMoves);
+  if (!(d.best[level.id] <= moves)) d.best[level.id] = moves;
+  const reward = { stars, coins: 0, undos: 0 };
+  if (prevStars === 0) {
+    reward.coins = E.winCoins + E.starCoins * stars;
+    d.undoProgress += 1;
+    if (d.undoProgress >= E.undoEveryLevels) {
+      d.undoProgress = 0;
+      reward.undos = 1;
+    }
+  } else {
+    reward.coins = E.starCoins * Math.max(0, stars - prevStars);
+  }
+  d.coins += reward.coins;
+  d.undos += reward.undos;
   const next = Math.min(index + 1, count - 1);
   d.unlocked = Math.max(d.unlocked, next);
   d.current = next;
   write();
+  return reward;
 }
 
 export function bestMoves(id) {
@@ -81,4 +110,34 @@ export function starsFor(moves, minMoves) {
 export function levelStars(level) {
   const best = bestMoves(level.id);
   return best === undefined ? 0 : starsFor(best, level.minMoves);
+}
+
+// ---------- монеты и отмены ----------
+
+export const coins = () => get().coins;
+export const undos = () => get().undos;
+
+// Потратить одну отмену; false — запаса нет.
+export function spendUndo() {
+  const d = get();
+  if (d.undos <= 0) return false;
+  d.undos -= 1;
+  write();
+  return true;
+}
+
+// Купить отмену за монеты (цена — CONFIG.economy.undoPrice); false — не хватает монет.
+export function buyUndo() {
+  const d = get();
+  if (d.coins < E.undoPrice) return false;
+  d.coins -= E.undoPrice;
+  d.undos += 1;
+  write();
+  return true;
+}
+
+// Начислить отмены (за рекламу, из ящиков — позже).
+export function addUndos(n) {
+  get().undos += n;
+  write();
 }

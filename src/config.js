@@ -30,6 +30,16 @@ export const CONFIG = {
     emptyAlpha: 0.35, // незаработанная звезда, если нет картинки ui_star_empty
   },
 
+  // Интерфейс: кнопки-иконки, пилюля монет, лоток (src/view/ui.js)
+  ui: {
+    iconButton: 112,     // сторона квадратной кнопки
+    buttonColor: 0x7b5cf0,
+    badgeColor: 0xe0245e,
+    pillWidth: 180,
+    topY: 62,            // верхняя полоса: монеты, табличка уровня, настройки
+    trayY: 1196,         // лоток с кнопками в игре
+  },
+
   // Реклама (этап 6). Пока выключена: кнопки «за рекламу» не показываются.
   ads: { enabled: false },
 
@@ -128,8 +138,6 @@ export const CONFIG = {
 
 
   layout: {
-    titleY: 60,
-    mapButtonX: 95,     // кнопка «Карта» слева от заголовка
     catsFloorY: 203,    // где стоят лапы котов (подоконник на фоне bg_game)
     catSpacing: 120,    // максимум между котами
     bowlsTop: 300,      // зона банок
@@ -141,7 +149,6 @@ export const CONFIG = {
     bowlPadding: 4,     // запас под горлышком над верхней порцией
     bowlGapX: 40,
     bowlGapY: 80,
-    buttonsY: 1212,
   },
 
   anim: {
@@ -271,12 +278,12 @@ export const CONFIG = {
 
   // Главный экран — комната кота (открывается после загрузки с map.homeFromLevel). Пока без арта.
   home: {
-    titleY: 150,
+    titleY: 190,
     floorY: 860,         // где стоят лапы кота; ниже — пол
     catScale: 2.6,
     catColor: 2,
     playY: 1010,
-    mapY: 1140,
+    iconsY: 1150,        // вторичные кнопки-иконки по бокам
     wallTop: 0xf7e3c8, wall: 0xe9c9a3, floor: 0xb98258,
   },
 

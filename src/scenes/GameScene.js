@@ -8,6 +8,8 @@ import { makeButton } from '../view/Button.js';
 import { sfx, sfxRandom, music } from '../audio.js';
 import { currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo } from '../save.js';
 import { showPopup } from '../view/Popup.js';
+import { iconButton, counterPill, plate, tray } from '../view/ui.js';
+import { openSettings } from '../view/settings.js';
 import LEVELS from '../levels/levels.json';
 
 const L = CONFIG.layout;
@@ -53,11 +55,11 @@ export class GameScene extends Phaser.Scene {
     this.createEffects();
     music(this, 'music_game');
 
-    const title = `Уровень ${level.id}` + (level.puzzle ? ' · головоломка' : '');
-    this.add.text(CONFIG.width / 2, L.titleY, title, {
-      fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '44px', color: '#ffffff',
-      stroke: '#1b1426', strokeThickness: 8,
-    }).setOrigin(0.5).setDepth(15);
+    // верхняя полоса: монеты, табличка уровня (у головоломки — сиреневая), настройки
+    const U = CONFIG.ui;
+    this.coinPill = counterPill(this, 30 + U.pillWidth / 2, U.topY, 'coin', coins());
+    plate(this, CONFIG.width / 2, U.topY, `Уровень ${level.id}`, { color: level.puzzle ? 0x6b2fa8 : undefined });
+    iconButton(this, CONFIG.width - 62, U.topY, 'gear', () => openSettings(this), { size: 84, shape: 'round' });
 
     this.layoutBowls();
     this.createBowls();
@@ -235,11 +237,16 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  // Лоток внизу: домой, отмена (с бейджем — сколько осталось), заново.
   createButtons() {
-    this.undoBtn = this.makeButton(CONFIG.width * 0.3, L.buttonsY, '', () => this.undo());
+    const U = CONFIG.ui;
+    const W = CONFIG.width;
+    const step = U.iconButton + 48;
+    tray(this, W / 2, U.trayY, step * 3 + 30, U.iconButton + 44);
+    iconButton(this, W / 2 - step, U.trayY, 'home', () => this.scene.start('Home'));
+    this.undoBtn = iconButton(this, W / 2, U.trayY, 'undo', () => this.undo());
+    iconButton(this, W / 2 + step, U.trayY, 'restart', () => this.scene.restart({ levelIndex: this.levelIndex }));
     this.refreshUndo();
-    this.makeButton(CONFIG.width * 0.7, L.buttonsY, 'Заново', () => this.scene.restart({ levelIndex: this.levelIndex }));
-    this.makeButton(L.mapButtonX, L.titleY, 'Карта', () => this.scene.start('Map'), 15, 150);
   }
 
   makeButton(x, y, label, onTap, depth = 0, w = 220) {
@@ -387,9 +394,11 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  // Число отмен на кнопке.
+  // Бейдж на отмене — сколько осталось (0 — значок «+»: купить); монеты в пилюле.
   refreshUndo() {
-    this.undoBtn.list[1].setText(`Отмена · ${undos()}`);
+    const n = undos();
+    this.undoBtn.setBadge(n > 0 ? n : '+');
+    this.coinPill.setValue(coins());
   }
 
   // Отмена тратит общий запас; запас кончился — предлагаем купить за монеты (позже — за рекламу).
@@ -563,6 +572,7 @@ export class GameScene extends Phaser.Scene {
     sfx(this, 'music_win');
     const level = LEVELS[this.levelIndex];
     const reward = recordWin(level, this.levelIndex, this.board.history.length, LEVELS.length);
+    this.refreshUndo();
     for (let k = 0; k < 5; k++) this.fxConfetti.explode(Math.round(A.confetti / 5), W * (0.1 + k * 0.2), H);
     const isLast = this.levelIndex === LEVELS.length - 1;
     this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.55).setDepth(20).setInteractive();

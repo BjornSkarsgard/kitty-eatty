@@ -2,8 +2,8 @@ import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { CatView } from '../view/CatView.js';
 import { sfx, music } from '../audio.js';
-import { makeButton } from '../view/Button.js';
-import { unlockedLevel, levelStars } from '../save.js';
+import { iconButton, counterPill } from '../view/ui.js';
+import { unlockedLevel, levelStars, coins } from '../save.js';
 import LEVELS from '../levels/levels.json';
 
 const M = CONFIG.map;
@@ -35,7 +35,9 @@ export class MapScene extends Phaser.Scene {
     this.cameras.main.scrollY = Phaser.Math.Clamp(cy - H * M.currentAt, 0, worldH - H);
     this.refresh();
     this.setupInput();
-    makeButton(this, 105, 70, 'Домой', () => this.scene.start('Home'), { depth: 10, w: 170 }).setScrollFactor(0);
+    const U = CONFIG.ui;
+    iconButton(this, 62, U.topY, 'home', () => this.scene.start('Home'), { size: 84, shape: 'round', depth: 10 }).setScrollFactor(0);
+    counterPill(this, 130 + U.pillWidth / 2, U.topY, 'coin', coins(), { depth: 10 }).setScrollFactor(0);
     music(this, 'music_game');
   }
 

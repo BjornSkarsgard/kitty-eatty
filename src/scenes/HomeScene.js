@@ -2,9 +2,11 @@ import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { CatView } from '../view/CatView.js';
 import { makeButton } from '../view/Button.js';
+import { iconButton, counterPill } from '../view/ui.js';
+import { openSettings } from '../view/settings.js';
 import { music } from '../audio.js';
 import { beatPhase } from '../beat.js';
-import { currentLevel } from '../save.js';
+import { currentLevel, coins } from '../save.js';
 import LEVELS from '../levels/levels.json';
 
 const HC = CONFIG.home;
@@ -34,10 +36,15 @@ export class HomeScene extends Phaser.Scene {
     this.cat.setInteractive(new Phaser.Geom.Rectangle(-55, -75, 110, 145), Phaser.Geom.Rectangle.Contains);
     this.cat.on('pointerdown', () => this.cat.poke());
 
+    // верх: монеты и настройки; низ: главная кнопка «Играть» и вторичные иконки с подписями
+    const U = CONFIG.ui;
+    counterPill(this, 30 + U.pillWidth / 2, U.topY, 'coin', coins());
+    iconButton(this, W - 62, U.topY, 'gear', () => openSettings(this), { size: 84, shape: 'round' });
     const level = currentLevel(LEVELS.length);
-    makeButton(this, W / 2, HC.playY, `Играть · ${LEVELS[level].id}`, () => this.scene.start('Game', { levelIndex: level }),
-      { w: 420, h: 110, size: 46, color: 0x4caf50 });
-    makeButton(this, W / 2, HC.mapY, 'Карта', () => this.scene.start('Map'), { w: 300 });
+    makeButton(this, W / 2, HC.playY, `Играть ${LEVELS[level].id}`, () => this.scene.start('Game', { levelIndex: level }),
+      { w: 440, h: 120, size: 56, color: 0xf5b301 });
+    iconButton(this, W / 2 - 190, HC.iconsY, 'map', () => this.scene.start('Map'), { label: 'Карта' });
+    iconButton(this, W / 2 + 190, HC.iconsY, 'collection', () => {}, { label: 'Коллекция' }).setEnabled(false); // этап 5, позже
     music(this, 'music_game');
   }
 

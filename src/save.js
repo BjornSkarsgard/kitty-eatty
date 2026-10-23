@@ -7,18 +7,22 @@
 //   best     — { id уровня: лучшее число ходов } — из него считаются звёзды;
 //   coins    — монеты (за победы; тратятся на отмены, позже — в магазине);
 //   undos    — запас отмен хода, общий на всю игру;
-//   undoProgress — сколько новых уровней пройдено к следующей бесплатной отмене.
+//   undoProgress — сколько новых уровней пройдено к следующей бесплатной отмене;
+//   settings — { sound, music, fx }: переключатели в окне настроек.
 import { CONFIG } from './config.js';
 
 const KEY = 'kittyeatty.save';
 const VERSION = 2;
 const E = CONFIG.economy;
 
-const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, undoProgress: 0 });
+const SETTINGS = { sound: true, music: true, fx: true };
+const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, undoProgress: 0, settings: { ...SETTINGS } });
 
 // Старые версии сохранения дополняем до текущей, прогресс не теряется.
 function migrate(d) {
   if (d.v === 1) d = { ...d, v: 2, coins: E.startCoins, undos: E.startUndos, undoProgress: 0 };
+  if (d && !d.settings) d.settings = {};
+  if (d) d.settings = { ...SETTINGS, ...d.settings }; // новые переключатели — со значением по умолчанию
   return d;
 }
 
@@ -139,5 +143,14 @@ export function buyUndo() {
 // Начислить отмены (за рекламу, из ящиков — позже).
 export function addUndos(n) {
   get().undos += n;
+  write();
+}
+
+// ---------- настройки ----------
+
+export const setting = (key) => get().settings[key];
+
+export function setSetting(key, value) {
+  get().settings[key] = value;
   write();
 }

@@ -1,9 +1,11 @@
 // Звук с защитой от отсутствующих файлов: нет файла — тишина, без ошибок.
 import { CONFIG } from './config.js';
+import { setting } from './save.js';
 
 const has = (scene, key) => scene.cache.audio.exists(key);
 
 export function sfx(scene, key, volume = 1) {
+  if (!setting('sound')) return;
   if (has(scene, key)) scene.sound.play(key, { volume: CONFIG.audio.sfx * volume });
 }
 
@@ -25,6 +27,13 @@ export function sfxRandom(scene, base, count, volume = 1) {
 // стыковаться конец-в-начало — шов размывается.
 let current = null;
 
+const musicVolume = () => (setting('music') ? CONFIG.audio.music : 0);
+
+// Переключатель «Музыка»: играющая плавно гаснет или возвращается, трек не останавливается.
+export function applyMusicSetting() {
+  if (current?.sound) fade(current.sound, musicVolume(), CONFIG.audio.musicFade);
+}
+
 export function music(scene, key) {
   if (current && current.key === key) return;
   stopMusic();
@@ -40,7 +49,7 @@ export function music(scene, key) {
     snd.play();
     snd.setVolume(0); // Phaser до старта отдаёт volume = 1 — без этого музыка начиналась на полной громкости
     state.sound = snd;
-    fade(snd, CONFIG.audio.music, xf, null, 0);
+    fade(snd, musicVolume(), xf, null, 0);
     const untilNext = Math.max(1000, snd.duration * 1000 - xf);
     state.timer = setTimeout(() => {
       if (state.stopped) return;

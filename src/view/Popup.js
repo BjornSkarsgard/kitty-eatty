@@ -3,9 +3,10 @@ import { CONFIG } from '../config.js';
 import { makeButton } from './Button.js';
 
 // Окно поверх экрана: затемнение (тап по нему закрывает), панель, заголовок, текст и кнопки столбиком.
-// buttons: [{ label, onTap, color, disabled }] — после onTap окно закрывается.
+// buttons: [{ label, onTap, color, disabled, keep }] — после onTap окно закрывается, если не keep
+// (keep — переключатели: onTap(btn) сам меняет надпись кнопки через btn.setLabel).
 // Картинка panel.png (этап 5) — позже, пока панель кодом.
-export function showPopup(scene, { title, text, buttons = [], depth = 50 }) {
+export function showPopup(scene, { title, text = '', buttons = [], depth = 50 }) {
   const W = CONFIG.width;
   const H = CONFIG.height;
   const parts = [];
@@ -16,7 +17,8 @@ export function showPopup(scene, { title, text, buttons = [], depth = 50 }) {
   parts.push(shade);
 
   const pw = 560;
-  const ph = 300 + buttons.length * 110;
+  const textH = text ? 110 : 0;
+  const ph = 135 + textH + buttons.length * 110;
   const top = H / 2 - ph / 2;
   const g = scene.add.graphics().setDepth(depth).setScrollFactor(0);
   g.fillStyle(0x000000, 0.25).fillRoundedRect(W / 2 - pw / 2 + 6, top + 10, pw, ph, 36);
@@ -35,8 +37,9 @@ export function showPopup(scene, { title, text, buttons = [], depth = 50 }) {
   }).setOrigin(0.5).setDepth(depth).setScrollFactor(0));
 
   buttons.forEach((b, i) => {
-    const btn = makeButton(scene, W / 2, top + 270 + i * 110, b.label, () => {
+    const btn = makeButton(scene, W / 2, top + 160 + textH + i * 110, b.label, () => {
       if (b.disabled) return;
+      if (b.keep) return b.onTap?.(btn);
       close();
       b.onTap?.();
     }, { depth, w: 420, h: 90, color: b.disabled ? 0xa89a8c : b.color ?? 0x5f4b8b }).setScrollFactor(0);

@@ -6,8 +6,10 @@ import { MapScene } from './scenes/MapScene.js';
 import { HomeScene } from './scenes/HomeScene.js';
 import { setupAudioFocus } from './audio.js';
 import { loadFonts } from './fonts.js';
+import { applySettings } from './view/settings.js';
 
 // Сначала шрифт — иначе первые надписи нарисуются системным.
+applySettings();
 loadFonts(CONFIG.font).then(() => {
   const game = new Phaser.Game({
     type: Phaser.AUTO,

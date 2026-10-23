@@ -13,6 +13,7 @@ export function makeButton(scene, x, y, label, onTap, { depth = 0, w = 220, h = 
     fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: `${size}px`, color: '#ffffff',
   }).setOrigin(0.5);
   const btn = scene.add.container(x, y, [g, t]).setDepth(depth).setSize(w, h).setInteractive();
+  btn.setLabel = (s) => { t.setText(s); return btn; };
   btn.on('pointerdown', () => {
     sfx(scene, 'sfx_button');
     scene.tweens.add({ targets: btn, scale: 0.92, duration: 60, yoyo: true });

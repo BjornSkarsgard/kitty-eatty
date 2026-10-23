@@ -1,7 +1,7 @@
 // Лапки на обоях фона: node tools/bg-paws.mjs
 // Ищет на art-src/bg_game.png (исходник фона) тёмные отпечатки лапок на стене и пишет:
-// - tools/bg-paws.json — центры и размеры лапок в пикселях фона (игра кладёт поверх них свечение);
-// - src/assets/paw_glow.png — мягкое белое свечение по форме лапки (размытый силуэт самой чёткой лапки).
+// - src/assets/paw_glow.png — атлас: каждая лапка вырезана из фона по своей форме;
+// - tools/bg-paws.json — где лапка на фоне (левый верх, размер) и где в атласе.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -96,35 +96,33 @@ for (let y = ref.y - Math.floor((ref.y - WALL[0]) / dy) * dy; y < WALL[1] - avgH
 console.log(`сетка: шаг ${dx.toFixed(0)}×${dy.toFixed(0)}, добавлено пропущенных: ${added}`);
 console.log(`лапок: ${paws.length}`);
 
-// свечение: силуэт самой «плотной» лапки, с полями, размытый
-const best = paws.reduce((a, b) => (b.n > a.n ? b : a));
-const PAD = 14;
-const gw = best.w + PAD * 2, gh = best.h + PAD * 2;
-let a = new Float32Array(gw * gh);
-for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
-  const sx = best.x - Math.round(gw / 2) + x, sy = best.y - Math.round(gh / 2) + y;
-  if (sx >= 0 && sy >= 0 && sx < w && sy < h) a[y * gw + x] = Math.min(1, Math.max(0, (local[sy * w + sx] - lum[sy * w + sx] - 2) / 10));
+// Каждая лапка — свой кусок фона: её же пиксели, прозрачность — по её форме (чёткий край). Куски сложены
+// в атлас src/assets/paw_glow.png; игра кладёт каждый ровно на его место фона и «подсвечивает» сложением цветов.
+const PAD = 3;
+const ATLAS_W = 512;
+let ax = 0, ay = 0, rowH = 0;
+const frames = [];
+for (const p of paws) {
+  const fw = Math.round(p.w + PAD * 2), fh = Math.round(p.h + PAD * 2);
+  if (ax + fw > ATLAS_W) { ax = 0; ay += rowH; rowH = 0; }
+  frames.push({ x0: Math.round(p.x - fw / 2), y0: Math.round(p.y - fh / 2), w: fw, h: fh, ax, ay });
+  ax += fw;
+  rowH = Math.max(rowH, fh);
 }
-const blur = (src, r) => {
-  const out = new Float32Array(gw * gh);
-  for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
-    let s = 0, c = 0;
-    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
-      const xx = x + dx, yy = y + dy;
-      if (xx >= 0 && yy >= 0 && xx < gw && yy < gh) { s += src[yy * gw + xx]; c++; }
-    }
-    out[y * gw + x] = s / c;
+const AH = ay + rowH;
+const atlas = Buffer.alloc(ATLAS_W * AH * 4);
+for (const f of frames) {
+  for (let y = 0; y < f.h; y++) for (let x = 0; x < f.w; x++) {
+    const sx = f.x0 + x, sy = f.y0 + y;
+    if (sx < 0 || sy < 0 || sx >= w || sy >= h) continue;
+    const i = sy * w + sx;
+    const alpha = Math.min(1, Math.max(0, (local[i] - lum[i] - 1.5) / 3)); // форма лапки, край в 1–2 px
+    const o = ((f.ay + y) * ATLAS_W + f.ax + x) * 4;
+    for (let k = 0; k < 3; k++) atlas[o + k] = rgba[i * 4 + k];
+    atlas[o + 3] = Math.round(alpha * 255);
   }
-  return out;
-};
-a = blur(blur(a, 3), 3);
-const out = Buffer.alloc(gw * gh * 4);
-for (let i = 0; i < gw * gh; i++) {
-  out[i * 4] = out[i * 4 + 1] = out[i * 4 + 2] = 255;
-  out[i * 4 + 3] = Math.round(Math.min(1, a[i] * 2) * 255);
 }
-writeFileSync(join(ROOT, 'src', 'assets', 'paw_glow.png'), encodePNG({ w: gw, h: gh, rgba: out }));
-console.log(`paw_glow.png ${gw}×${gh} по лапке в (${best.x}, ${best.y})`);
-// glow — ширина лапки, по которой сделано свечение: игра масштабирует его под размер каждой лапки
+writeFileSync(join(ROOT, 'src', 'assets', 'paw_glow.png'), encodePNG({ w: ATLAS_W, h: AH, rgba: atlas }));
 writeFileSync(join(ROOT, 'tools', 'bg-paws.json'),
-  JSON.stringify({ bg: [w, h], glow: best.w, paws: paws.map(({ x, y, w: pw, h: ph }) => [x, y, pw, ph]) }));
+  JSON.stringify({ bg: [w, h], paws: frames.map((f) => [f.x0, f.y0, f.w, f.h, f.ax, f.ay]) }));
+console.log(`атлас paw_glow.png ${ATLAS_W}×${AH}, лапок ${frames.length}`);

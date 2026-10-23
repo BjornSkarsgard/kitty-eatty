@@ -62,25 +62,36 @@ export class GameScene extends Phaser.Scene {
     this.createButtons();
   }
 
-  // Лапки на обоях по очереди в разнобой мягко разгораются и гаснут. Где лапки — tools/bg-paws.json.
+  // Лапки на обоях в разнобой чуть светлеют в своём же цвете (не больше fx.wallGlow.max за раз).
+  // Каждая лапка — свой кусок атласа paw_glow (вырезан из фона по её форме, tools/bg-paws.mjs), лежит ровно
+  // на своём месте и рисуется сложением цветов: прозрачность = насколько светлее.
   createWallGlow(bg) {
     const G = CONFIG.fx.wallGlow;
     if (!CONFIG.fx.enabled || !this.textures.exists('paw_glow')) return;
+    const tex = this.textures.get('paw_glow');
     const s = bg.scaleX;
     const [bw, bh] = PAWS.bg;
-    for (const [x, y, w] of PAWS.paws) {
-      const img = this.add.image(bg.x + (x - bw / 2) * s, bg.y + (y - bh / 2) * s, 'paw_glow')
-        .setScale((s * w) / PAWS.glow).setTint(G.color).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
-      const glow = (first) => {
+    const paws = PAWS.paws.map(([x0, y0, w, h, ax, ay], k) => {
+      if (!tex.has(`p${k}`)) tex.add(`p${k}`, 0, ax, ay, w, h);
+      return this.add.image(bg.x + (x0 - bw / 2) * s, bg.y + (y0 - bh / 2) * s, 'paw_glow', `p${k}`)
+        .setOrigin(0, 0).setScale(s).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
+    });
+    let active = 0;
+    const next = () => {
+      const idle = paws.filter((p) => !p.glowing);
+      if (active < G.max && idle.length) {
+        const p = Phaser.Utils.Array.GetRandom(idle);
+        p.glowing = true;
+        active++;
         this.tweens.add({
-          targets: img, alpha: Phaser.Math.FloatBetween(...G.alpha),
-          delay: Phaser.Math.Between(first ? 0 : G.gap[0], G.gap[1]),
-          duration: G.fade, hold: G.hold, yoyo: true, ease: 'Sine.easeInOut',
-          onComplete: () => glow(false),
+          targets: p, alpha: Phaser.Math.FloatBetween(...G.alpha), duration: G.fade, hold: G.hold,
+          yoyo: true, ease: 'Sine.easeInOut',
+          onComplete: () => { p.glowing = false; active--; },
         });
-      };
-      glow(true);
-    }
+      }
+      this.time.delayedCall(Phaser.Math.Between(...G.gap), next);
+    };
+    next();
   }
 
   // ---------- раскладка ----------

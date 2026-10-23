@@ -50,7 +50,7 @@ export class GameScene extends Phaser.Scene {
 
     const title = `Уровень ${level.id}` + (level.puzzle ? ' · головоломка' : '');
     this.add.text(CONFIG.width / 2, L.titleY, title, {
-      fontFamily: 'sans-serif', fontSize: '44px', color: '#ffffff',
+      fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '44px', color: '#ffffff',
       stroke: '#1b1426', strokeThickness: 8,
     }).setOrigin(0.5).setDepth(15);
 
@@ -243,7 +243,7 @@ export class GameScene extends Phaser.Scene {
     g.fillRoundedRect(-w / 2, -h / 2, w, h, 20);
     g.lineStyle(CONFIG.outlineWidth, CONFIG.outline, 1);
     g.strokeRoundedRect(-w / 2, -h / 2, w, h, 20);
-    const t = this.add.text(0, 0, label, { fontFamily: 'sans-serif', fontSize: '34px', color: '#ffffff' }).setOrigin(0.5);
+    const t = this.add.text(0, 0, label, { fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '34px', color: '#ffffff' }).setOrigin(0.5);
     const btn = this.add.container(x, y, [g, t]).setDepth(depth).setSize(w, h).setInteractive();
     btn.on('pointerdown', () => {
       sfx(this, 'sfx_button');
@@ -553,10 +553,10 @@ export class GameScene extends Phaser.Scene {
     const isLast = this.levelIndex === LEVELS.length - 1;
     this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.55).setDepth(20).setInteractive();
     this.add.text(W / 2, H * 0.4, 'Все котики сыты!', {
-      fontFamily: 'sans-serif', fontSize: '56px', color: '#ffffff',
+      fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '56px', color: '#ffffff',
     }).setOrigin(0.5).setDepth(21);
     this.add.text(W / 2, H * 0.47, `Ходов: ${this.board.history.length} (минимум ${LEVELS[this.levelIndex].minMoves})`, {
-      fontFamily: 'sans-serif', fontSize: '34px', color: '#cfc6e0',
+      fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '34px', color: '#cfc6e0',
     }).setOrigin(0.5).setDepth(21);
     this.makeButton(W / 2, H * 0.58, isLast ? 'С начала' : 'Дальше', () => {
       this.scene.restart({ levelIndex: isLast ? 0 : this.levelIndex + 1 });

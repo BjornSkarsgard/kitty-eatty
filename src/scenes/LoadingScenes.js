@@ -35,9 +35,17 @@ export class PreloadScene extends Phaser.Scene {
     this.drawBowl();
     this.createCat();
 
-    this.add.text(this.center.x, this.center.y - 10, 'Загрузка…', {
-      fontFamily: 'sans-serif', fontSize: '40px', color: '#5a3a2a',
+    // Объёмная надпись: заливка светлеет кверху, толстая обводка и тень вниз (свет сверху).
+    const T = Lc.title;
+    const title = this.add.text(this.center.x, this.center.y - 10, 'Загрузка…', {
+      fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: `${T.size}px`,
+      stroke: T.stroke, strokeThickness: T.strokeWidth,
+      shadow: { offsetX: 0, offsetY: T.shadowY, color: T.shadow, blur: 0, stroke: true, fill: true },
     }).setOrigin(0.5);
+    const grad = title.context.createLinearGradient(0, 0, 0, title.height);
+    grad.addColorStop(0.25, T.top);
+    grad.addColorStop(0.8, T.bottom);
+    title.setFill(grad);
     this.bar = this.add.graphics();
     this.loadProgress = 0;
     this.drawBar(0);

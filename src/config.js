@@ -3,6 +3,7 @@ export const CONFIG = {
   width: 720,      // логическое разрешение, портрет
   height: 1280,
   background: '#2b2140',
+  font: 'Balsamiq Sans', // шрифт всех надписей (жирный); файлы — src/assets/fonts, загрузка — src/fonts.js
 
   // Цвет корма = цвет кота. Форма дублирует цвет для дальтоников. name — в именах файлов котов (cat_<name>_head.png).
   colors: [
@@ -224,6 +225,8 @@ export const CONFIG = {
     // Картинка loading_bowl: центр проёма и радиус середины ободка в пикселях файла.
     // Картинка масштабируется так, чтобы середина ободка легла на radius — по ней ходит кот.
     bowlArt: { cx: 325, cy: 516, rim: 210 },
+    // Надпись «Загрузка…»: заливка сверху вниз, обводка, тень вниз
+    title: { size: 52, top: '#ffffff', bottom: '#ffd88a', stroke: '#9c3f1c', strokeWidth: 10, shadow: '#5e2210', shadowY: 5 },
     catScale: 2.2,
     headInset: 62,       // насколько голова свешивается внутрь круга
     pawSpread: 104,      // лапы — по сторонам от головы

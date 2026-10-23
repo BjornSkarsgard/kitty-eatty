@@ -10,6 +10,7 @@ import { currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyU
 import { showPopup } from '../view/Popup.js';
 import { iconButton, counterPill, plate, tray, makeIcon } from '../view/ui.js';
 import { addSettingsMenu } from '../view/settings.js';
+import { turnTo, turnIn } from '../view/transition.js';
 import LEVELS from '../levels/levels.json';
 
 const L = CONFIG.layout;
@@ -32,6 +33,7 @@ export class GameScene extends Phaser.Scene {
     // по кнопке — переданный уровень, при запуске — из ?level= (разработка) или из сохранения
     this.levelIndex = data.levelIndex ?? levelFromUrl() ?? currentLevel(LEVELS.length);
     setCurrentLevel(this.levelIndex);
+    this.turn = data.turn; // пришли из комнаты — въезжаем «поворотом»
   }
 
   create() {
@@ -59,13 +61,19 @@ export class GameScene extends Phaser.Scene {
     const U = CONFIG.ui;
     this.coinPill = counterPill(this, 30 + U.pillWidth / 2, U.topY, 'coin', coins());
     plate(this, CONFIG.width / 2, U.topY, `Уровень ${level.id}`, { color: level.puzzle ? 0x6b2fa8 : undefined });
-    addSettingsMenu(this, { onExit: () => this.scene.start('Room') });
+    addSettingsMenu(this, { onExit: () => this.leave() });
 
     this.layoutBowls();
     this.createBowls();
     this.createPortions();
     this.createCats();
     this.createButtons();
+    if (this.turn) turnIn(this, this.turn);
+  }
+
+  // Домой — «поворотом» обратно в комнату.
+  leave() {
+    turnTo(this, 'Room', {}, -1);
   }
 
   // Лапки на обоях: штамп paw.png ровной сеткой по стене (ряды через dy, соседние сдвинуты на полшага dx).
@@ -635,36 +643,37 @@ export class GameScene extends Phaser.Scene {
 
     const next = () => this.scene.restart({ levelIndex: isLast ? 0 : this.levelIndex + 1 });
     box.add(makeButton(this, 0, WC.buttonY, isLast ? 'С начала' : 'Продолжить', next, { w: 440, h: 120, size: 52, color: 0x43c43a }));
-    box.add(iconButton(this, pw / 2 - 6, -ph / 2 + 4, 'close', () => this.scene.start('Room'), {
+    box.add(iconButton(this, pw / 2 - 6, -ph / 2 + 4, 'close', () => this.leave(), {
       size: 92, shape: 'round', color: CONFIG.ui.exitColor, depth: 0,
     }));
 
     box.setScale(0.5).setAlpha(0);
     this.tweens.add({ targets: box, scale: 1, alpha: 1, duration: 320, ease: 'Back.easeOut' });
-    this.showStars(W / 2, cy + WC.starsY, reward.stars);
+    this.showStars(box, WC.starsY, reward.stars);
   }
 
 
-  // Три звезды в ряд: заработанные по очереди выпрыгивают со вспышкой, остальные — бледные.
-  // Картинки ui_star / ui_star_empty; пока их нет — растянутая искорка fx_star.
-  showStars(x, y, count) {
+  // Три звезды в ряд внутри окна победы (box): сначала все пустые — выпрыгивают вместе с окном,
+  // потом заработанные по очереди заполняются со вспышкой. Картинки ui_star / ui_star_empty;
+  // пока их нет — растянутая искорка fx_star (пустая — бледная).
+  showStars(box, y, count) {
     const S = CONFIG.stars;
     const full = this.textures.exists('ui_star') ? 'ui_star' : 'fx_star';
     const hasEmpty = this.textures.exists('ui_star_empty');
     const fit = (img) => img.setScale(S.size / Math.max(img.width, img.height));
     for (let i = 0; i < 3; i++) {
-      const sx = x + (i - 1) * (S.size + S.gap);
+      const sx = (i - 1) * (S.size + S.gap);
       const sy = y + (i === 1 ? 0 : S.size * 0.12); // средняя чуть выше — дугой
-      fit(this.add.image(sx, sy, hasEmpty ? 'ui_star_empty' : full)).setDepth(21)
-        .setAlpha(hasEmpty ? 1 : S.emptyAlpha);
+      box.add(fit(this.add.image(sx, sy, hasEmpty ? 'ui_star_empty' : full)).setAlpha(hasEmpty ? 1 : S.emptyAlpha));
       if (i >= count) continue;
-      const star = fit(this.add.image(sx, sy, full)).setDepth(22);
+      const star = fit(this.add.image(sx, sy, full));
+      box.add(star);
       const target = star.scale;
       star.setScale(0);
       this.tweens.add({
         targets: star, scale: target, duration: 380, ease: 'Back.easeOut', delay: 400 + i * S.popDelay,
         onStart: () => sfx(this, 'sfx_pick'),
-        onComplete: () => this.fxStars.setDepth(23).explode(10, sx, sy),
+        onComplete: () => this.fxStars.setDepth(23).explode(10, box.x + sx, box.y + sy),
       });
     }
   }

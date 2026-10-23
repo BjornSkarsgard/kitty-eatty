@@ -5,6 +5,7 @@ import { MapView } from '../view/MapView.js';
 import { makeButton } from '../view/Button.js';
 import { counterPill, tabBar, iconButton, makeIcon } from '../view/ui.js';
 import { addSettingsMenu } from '../view/settings.js';
+import { turnTo, turnIn } from '../view/transition.js';
 import { music } from '../audio.js';
 import { beatPhase } from '../beat.js';
 import { currentLevel, unlockedLevel, levelStars, coins } from '../save.js';
@@ -36,6 +37,7 @@ export class RoomScene extends Phaser.Scene {
 
   init(data) {
     this.startZone = zoneIndex(data.zone ?? 'home');
+    this.turn = data.turn; // пришли из уровня — въезжаем «поворотом»
   }
 
   create() {
@@ -58,6 +60,12 @@ export class RoomScene extends Phaser.Scene {
     }).setScrollFactor(0).setVisible(false);
     this.setupInput();
     music(this, 'music_game');
+    if (this.turn) turnIn(this, this.turn);
+  }
+
+  // В уровень — «поворотом» на кухню.
+  startLevel(index) {
+    turnTo(this, 'Game', { levelIndex: index }, 1);
   }
 
   // ---------- комната ----------
@@ -95,7 +103,7 @@ export class RoomScene extends Phaser.Scene {
     this.cat.setInteractive(new Phaser.Geom.Rectangle(-55, -75, 110, 145), Phaser.Geom.Rectangle.Contains);
     this.cat.on('pointerdown', () => this.cat.poke());
     const level = currentLevel(LEVELS.length);
-    makeButton(this, x0 + W / 2, HC.playY, `Играть ${LEVELS[level].id}`, () => this.scene.start('Game', { levelIndex: level }),
+    makeButton(this, x0 + W / 2, HC.playY, `Играть ${LEVELS[level].id}`, () => this.startLevel(level),
       { w: 440, h: 120, size: 56, color: 0xf5b301 });
   }
 

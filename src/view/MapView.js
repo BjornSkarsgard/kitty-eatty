@@ -75,7 +75,7 @@ export class MapView {
       }
       sfx(this.scene, 'sfx_button');
       this.scene.tweens.add({ targets: v.node, scale: v.node.scale * 0.9, duration: 70, yoyo: true,
-        onComplete: () => this.scene.scene.start('Game', { levelIndex: i }) });
+        onComplete: () => this.scene.startLevel(i) });
       return;
     }
   }

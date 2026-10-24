@@ -10,7 +10,7 @@ import { currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyU
 import { showPopup } from '../view/Popup.js';
 import { iconButton, counterPill, plate, tray, makeIcon } from '../view/ui.js';
 import { addSettingsMenu } from '../view/settings.js';
-import { turnTo, turnIn } from '../view/transition.js';
+import { zoomIn, enterZoom } from '../view/transition.js';
 import LEVELS from '../levels/levels.json';
 
 const L = CONFIG.layout;
@@ -33,7 +33,7 @@ export class GameScene extends Phaser.Scene {
     // по кнопке — переданный уровень, при запуске — из ?level= (разработка) или из сохранения
     this.levelIndex = data.levelIndex ?? levelFromUrl() ?? currentLevel(LEVELS.length);
     setCurrentLevel(this.levelIndex);
-    this.turn = data.turn; // пришли из комнаты — въезжаем «поворотом»
+    this.fromHall = data.fromHall; // вошли из холла через дверь кухни — отъезжаем зумом
   }
 
   create() {
@@ -68,12 +68,12 @@ export class GameScene extends Phaser.Scene {
     this.createPortions();
     this.createCats();
     this.createButtons();
-    if (this.turn) turnIn(this, this.turn);
+    if (this.fromHall) enterZoom(this, CONFIG.room.doorZoom, CONFIG.room.doorZoomDuration);
   }
 
-  // Домой — «поворотом» обратно в комнату.
+  // Домой: камера приближается, как будто отступаем назад сквозь дверь, и холл начинается с открытой двери кухни.
   leave() {
-    turnTo(this, 'Room', {}, -1);
+    zoomIn(this, CONFIG.room.doorZoom, CONFIG.room.doorZoomDuration, () => this.scene.start('Room', { fromKitchen: true }));
   }
 
   // Лапки на обоях: штамп paw.png ровной сеткой по стене (ряды через dy, соседние сдвинуты на полшага dx).

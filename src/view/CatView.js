@@ -301,6 +301,7 @@ export class CatView extends Phaser.GameObjects.Container {
     if (!this.scene.textures.exists('fx_heart')) return;
     const h = this.scene.add.image(this.x + Phaser.Math.Between(-20, 20) * this.baseScale, this.y - 70 * this.baseScale, 'fx_heart')
       .setDepth(13).setScale(0.6 * this.baseScale).setAlpha(0);
+    this.parentContainer?.add(h); // кот внутри комнаты холла — сердечко там же, в её координатах
     this.scene.tweens.add({
       targets: h, delay, y: h.y - 70 * this.baseScale, alpha: { from: 1, to: 0 }, scale: this.baseScale,
       duration: 900, ease: 'Sine.easeOut', onComplete: () => h.destroy(),

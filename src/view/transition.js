@@ -2,80 +2,70 @@ import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { sfx } from '../audio.js';
 
-// Переход «поворот» между комнатой и кухней (уровнем): обе сцены едут вбок одновременно, вплотную друг к другу —
-// старая уходит, новая въезжает, пустоты между ними нет. Размытие в движении и звук ветра — будто резко
-// повернулись на 180°. dir: 1 — поворот вправо (новая въезжает справа), -1 — влево.
-// Кухня стоит в доме сразу за последним участком комнаты, поэтому из комнаты проезжаем все участки до её края
-// (главная → коллекция → лежанка → кухня) и обратно так же. Сколько ехать — спрашиваем у сцен:
-// scene.turnExit(dir) — путь до своего края, scene.turnEnter(dir) — путь от края до своего места; без них — экран.
+// Эффекты переходов между холлом (RoomScene) и кухней (уровнем).
+// - Быстрый проезд по кругу холла к двери кухни и обратно: размытие в движении, мультяшные струйки ветра,
+//   звук sfx_whoosh серединой на середину проезда (panFx).
+// - Сквозь открытую дверь — зум камеры: холл приближается, пока проём не заполнит экран, и на этом кадре
+//   включается уровень, который сам доезжает зумом до 1 (zoomIn / enterZoom). Назад — наоборот.
 // Размытие — только WebGL и включённые эффекты; в Canvas — просто быстрый проезд.
 const T = () => CONFIG.transition;
-
-// Начать поворот из сцены from в сцену toKey: новая запускается параллельно и сама доводит переход (turnIn).
-export function turnTo(from, toKey, data, dir) {
-  from.input.enabled = false;
-  from.scene.launch(toKey, { ...data, turn: { from: from.scene.key, dir } });
-}
 
 function blurOn(scene) {
   if (!CONFIG.fx.enabled || scene.game.renderer.type !== Phaser.WEBGL) return null;
   return scene.cameras.main.postFX?.addBlur(T().blurQuality, 1, 0, 0) || null;
 }
 
-// Закреплённые на экране элементы (кнопки сверху, вкладки) — они не едут с комнатой, поэтому гаснут/появляются.
-// Зоны нажатия (вкладки) прозрачности не имеют — их пропускаем.
-const hud = (scene) => scene.children.list.filter((o) => o.scrollFactorX === 0 && o.visible && typeof o.alpha === 'number');
+// Сколько длится проезд на span пикселей (span — со знаком, важна только длина).
+export function panDuration(span) {
+  return T().duration + T().perScreen * Math.max(0, Math.abs(span) / CONFIG.width - 1);
+}
 
-// Вызывается в create() новой сцены, если её запустили поворотом (data.turn).
-export function turnIn(scene, { from, dir }) {
-  const old = scene.scene.get(from);
-  scene.scene.bringToTop();
-  const W = CONFIG.width;
-  const cam = scene.cameras.main;
-  const oldCam = old.cameras.main;
-  const to = cam.scrollX;
-  const span = (old.turnExit ? old.turnExit(dir) : W) + (scene.turnEnter ? scene.turnEnter(dir) : 0);
-  const ms = T().duration + T().perScreen * Math.max(0, span / W - 1);
-  // звук ветра — серединой на середину поворота (там камера быстрее всего)
+// Эффекты на время проезда длиной ms в сторону dir (1 — камера едет вправо, -1 — влево).
+export function panFx(scene, dir, ms) {
   const whoosh = scene.cache.audio.get('sfx_whoosh');
   const soundMs = whoosh?.duration ? whoosh.duration * 1000 : ms;
   scene.time.delayedCall(Math.max(0, (ms - soundMs) / 2), () => sfx(scene, 'sfx_whoosh', T().volume));
-  const bounds = cam.useBounds ? Phaser.Geom.Rectangle.Clone(cam.getBounds()) : null;
-  cam.removeBounds();
-  oldCam.removeBounds();
-  cam.scrollX = to - dir * span;
-
-  const blurs = [blurOn(scene), blurOn(old)].filter(Boolean);
-  // размытие: нарастает к середине поворота и уходит к концу
-  if (blurs.length) {
+  const blur = blurOn(scene);
+  // размытие: нарастает к середине проезда и уходит к концу
+  if (blur) {
     scene.tweens.addCounter({
       from: 0, to: 1, duration: ms, ease: 'Linear',
-      onUpdate: (tw) => { const s = Math.sin(tw.getValue() * Math.PI) * T().blur; blurs.forEach((b) => (b.strength = s)); },
+      onUpdate: (tw) => (blur.strength = Math.sin(tw.getValue() * Math.PI) * T().blur),
+      onComplete: () => scene.cameras.main.postFX?.remove(blur),
     });
   }
-  scene.tweens.add({ targets: hud(old), alpha: 0, duration: ms * 0.4 });
-  // свои закреплённые элементы проявляются к концу — каждый до своей прозрачности (бледные вкладки остаются бледными)
+  if (CONFIG.fx.enabled) windStreaks(scene, dir, ms);
+}
+
+// Закреплённые на экране элементы (монеты, настройки, вкладки) — при зуме в дверь гаснут, на выходе проявляются.
+// Зоны нажатия (вкладки) прозрачности не имеют — их пропускаем.
+export const hud = (scene) => scene.children.list.filter((o) => o.scrollFactorX === 0 && o.visible && typeof o.alpha === 'number');
+
+// Камера приближается в zoom (центр — середина экрана), потом onDone.
+export function zoomIn(scene, zoom, ms, onDone) {
+  scene.input.enabled = false;
+  scene.tweens.add({ targets: hud(scene), alpha: 0, duration: ms * 0.5 });
+  scene.tweens.add({ targets: scene.cameras.main, zoom, duration: ms, ease: 'Cubic.easeIn', onComplete: onDone });
+}
+
+// Сцена начинается приближенной в zoom и отъезжает до 1; закреплённые элементы проявляются к концу.
+export function enterZoom(scene, zoom, ms, onDone) {
+  const cam = scene.cameras.main;
+  cam.setZoom(zoom);
+  scene.input.enabled = false;
   hud(scene).forEach((o) => {
-    const a = o.alpha;
+    const a = o.alpha; // бледные вкладки остаются бледными
     o.setAlpha(0);
     scene.tweens.add({ targets: o, alpha: a, duration: ms * 0.5, delay: ms * 0.5 });
   });
-  if (CONFIG.fx.enabled) windStreaks(scene, dir, ms);
-  scene.input.enabled = false;
-  scene.tweens.add({ targets: oldCam, scrollX: oldCam.scrollX + dir * span, duration: ms, ease: 'Cubic.easeInOut' });
   scene.tweens.add({
-    targets: cam, scrollX: to, duration: ms, ease: 'Cubic.easeInOut',
-    onComplete: () => {
-      if (bounds) cam.setBounds(bounds.x, bounds.y, bounds.width, bounds.height);
-      if (blurs[0] && scene.cameras.main.postFX) scene.cameras.main.postFX.remove(blurs[0]);
-      scene.input.enabled = true;
-      scene.scene.stop(from);
-    },
+    targets: cam, zoom: 1, duration: ms, ease: 'Cubic.easeOut',
+    onComplete: () => { scene.input.enabled = true; onDone?.(); },
   });
 }
 
 // Мультяшные струйки ветра: белые изогнутые штрихи с острыми концами проносятся поперёк экрана навстречу
-// повороту. Несколько вариантов рисуются один раз в текстуры (wind_0..), дальше это обычные картинки —
+// движению. Несколько вариантов рисуются один раз в текстуры (wind_0..), дальше это обычные картинки —
 // дешевле всего и в WebGL, и в Canvas. Есть свои картинки wind_N.png — берутся они.
 const WIND_VARIANTS = 4;
 

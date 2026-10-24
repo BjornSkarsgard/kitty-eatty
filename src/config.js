@@ -321,14 +321,15 @@ export const CONFIG = {
     door: { scale: 1.08, bottom: 1132, openDuration: 380, open: 0.1, shade: 0x8a6a55, playY: 760 },
     doorZoom: 1.23,      // зум сквозь открытую дверь: проём заполняет экран, на этом кадре включается уровень
     doorZoomDuration: 380,
+    // Координаты в комнатах — как на экране, когда фон комнаты растянут на весь экран (картинка 720×1192 → ×1.074).
     // карта в большой рамке на стене bg_room_map (координаты комнаты, до roomScale): окошко шириной с экран
     // и высотой posterViewH (в координатах карты), уменьшенное в posterScale
-    posterScale: 0.332,
-    posterViewH: 852,
-    posterX: 357,
-    posterY: 312,
+    posterScale: 0.358,
+    posterViewH: 849,
+    posterX: 358,
+    posterY: 337,
     zoomDuration: 420,   // мс: карта разворачивается на весь экран и обратно
-    collection: { x: [262, 458], y: [206, 346, 482] }, // середины пустых рамок на стене bg_room_collection
+    collection: { x: [255, 465], y: [221, 372, 518] }, // середины пустых рамок на стене bg_room_collection
     profile: { y: 305, step: 90, w: 470, h: 76 },        // таблички статистики на стене bg_room_profile
   },
 

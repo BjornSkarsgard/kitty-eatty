@@ -98,7 +98,10 @@ export class RoomScene extends Phaser.Scene {
       arch = this.add.image(0, H / 2, 'hall_arch').setDepth(5);
       arch.setScale(H / arch.height);
     }
-    return { i, room, mask, arch };
+    // кусок стены справа от арки — до следующей (hall_wall.jpg, tools/fit-hall-wall.mjs)
+    const wall = this.textures.exists('hall_wall') && R.wallGap ? this.add.image(0, H / 2, 'hall_wall').setDepth(5) : null;
+    wall?.setDisplaySize(R.wallGap, H);
+    return { i, room, mask, arch, wall };
   }
 
   // Каждый кадр: всё на своих местах для текущего поворота pan.p.
@@ -111,6 +114,8 @@ export class RoomScene extends Phaser.Scene {
       s.room.setVisible(on).setPosition(W / 2 - (W / 2) * k + R.depth * d, O.top * (1 - k));
       s.mask.x = d;
       s.arch?.setVisible(on).setX(W / 2 + d);
+      const dw = d + STEP / 2; // середина стены после арки
+      s.wall?.setVisible(Math.abs(dw) < (W + R.wallGap) / 2).setX(W / 2 + dw);
       s.d = d;
     }
     this.placeDoor(this.slots[KITCHEN].d);

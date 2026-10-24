@@ -154,6 +154,15 @@ export class CatView extends Phaser.GameObjects.Container {
     if (this.body) this.body.scaleY = 1;
   }
 
+  // Кота удаляют (сменили окрас) — гасим его таймеры и твины, иначе моргание сработает на удалённом коте.
+  preDestroy() {
+    this.stopIdle();
+    this.actions.forEach(safeRemove);
+    this.actions = [];
+    this.scene?.tweens.killTweensOf([this, this.head, this.eyes].filter(Boolean));
+    super.preDestroy();
+  }
+
   track(t) {
     if (this.actions.length > 32) this.actions = this.actions.filter((a) => a.isPlaying?.() || a.getProgress?.() < 1);
     this.actions.push(t);

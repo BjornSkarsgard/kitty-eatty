@@ -6,7 +6,8 @@ import { beatPulse, beatPhase } from '../beat.js';
 import { CatView } from '../view/CatView.js';
 import { makeButton } from '../view/Button.js';
 import { sfx, sfxRandom, music } from '../audio.js';
-import { currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo, catNeed } from '../save.js';
+import { currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo, catNeed, lives, loseLife } from '../save.js';
+import { confirmLife, showNoLives } from '../view/lives.js';
 import { showPopup } from '../view/Popup.js';
 import { iconButton, counterPill, plate, tray, makeIcon } from '../view/ui.js';
 import { addSettingsMenu } from '../view/settings.js';
@@ -40,6 +41,7 @@ export class GameScene extends Phaser.Scene {
     this.board = new Board(level);
     this.selected = null;
     this.won = false;
+    this.moved = false; // был ли ход — тогда «Заново» и выход сжигают жизнь
     this.pulsing = new Set(); // порции, которые пульсируют в такт музыке
     this.glass = null;
     this.lastFeedMeow = -Infinity;
@@ -78,9 +80,23 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  // Выход из уровня: если уровень начат и не пройден — сначала предупреждение, что сгорит жизнь.
+  leave() {
+    if (this.won || !this.moved || lives() <= 0) return this.goHome();
+    confirmLife(this, 'Выйти из уровня?', () => { loseLife(); this.goHome(); });
+  }
+
+  // «Заново»: начатый уровень — за жизнь (с предупреждением); жизней нет — окно «Жизни кончились».
+  restartLevel() {
+    const again = () => this.scene.restart({ levelIndex: this.levelIndex });
+    if (!this.moved) return again();
+    if (lives() <= 0) return showNoLives(this);
+    confirmLife(this, 'Начать заново?', () => { loseLife(); again(); });
+  }
+
   // Домой: холл запускается поверх уровня у открытой двери кухни, сам уводит камеру назад, закрывает дверь
   // и выключает уровень (RoomScene.backFromKitchen).
-  leave() {
+  goHome() {
     this.input.enabled = false;
     this.scene.moveBelow('Room');
     this.scene.launch('Room', { fromKitchen: true });
@@ -263,7 +279,7 @@ export class GameScene extends Phaser.Scene {
     const step = U.iconButton + 48;
     tray(this, W / 2, U.trayY, step * 2 + 30, U.iconButton + 44);
     this.undoBtn = iconButton(this, W / 2 - step / 2, U.trayY, 'undo', () => this.undo());
-    iconButton(this, W / 2 + step / 2, U.trayY, 'restart', () => this.scene.restart({ levelIndex: this.levelIndex }));
+    iconButton(this, W / 2 + step / 2, U.trayY, 'restart', () => this.restartLevel());
     this.refreshUndo();
   }
 
@@ -390,6 +406,7 @@ export class GameScene extends Phaser.Scene {
   // ---------- ходы ----------
 
   doMove(from, to) {
+    this.moved = true;
     const startSlot = this.portions[to].length;
     const n = this.board.move(from, to);
     const moved = this.portions[from].splice(-n);
@@ -655,7 +672,9 @@ export class GameScene extends Phaser.Scene {
     // полоска опыта кота доезжает, когда звёзды отпрыгали; новые уровни кота — окном поверх
     this.time.delayedCall(400 + reward.stars * CONFIG.stars.popDelay + 300, () => this.fillXpBar(xpBar, reward));
 
-    const next = () => this.scene.restart({ levelIndex: isLast ? 0 : this.levelIndex + 1 });
+    // следующий уровень — только если есть жизни (иначе окно «Жизни кончились»; купил — сразу дальше)
+    const go = () => this.scene.restart({ levelIndex: isLast ? 0 : this.levelIndex + 1 });
+    const next = () => (lives() > 0 ? go() : showNoLives(this, go));
     box.add(makeButton(this, 0, WC.buttonY, isLast ? 'С начала' : 'Продолжить', next, { w: 380, h: 150, size: 50, skin: 'green' }));
     box.add(iconButton(this, pw / 2 - 6, -ph / 2 + 4, 'close', () => this.leave(), {
       size: 92, shape: 'round', color: CONFIG.ui.exitColor, depth: 0,

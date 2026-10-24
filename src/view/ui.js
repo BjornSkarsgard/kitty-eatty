@@ -106,9 +106,13 @@ const ICONS = {
   },
 };
 
+// Иконки, у которых пока нет своей картинки icon_<имя>, но есть подходящий арт.
+const ICON_ART = { heart: 'fx_heart' };
+
 export function makeIcon(scene, name, size) {
-  if (scene.textures.exists(`icon_${name}`)) {
-    const img = scene.add.image(0, 0, `icon_${name}`);
+  const key = scene.textures.exists(`icon_${name}`) ? `icon_${name}` : ICON_ART[name];
+  if (key && scene.textures.exists(key)) {
+    const img = scene.add.image(0, 0, key);
     return img.setScale(size / Math.max(img.width, img.height));
   }
   const g = scene.add.graphics();

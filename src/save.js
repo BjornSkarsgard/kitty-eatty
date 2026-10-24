@@ -9,21 +9,24 @@
 //   undos    — запас отмен хода, общий на всю игру;
 //   undoProgress — сколько новых уровней пройдено к следующей бесплатной отмене;
 //   catLevel, xp — уровень кота (общий на игрока) и опыт, набранный к следующему;
+//   lives, refillAt — жизни и момент (мс, Date.now), когда они разом станут полными (null — уже полные);
 //   settings — { sound, music, fx, vibro }: переключатели под шестерёнкой.
 import { CONFIG } from './config.js';
 
 const KEY = 'kittyeatty.save';
-const VERSION = 3;
+const VERSION = 4;
 const E = CONFIG.economy;
 const C = CONFIG.catXp;
+const LV = CONFIG.lives;
 
 const SETTINGS = { sound: true, music: true, fx: true, vibro: true };
-const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, undoProgress: 0, catLevel: 1, xp: 0, settings: { ...SETTINGS } });
+const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, settings: { ...SETTINGS } });
 
 // Старые версии сохранения дополняем до текущей, прогресс не теряется.
 function migrate(d) {
   if (d.v === 1) d = { ...d, v: 2, coins: E.startCoins, undos: E.startUndos, undoProgress: 0 };
   if (d.v === 2) d = { ...d, v: 3, catLevel: 1, xp: 0 };
+  if (d.v === 3) d = { ...d, v: 4, lives: LV.max, refillAt: null };
   if (d && !Number.isFinite(d.xp)) d.xp = 0; // битый опыт — с нуля, уровень кота не трогаем
   if (d && !d.settings) d.settings = {};
   if (d) d.settings = { ...SETTINGS, ...d.settings }; // новые переключатели — со значением по умолчанию
@@ -38,7 +41,7 @@ function read() {
   try {
     const raw = window.localStorage.getItem(KEY);
     const d = raw && migrate(JSON.parse(raw));
-    if (d && d.v === VERSION && Number.isInteger(d.coins) && Number.isInteger(d.undos) && Number.isInteger(d.current) && Number.isInteger(d.unlocked) && Number.isInteger(d.catLevel) && d.best) return d;
+    if (d && d.v === VERSION && Number.isInteger(d.coins) && Number.isInteger(d.undos) && Number.isInteger(d.current) && Number.isInteger(d.unlocked) && Number.isInteger(d.catLevel) && Number.isInteger(d.lives) && d.best) return d;
   } catch (e) { /* нет доступа или битые данные — начинаем заново */ }
   return empty();
 }
@@ -147,6 +150,65 @@ export function catReward(level) {
 }
 
 export const catLevel = () => get().catLevel;
+
+// ---------- жизни ----------
+
+// Таймер дошёл — жизни разом полные.
+function refill(d) {
+  if (d.refillAt !== null && Date.now() >= d.refillAt) {
+    d.lives = LV.max;
+    d.refillAt = null;
+    write();
+  }
+}
+
+export function lives() {
+  const d = get();
+  refill(d);
+  return d.lives;
+}
+
+// Сколько мс до полных жизней (0 — уже полные).
+export function livesRefillLeft() {
+  const d = get();
+  refill(d);
+  return d.refillAt === null ? 0 : Math.max(0, d.refillAt - Date.now());
+}
+
+// Сжечь жизнь; false — жизней нет. Первая сгоревшая из полных запускает таймер.
+export function loseLife() {
+  const d = get();
+  refill(d);
+  if (d.lives <= 0) return false;
+  if (d.lives >= LV.max) d.refillAt = Date.now() + LV.refillHours * 3600 * 1000;
+  d.lives -= 1;
+  write();
+  return true;
+}
+
+// Начислить жизни (покупка, ролик), не больше максимума; стали полными — таймер не нужен.
+function giveLives(d, n) {
+  d.lives = Math.min(LV.max, d.lives + n);
+  if (d.lives >= LV.max) d.refillAt = null;
+}
+
+// Купить жизнь за монеты; false — не хватает монет или жизни и так полные.
+export function buyLife() {
+  const d = get();
+  refill(d);
+  if (d.coins < LV.price || d.lives >= LV.max) return false;
+  d.coins -= LV.price;
+  giveLives(d, 1);
+  write();
+  return true;
+}
+
+// Жизни за ролик (этап 6).
+export function addLives(n) {
+  const d = get();
+  giveLives(d, n);
+  write();
+}
 
 // ---------- монеты и отмены ----------
 

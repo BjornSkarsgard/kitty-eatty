@@ -8,7 +8,8 @@ import { addSettingsMenu } from '../view/settings.js';
 import { panDuration, panFx, hud } from '../view/transition.js';
 import { music, sfx } from '../audio.js';
 import { beatPhase } from '../beat.js';
-import { currentLevel, unlockedLevel, levelStars, coins, catLevel } from '../save.js';
+import { currentLevel, unlockedLevel, levelStars, coins, catLevel, lives, livesRefillLeft } from '../save.js';
+import { showNoLives, formatLeft } from '../view/lives.js';
 import LEVELS from '../levels/levels.json';
 
 const W = CONFIG.width;
@@ -91,7 +92,8 @@ export class RoomScene extends Phaser.Scene {
     this.createDoor();
 
     const U = CONFIG.ui;
-    counterPill(this, 30 + U.pillWidth / 2, U.topY, 'coin', coins(), { depth: 25 }).setScrollFactor(0);
+    this.coinPill = counterPill(this, 30 + U.pillWidth / 2, U.topY, 'coin', coins(), { depth: 25 }).setScrollFactor(0);
+    this.createLives();
     addSettingsMenu(this);
     this.tabs = tabBar(this, TABS.map((z) => ({ ...z, enabled: z.enabled ? z.enabled() : true })), (i) => this.goTo(i + 1));
     this.mapBack = iconButton(this, 62, U.topY + 110, 'close', () => this.collapseMap(), {
@@ -120,6 +122,26 @@ export class RoomScene extends Phaser.Scene {
   // Точка экрана → мир основной камеры (она бывает приближена).
   worldAt(p) {
     return this.cameras.main.getWorldPoint(p.x, p.y);
+  }
+
+  // Жизни в верхней полосе рядом с монетами; не полные — под ними таймер до полных. Обновляются раз в секунду.
+  createLives() {
+    const U = CONFIG.ui;
+    const w = 130;
+    const x = 30 + U.pillWidth + 20 + w / 2;
+    this.livesPill = counterPill(this, x, U.topY, 'heart', lives(), { w, depth: 25 }).setScrollFactor(0);
+    this.livesTimer = this.add.text(x, U.topY + 46, '', {
+      fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '24px', color: '#ffffff', stroke: '#3b2a55', strokeThickness: 6,
+    }).setOrigin(0.5).setDepth(25).setScrollFactor(0);
+    this.refreshTop();
+    this.time.addEvent({ delay: 1000, loop: true, callback: () => this.refreshTop() });
+  }
+
+  refreshTop() {
+    this.coinPill.setValue(coins());
+    this.livesPill.setValue(lives());
+    const left = livesRefillLeft();
+    this.livesTimer.setText(left ? formatLeft(left) : '');
   }
 
   // ---------- холл ----------
@@ -262,6 +284,7 @@ export class RoomScene extends Phaser.Scene {
   // за ней уже коты и банки, — и камера влетает в проём, а уровень одновременно доезжает до полного экрана.
   startLevel(index) {
     if (this.mapOpen) return this.collapseMap(() => this.startLevel(index));
+    if (lives() <= 0) return showNoLives(this, () => { this.refreshTop(); this.startLevel(index); });
     this.input.enabled = false;
     this.lockTabsHome();
     const game = this.scene.get('Game');

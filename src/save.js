@@ -237,12 +237,14 @@ const today = () => {
   return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
 };
 
-export const dailyAvailable = () => get().daily.last !== today();
+// extra — подарки сверх «раз в день» (выдаются читом разработки devGive)
+export const dailyAvailable = () => get().daily.last !== today() || (get().daily.extra || 0) > 0;
 
 // Забрать подарок дня; null — сегодня уже забран. Возвращает { day (1..7), items }.
 export function claimDaily() {
   const d = get();
-  if (d.daily.last === today()) return null;
+  const extra = d.daily.extra || 0;
+  if (d.daily.last === today() && !extra) return null;
   const i = d.daily.day % CONFIG.daily.length;
   const g = CONFIG.daily[i];
   let items;
@@ -251,7 +253,8 @@ export function claimDaily() {
     d.coins += g;
     items = [{ icon: 'coin', n: g }];
   }
-  d.daily = { last: today(), day: i + 1 };
+  // сегодняшний уже забран — тратится дополнительный
+  d.daily = { last: today(), day: i + 1, extra: d.daily.last === today() ? extra - 1 : extra };
   write();
   return { day: i + 1, items };
 }
@@ -351,5 +354,16 @@ export const setting = (key) => get().settings[key];
 
 export function setSetting(key, value) {
   get().settings[key] = value;
+  write();
+}
+
+// ---------- для разработки ----------
+
+// Начислить монеты, сундуки, подарки дня (только в режиме разработки, ссылкой ?give=coins2000,chests3,gifts3).
+export function devGive({ coins = 0, chests = 0, gifts = 0 }) {
+  const d = get();
+  d.coins += coins;
+  d.chests += chests;
+  d.daily.extra = (d.daily.extra || 0) + gifts;
   write();
 }

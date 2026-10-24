@@ -44,6 +44,13 @@ export const CONFIG = {
     tabBarHeight: 130,
     tabBarColor: 0x2b1a66,
     tabBarAlpha: 0.88,   // панель чуть прозрачная — комната просвечивает
+    // объёмные кнопки btn_<skin>.png / btn_<skin>_pressed.png (src/view/Button.js): обводка надписи и
+    // середина лицевой стороны — px от нижнего края картинки (поднятая / прожатая)
+    skins: {
+      yellow: { stroke: '#a8560a', faceUp: 184, faceDown: 135 },
+      green: { stroke: '#2b7a12', faceUp: 190, faceDown: 135 },
+    },
+    pressBounce: 1.05,   // кнопку отпустили — чуть подпрыгивает
   },
 
   // Реклама (этап 6). Пока выключена: кнопки «за рекламу» не показываются.
@@ -64,7 +71,7 @@ export const CONFIG = {
   // Окно победы: размеры панели и положения внутри неё (от центра панели); похвала — по числу звёзд (1, 2, 3).
   win: {
     width: 600, height: 780, offsetY: -10,
-    starsY: -250, praiseY: -135, movesY: -45, rewardsY: 120, buttonY: 300,
+    starsY: -250, praiseY: -135, movesY: -45, rewardsY: 120, buttonY: 280,
     praise: ['Неплохо!', 'Отлично!', 'Идеально!'],
   },
 

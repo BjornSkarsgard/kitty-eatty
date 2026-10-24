@@ -647,7 +647,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     const next = () => this.scene.restart({ levelIndex: isLast ? 0 : this.levelIndex + 1 });
-    box.add(makeButton(this, 0, WC.buttonY, isLast ? 'С начала' : 'Продолжить', next, { w: 440, h: 120, size: 52, color: 0x43c43a }));
+    box.add(makeButton(this, 0, WC.buttonY, isLast ? 'С начала' : 'Продолжить', next, { w: 380, h: 160, size: 50, skin: 'green' }));
     box.add(iconButton(this, pw / 2 - 6, -ph / 2 + 4, 'close', () => this.leave(), {
       size: 92, shape: 'round', color: CONFIG.ui.exitColor, depth: 0,
     }));

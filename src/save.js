@@ -11,18 +11,20 @@
 //   catLevel, xp — уровень кота (общий на игрока) и опыт, набранный к следующему;
 //   lives, refillAt — жизни и момент (мс, Date.now), когда они разом станут полными (null — уже полные);
 //   skins, skin — открытые рескины обычного кота (id из CONFIG.skins) и выбранный;
+//   chests, chestStars — неоткрытые сундуки и звёзды, накопленные к следующему;
+//   daily — { last: 'ГГГГ-ММ-ДД' последнего подарка, day: какой по счёту следующий };
 //   settings — { sound, music, fx, vibro }: переключатели под шестерёнкой.
 import { CONFIG } from './config.js';
 
 const KEY = 'kittyeatty.save';
-const VERSION = 5;
+const VERSION = 6;
 const E = CONFIG.economy;
 const C = CONFIG.catXp;
 const LV = CONFIG.lives;
 const START_SKINS = CONFIG.skins.filter((k) => k.start).map((k) => k.id);
 
 const SETTINGS = { sound: true, music: true, fx: true, vibro: true };
-const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], settings: { ...SETTINGS } });
+const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, chestStars: 0, daily: { last: null, day: 0 }, settings: { ...SETTINGS } });
 
 // Старые версии сохранения дополняем до текущей, прогресс не теряется.
 function migrate(d) {
@@ -34,6 +36,7 @@ function migrate(d) {
     const byLevel = CONFIG.skins.filter((k) => k.catLevel && k.catLevel <= d.catLevel).map((k) => k.id);
     d = { ...d, v: 5, skins: [...START_SKINS, ...byLevel], skin: START_SKINS[0] };
   }
+  if (d.v === 5) d = { ...d, v: 6, chests: 0, chestStars: 0, daily: { last: null, day: 0 } };
   if (d && !Number.isFinite(d.xp)) d.xp = 0; // битый опыт — с нуля, уровень кота не трогаем
   if (d && !d.settings) d.settings = {};
   if (d) d.settings = { ...SETTINGS, ...d.settings }; // новые переключатели — со значением по умолчанию
@@ -48,7 +51,7 @@ function read() {
   try {
     const raw = window.localStorage.getItem(KEY);
     const d = raw && migrate(JSON.parse(raw));
-    if (d && d.v === VERSION && Number.isInteger(d.coins) && Number.isInteger(d.undos) && Number.isInteger(d.current) && Number.isInteger(d.unlocked) && Number.isInteger(d.catLevel) && Number.isInteger(d.lives) && Array.isArray(d.skins) && d.best) return d;
+    if (d && d.v === VERSION && Number.isInteger(d.coins) && Number.isInteger(d.undos) && Number.isInteger(d.current) && Number.isInteger(d.unlocked) && Number.isInteger(d.catLevel) && Number.isInteger(d.lives) && Array.isArray(d.skins) && Number.isInteger(d.chests) && d.daily && d.best) return d;
   } catch (e) { /* нет доступа или битые данные — начинаем заново */ }
   return empty();
 }
@@ -87,13 +90,20 @@ export function setCurrentLevel(index) {
 // за первое прохождение монеты за победу и звёзды и шаг к бесплатной отмене;
 // за переигровку — монеты только за новые звёзды (фармить старые уровни невыгодно). Так же опыт кота.
 // Возвращает, что показать в окне победы: { stars, coins, undos, xp, cat: { level, xp } — каким кот был до победы,
-// levelUps: [{ level, coins, undos }] — новые уровни кота и их награды (уже начислены) }.
+// levelUps: [{ level, coins, undos, skin, chest }] — новые уровни кота и их награды (уже начислены),
+// chests — сколько сундуков добавилось (за звёзды и уровни кота) }.
 export function recordWin(level, index, moves, count) {
   const d = get();
   const prevStars = levelStars(level);
   const stars = starsFor(moves, level.minMoves);
   if (!(d.best[level.id] <= moves)) d.best[level.id] = moves;
-  const reward = { stars, coins: 0, undos: 0, xp: 0, cat: { level: d.catLevel, xp: d.xp }, levelUps: [] };
+  const reward = { stars, coins: 0, undos: 0, xp: 0, cat: { level: d.catLevel, xp: d.xp }, levelUps: [], chests: 0 };
+  // новые звёзды копятся к сундуку
+  d.chestStars += Math.max(0, stars - prevStars);
+  while (d.chestStars >= CONFIG.chest.everyStars) {
+    d.chestStars -= CONFIG.chest.everyStars;
+    reward.chests += 1;
+  }
   if (prevStars === 0) {
     reward.coins = E.winCoins + E.coinsPer25Levels * Math.floor(index / 25) + E.starCoins * stars;
     reward.xp = C.winXp + C.starXp * stars + C.xpPer10Levels * Math.floor(index / 10);
@@ -116,8 +126,10 @@ export function recordWin(level, index, moves, count) {
     d.coins += up.coins;
     d.undos += up.undos;
     if (up.skin && !d.skins.includes(up.skin)) d.skins.push(up.skin);
+    if (up.chest) reward.chests += 1;
     reward.levelUps.push(up);
   }
+  d.chests += reward.chests;
   const next = Math.min(index + 1, count - 1);
   d.unlocked = Math.max(d.unlocked, next);
   d.current = next;
@@ -155,6 +167,7 @@ export function catReward(level) {
     coins: C.rewardCoins + C.rewardCoinsPerLevel * level,
     undos: C.rewardUndos + (level % C.bonusUndoEvery === 0 ? 1 : 0),
     skin: CONFIG.skins.find((k) => k.catLevel === level)?.id ?? null, // рескин за этот уровень кота
+    chest: level % CONFIG.chest.everyCatLevels === 0,
   };
 }
 
@@ -182,6 +195,65 @@ export function buySkin(id) {
   d.skins.push(id);
   write();
   return true;
+}
+
+// ---------- сундуки и подарок дня ----------
+
+export const chestsPending = () => get().chests;
+export const chestStars = () => get().chestStars;
+
+// Содержимое сундука — сразу начисляется. Возвращает, что показать: [{ icon, n }] и [{ skin }].
+function rollChest(d) {
+  const C = CONFIG.chest;
+  const items = [{ icon: 'coin', n: C.coins }, { icon: 'undo', n: C.undos }];
+  d.coins += C.coins;
+  d.undos += C.undos;
+  if (Math.random() < C.skinChance) {
+    const pool = CONFIG.skins.filter((k) => !k.catLevel && !d.skins.includes(k.id));
+    if (pool.length) {
+      const k = pool[Math.floor(Math.random() * pool.length)];
+      d.skins.push(k.id);
+      items.push({ skin: k.id });
+    } else {
+      d.coins += C.dupCoins;
+      items[0].n += C.dupCoins;
+    }
+  }
+  return items;
+}
+
+// Открыть один сундук; null — сундуков нет.
+export function openChest() {
+  const d = get();
+  if (d.chests <= 0) return null;
+  d.chests -= 1;
+  const items = rollChest(d);
+  write();
+  return items;
+}
+
+const today = () => {
+  const t = new Date();
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+};
+
+export const dailyAvailable = () => get().daily.last !== today();
+
+// Забрать подарок дня; null — сегодня уже забран. Возвращает { day (1..7), items }.
+export function claimDaily() {
+  const d = get();
+  if (d.daily.last === today()) return null;
+  const i = d.daily.day % CONFIG.daily.length;
+  const g = CONFIG.daily[i];
+  let items;
+  if (g === 'chest') items = rollChest(d);
+  else {
+    d.coins += g;
+    items = [{ icon: 'coin', n: g }];
+  }
+  d.daily = { last: today(), day: i + 1 };
+  write();
+  return { day: i + 1, items };
 }
 
 // ---------- жизни ----------

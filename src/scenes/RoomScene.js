@@ -10,6 +10,9 @@ import { music, sfx } from '../audio.js';
 import { beatPhase } from '../beat.js';
 import { currentLevel, unlockedLevel, levelStars, coins, catLevel, lives, livesRefillLeft, selectedSkin, skinsOwned } from '../save.js';
 import { openCollection } from '../view/CollectionView.js';
+import { openBox, closedBox } from '../view/ChestView.js';
+import { chestsPending, chestStars, openChest, dailyAvailable, claimDaily } from '../save.js';
+import { showPopup } from '../view/Popup.js';
 import { showNoLives, formatLeft } from '../view/lives.js';
 import LEVELS from '../levels/levels.json';
 
@@ -385,11 +388,83 @@ export class RoomScene extends Phaser.Scene {
     // кот сидит на полу, дышит в такт музыке, на тап — случайная реакция, как в игре
     const s = HC.catScale;
     this.homeRoom = room;
+    this.cat = null; // сцена переиспользуется — кот с прошлого раза уже уничтожен
     this.makeHomeCat();
     const level = currentLevel(LEVELS.length);
     const play = makeButton(this, W / 2, HC.playY, `Играть ${LEVELS[level].id}`, () => this.startLevel(level),
       { w: 380, h: 150, size: 52, skin: 'yellow' });
     room.add([title, shadow, this.cat, play]);
+    this.createBoxes(room);
+  }
+
+  // По бокам от «Играть»: сундук (число неоткрытых, звёзды до следующего) и подарок дня («!», если можно забрать).
+  // Есть что открыть — коробка покачивается.
+  createBoxes(room) {
+    const B = HC.boxes;
+    const make = (kind, x, onTap) => {
+      const c = this.add.container(x, B.y);
+      const box = closedBox(this, kind, B.size);
+      const badge = this.add.container(B.size * 0.42, -B.size * 0.42);
+      const bg = this.add.graphics();
+      bg.fillStyle(0x7a0f2a, 1).fillCircle(0, 3, 24).fillStyle(CONFIG.ui.badgeColor, 1).fillCircle(0, 0, 24);
+      bg.lineStyle(4, 0xffffff, 1).strokeCircle(0, 0, 24);
+      const num = this.add.text(0, -1, '', { fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '28px', color: '#ffffff' }).setOrigin(0.5);
+      badge.add([bg, num]);
+      const label = this.add.text(0, B.size * 0.5 + 20, '', this.noteStyle()).setOrigin(0.5).setFontSize(26);
+      c.add([box, badge, label]);
+      c.setSize(B.size, B.size).setInteractive();
+      c.on('pointerdown', () => { sfx(this, 'sfx_button'); onTap(); });
+      c.badge = (t) => { badge.setVisible(!!t); num.setText(String(t || '')); };
+      c.label = label;
+      c.box = box;
+      room.add(c);
+      return c;
+    };
+    this.chestBtn = make('chest', B.x, () => this.tapChest());
+    this.giftBtn = make('gift', W - B.x, () => this.tapGift());
+    this.refreshBoxes();
+  }
+
+  refreshBoxes() {
+    const n = chestsPending();
+    this.chestBtn.badge(n);
+    this.chestBtn.label.setText(`★ ${chestStars()}/${CONFIG.chest.everyStars}`);
+    const gift = dailyAvailable();
+    this.giftBtn.badge(gift ? '!' : '');
+    this.giftBtn.label.setText('Подарок');
+    // есть что открыть — покачивается
+    for (const [btn, on] of [[this.chestBtn, n > 0], [this.giftBtn, gift]]) {
+      this.tweens.killTweensOf(btn.box);
+      btn.box.setAngle(0);
+      if (on) this.tweens.add({ targets: btn.box, angle: { from: -6, to: 6 }, duration: 260, yoyo: true, repeat: -1, repeatDelay: 1400, ease: 'Sine.easeInOut' });
+    }
+  }
+
+  // После сундука или подарка: монеты, коллекция, кнопки.
+  afterBox() {
+    this.refreshTop();
+    this.refreshBoxes();
+    this.refreshCollectionWall();
+  }
+
+  tapChest() {
+    const items = openChest();
+    if (!items) {
+      return showPopup(this, {
+        title: 'Сундук',
+        text: `Сундук даётся за каждые ${CONFIG.chest.everyStars} звёзд и каждый ${CONFIG.chest.everyCatLevels}-й уровень кота.\nЗвёзд: ${chestStars()}/${CONFIG.chest.everyStars}`,
+        buttons: [{ label: 'Понятно' }],
+      });
+    }
+    openBox(this, 'chest', items, () => this.afterBox());
+  }
+
+  tapGift() {
+    const got = claimDaily();
+    if (!got) {
+      return showPopup(this, { title: 'Подарок дня', text: 'Следующий подарок — завтра', buttons: [{ label: 'Понятно' }] });
+    }
+    openBox(this, 'gift', got.items, () => this.afterBox());
   }
 
   // Кот на главной — выбранного в коллекции окраса; при смене окраса пересоздаётся на том же месте.

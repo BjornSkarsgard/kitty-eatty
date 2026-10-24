@@ -649,12 +649,13 @@ export class GameScene extends Phaser.Scene {
     box.add(this.add.text(0, WC.rewardsY - 92, 'Награды:', {
       fontFamily: font, fontStyle: 'bold', fontSize: '36px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 7,
     }).setOrigin(0.5));
-    const items = [['coin', reward.coins], ['undo', reward.undos]].filter(([, n]) => n > 0);
+    const items = [['coin', reward.coins], ['undo', reward.undos], ['chest', reward.chests]].filter(([, n]) => n > 0);
     items.forEach(([icon, n], i) => {
       const x = (i - (items.length - 1) / 2) * 170;
-      const ic = makeIcon(this, icon, 104).setPosition(x, WC.rewardsY);
-      if (icon !== 'coin') ic.setScale(ic.scale * 0.8);
-      box.add(icon === 'coin' ? ic : [this.add.circle(x, WC.rewardsY, 48, 0x7b5cf0), ic]);
+      const plain = icon === 'coin' || icon === 'chest'; // свои картинки — без кружка под иконкой
+      const ic = makeIcon(this, icon, icon === 'chest' ? 118 : 104).setPosition(x, WC.rewardsY);
+      if (!plain) ic.setScale(ic.scale * 0.8);
+      box.add(plain ? ic : [this.add.circle(x, WC.rewardsY, 48, 0x7b5cf0), ic]);
       box.add(this.add.text(x + 40, WC.rewardsY + 38, String(n), {
         fontFamily: font, fontStyle: 'bold', fontSize: '50px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 9,
       }).setOrigin(0.5));
@@ -816,7 +817,7 @@ export class GameScene extends Phaser.Scene {
     box.add(this.add.text(0, -72, String(up.level), {
       fontFamily: font, fontStyle: 'bold', fontSize: '96px', color: '#ffffff', stroke: '#7a3a00', strokeThickness: 12,
     }).setOrigin(0.5));
-    const items = [['coin', up.coins], ['undo', up.undos], ['skin', up.skin ? 1 : 0]].filter(([, n]) => n > 0);
+    const items = [['coin', up.coins], ['undo', up.undos], ['skin', up.skin ? 1 : 0], ['chest', up.chest ? 1 : 0]].filter(([, n]) => n > 0);
     items.forEach(([icon, n], i) => {
       const x = (i - (items.length - 1) / 2) * 170;
       if (icon === 'skin') { // новый окрас: голова кота этого окраса и подпись
@@ -828,9 +829,10 @@ export class GameScene extends Phaser.Scene {
         }).setOrigin(0.5)]);
         return;
       }
-      const ic = makeIcon(this, icon, 92).setPosition(x, 80);
-      if (icon !== 'coin') ic.setScale(ic.scale * 0.8);
-      box.add(icon === 'coin' ? ic : [this.add.circle(x, 80, 44, 0x7b5cf0), ic]);
+      const plain = icon === 'coin' || icon === 'chest';
+      const ic = makeIcon(this, icon, icon === 'chest' ? 108 : 92).setPosition(x, 80);
+      if (!plain) ic.setScale(ic.scale * 0.8);
+      box.add(plain ? ic : [this.add.circle(x, 80, 44, 0x7b5cf0), ic]);
       box.add(this.add.text(x + 38, 114, String(n), {
         fontFamily: font, fontStyle: 'bold', fontSize: '44px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 8,
       }).setOrigin(0.5));

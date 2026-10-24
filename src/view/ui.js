@@ -164,6 +164,15 @@ const ICONS = {
 const ICON_ART = { heart: 'fx_heart' };
 
 export function makeIcon(scene, name, size) {
+  // сундук — закрытый: коробка и крышка вместе
+  if (name === 'chest' && scene.textures.exists('chest_body') && scene.textures.exists('chest_lid')) {
+    const body = scene.add.image(0, 0, 'chest_body');
+    const k = size / body.width;
+    body.setScale(k).setY(size * 0.12);
+    const lid = scene.add.image(0, body.y - body.displayHeight / 2, 'chest_lid').setOrigin(0.5, 1).setScale(k);
+    lid.y += lid.displayHeight * CONFIG.chestAnim.lidOverlap;
+    return scene.add.container(0, 0, [body, lid]);
+  }
   const key = scene.textures.exists(`icon_${name}`) ? `icon_${name}` : ICON_ART[name];
   if (key && scene.textures.exists(key)) {
     const img = scene.add.image(0, 0, key);

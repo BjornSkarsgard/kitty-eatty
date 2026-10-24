@@ -13,18 +13,24 @@
 //   skins, skin — открытые рескины обычного кота (id из CONFIG.skins) и выбранный;
 //   chests, chestStars — неоткрытые сундуки и звёзды, накопленные к следующему;
 //   daily — { last: 'ГГГГ-ММ-ДД' последнего подарка, day: какой по счёту следующий };
+//   names, name — открытые клички (id из src/names.js) и выбранная ('#custom' — своя); custom — своя кличка (или null);
+//   nameTokens — неиспользованные «именные таблички» (можно придумать кличку самому);
 //   settings — { sound, music, fx, vibro }: переключатели под шестерёнкой.
 import { CONFIG } from './config.js';
+import { NAMES } from './names.js';
 
 const KEY = 'kittyeatty.save';
-const VERSION = 6;
+const VERSION = 7;
 const E = CONFIG.economy;
 const C = CONFIG.catXp;
 const LV = CONFIG.lives;
 const START_SKINS = CONFIG.skins.filter((k) => k.start).map((k) => k.id);
+const START_NAMES = NAMES.filter((n) => n.start).map((n) => n.id);
+export const CUSTOM = '#custom';
 
 const SETTINGS = { sound: true, music: true, fx: true, vibro: true };
-const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, chestStars: 0, daily: { last: null, day: 0 }, settings: { ...SETTINGS } });
+const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, chestStars: 0, daily: { last: null, day: 0 },
+  names: [...START_NAMES], name: START_NAMES[0], custom: null, nameTokens: 0, settings: { ...SETTINGS } });
 
 // Старые версии сохранения дополняем до текущей, прогресс не теряется.
 function migrate(d) {
@@ -37,6 +43,10 @@ function migrate(d) {
     d = { ...d, v: 5, skins: [...START_SKINS, ...byLevel], skin: START_SKINS[0] };
   }
   if (d.v === 5) d = { ...d, v: 6, chests: 0, chestStars: 0, daily: { last: null, day: 0 } };
+  if (d.v === 6) {
+    const byLevel = NAMES.filter((n) => n.catLevel && n.catLevel <= d.catLevel).map((n) => n.id);
+    d = { ...d, v: 7, names: [...START_NAMES, ...byLevel], name: START_NAMES[0], custom: null, nameTokens: 0 };
+  }
   if (d && !Number.isFinite(d.xp)) d.xp = 0; // битый опыт — с нуля, уровень кота не трогаем
   if (d && !d.settings) d.settings = {};
   if (d) d.settings = { ...SETTINGS, ...d.settings }; // новые переключатели — со значением по умолчанию
@@ -51,7 +61,7 @@ function read() {
   try {
     const raw = window.localStorage.getItem(KEY);
     const d = raw && migrate(JSON.parse(raw));
-    if (d && d.v === VERSION && Number.isInteger(d.coins) && Number.isInteger(d.undos) && Number.isInteger(d.current) && Number.isInteger(d.unlocked) && Number.isInteger(d.catLevel) && Number.isInteger(d.lives) && Array.isArray(d.skins) && Number.isInteger(d.chests) && d.daily && d.best) return d;
+    if (d && d.v === VERSION && Number.isInteger(d.coins) && Number.isInteger(d.undos) && Number.isInteger(d.current) && Number.isInteger(d.unlocked) && Number.isInteger(d.catLevel) && Number.isInteger(d.lives) && Array.isArray(d.skins) && Number.isInteger(d.chests) && d.daily && Array.isArray(d.names) && d.best) return d;
   } catch (e) { /* нет доступа или битые данные — начинаем заново */ }
   return empty();
 }
@@ -126,6 +136,7 @@ export function recordWin(level, index, moves, count) {
     d.coins += up.coins;
     d.undos += up.undos;
     if (up.skin && !d.skins.includes(up.skin)) d.skins.push(up.skin);
+    if (up.name && !d.names.includes(up.name)) d.names.push(up.name);
     if (up.chest) reward.chests += 1;
     reward.levelUps.push(up);
   }
@@ -168,6 +179,7 @@ export function catReward(level) {
     undos: C.rewardUndos + (level % C.bonusUndoEvery === 0 ? 1 : 0),
     skin: CONFIG.skins.find((k) => k.catLevel === level)?.id ?? null, // рескин за этот уровень кота
     chest: level % CONFIG.chest.everyCatLevels === 0,
+    name: NAMES.find((n) => n.catLevel === level)?.id ?? null, // кличка за этот уровень кота
   };
 }
 
@@ -208,6 +220,7 @@ function rollChest(d) {
   const items = [{ icon: 'coin', n: C.coins }, { icon: 'undo', n: C.undos }];
   d.coins += C.coins;
   d.undos += C.undos;
+  rollName(d, items);
   if (Math.random() < C.skinChance) {
     const pool = CONFIG.skins.filter((k) => !k.catLevel && !d.skins.includes(k.id));
     if (pool.length) {
@@ -220,6 +233,29 @@ function rollChest(d) {
     }
   }
   return items;
+}
+
+// Кличка из сундука: с шансом — новая (редкость по весам; все этой редкости есть — монеты), очень редко — именная табличка.
+function rollName(d, items) {
+  const N = CONFIG.names;
+  if (Math.random() < N.uniqueChance) {
+    d.nameTokens += 1;
+    items.push({ token: 1 });
+    return;
+  }
+  if (Math.random() >= N.chestChance) return;
+  const total = Object.values(N.weights).reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
+  const rarity = Object.keys(N.weights).find((k) => (r -= N.weights[k]) < 0) ?? 'common';
+  const pool = NAMES.filter((n) => n.rarity === rarity && !n.catLevel && !d.names.includes(n.id));
+  if (!pool.length) {
+    d.coins += N.dupCoins;
+    items[0].n += N.dupCoins;
+    return;
+  }
+  const n = pool[Math.floor(Math.random() * pool.length)];
+  d.names.push(n.id);
+  items.push({ name: n.id });
 }
 
 // Открыть один сундук; null — сундуков нет.
@@ -257,6 +293,51 @@ export function claimDaily() {
   d.daily = { last: today(), day: i + 1, extra: d.daily.last === today() ? extra - 1 : extra };
   write();
   return { day: i + 1, items };
+}
+
+// ---------- клички ----------
+
+export const namesOwned = () => get().names;
+export const selectedName = () => get().name;
+export const customName = () => get().custom;
+export const nameTokens = () => get().nameTokens;
+
+// Как зовут кота сейчас (текст).
+export function catName() {
+  const d = get();
+  if (d.name === CUSTOM && d.custom) return d.custom;
+  return NAMES.find((n) => n.id === d.name)?.name ?? NAMES[0].name;
+}
+
+export function selectName(id) {
+  const d = get();
+  if (id === CUSTOM ? !d.custom : !d.names.includes(id)) return false;
+  d.name = id;
+  write();
+  return true;
+}
+
+// Купить кличку за монеты; false — не продаётся, уже есть или не хватает монет.
+export function buyName(id) {
+  const d = get();
+  const n = NAMES.find((x) => x.id === id);
+  const price = n && CONFIG.names.price[n.rarity];
+  if (!price || n.catLevel || d.names.includes(id) || d.coins < price) return false;
+  d.coins -= price;
+  d.names.push(id);
+  write();
+  return true;
+}
+
+// Своя кличка (уже проверенная checkCustomName): тратит именную табличку и сразу выбирается.
+export function setCustomName(s) {
+  const d = get();
+  if (d.nameTokens <= 0) return false;
+  d.nameTokens -= 1;
+  d.custom = s;
+  d.name = CUSTOM;
+  write();
+  return true;
 }
 
 // ---------- жизни ----------
@@ -360,8 +441,9 @@ export function setSetting(key, value) {
 // ---------- для разработки ----------
 
 // Начислить монеты, сундуки, подарки дня (только в режиме разработки, ссылкой ?give=coins2000,chests3,gifts3).
-export function devGive({ coins = 0, chests = 0, gifts = 0 }) {
+export function devGive({ coins = 0, chests = 0, gifts = 0, tokens = 0 }) {
   const d = get();
+  d.nameTokens += tokens;
   d.coins += coins;
   d.chests += chests;
   d.daily.extra = (d.daily.extra || 0) + gifts;

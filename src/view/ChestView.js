@@ -3,6 +3,7 @@ import { CONFIG } from '../config.js';
 import { makeButton } from './Button.js';
 import { makeIcon } from './ui.js';
 import { sfx } from '../audio.js';
+import { NAMES } from '../names.js';
 
 // Открытие сундука или подарка (kind: 'chest' | 'gift'), награды уже начислены — здесь только показ:
 // коробка падает сверху с подскоком → раскачивается всё сильнее, сзади разгораются лучи → вспышка, крышка улетает →
@@ -105,9 +106,26 @@ export function closedBox(scene, kind, size) {
   return c;
 }
 
-// Одна награда: иконка с числом или голова кота нового окраса с именем.
+// Одна награда: иконка с числом, голова кота нового окраса с именем, кличка или именная табличка.
 function rewardItem(scene, it, font) {
   const c = scene.add.container(0, 0);
+  if (it.name || it.token) {
+    const n = NAMES.find((x) => x.id === it.name);
+    const color = it.token ? CONFIG.names.colors.legendary : CONFIG.names.colors[n.rarity];
+    const label = it.token ? '✎ Своя кличка' : n.name;
+    const t = scene.add.text(0, 6, label, {
+      fontFamily: font, fontStyle: 'bold', fontSize: '30px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 7,
+    }).setOrigin(0.5);
+    const w = Math.max(150, t.width + 40);
+    const g = scene.add.graphics();
+    g.fillStyle(0x000000, 0.3).fillRoundedRect(-w / 2 + 3, -30 + 6, w, 66, 22);
+    g.fillStyle(color, 1).fillRoundedRect(-w / 2, -30, w, 66, 22);
+    g.lineStyle(4, 0xffffff, 0.8).strokeRoundedRect(-w / 2, -30, w, 66, 22);
+    c.add([g, t, scene.add.text(0, -52, 'Кличка', {
+      fontFamily: font, fontStyle: 'bold', fontSize: '24px', color: '#ffe066', stroke: '#2b1a66', strokeThickness: 5,
+    }).setOrigin(0.5)]);
+    return c;
+  }
   if (it.skin) {
     const k = CONFIG.skins.find((s) => s.id === it.skin);
     const head = scene.add.image(0, -6, `cat_${k.file}_head`);

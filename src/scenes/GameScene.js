@@ -8,6 +8,7 @@ import { makeButton } from '../view/Button.js';
 import { sfx, sfxRandom, music } from '../audio.js';
 import { currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo, catNeed, lives, loseLife } from '../save.js';
 import { confirmLife, showNoLives } from '../view/lives.js';
+import { NAMES } from '../names.js';
 import { showPopup } from '../view/Popup.js';
 import { iconButton, counterPill, plate, tray, makeIcon, panel } from '../view/ui.js';
 import { addSettingsMenu } from '../view/settings.js';
@@ -817,9 +818,23 @@ export class GameScene extends Phaser.Scene {
     box.add(this.add.text(0, -72, String(up.level), {
       fontFamily: font, fontStyle: 'bold', fontSize: '96px', color: '#ffffff', stroke: '#7a3a00', strokeThickness: 12,
     }).setOrigin(0.5));
-    const items = [['coin', up.coins], ['undo', up.undos], ['skin', up.skin ? 1 : 0], ['chest', up.chest ? 1 : 0]].filter(([, n]) => n > 0);
+    const items = [['coin', up.coins], ['undo', up.undos], ['skin', up.skin ? 1 : 0], ['chest', up.chest ? 1 : 0], ['name', up.name ? 1 : 0]].filter(([, n]) => n > 0);
     items.forEach(([icon, n], i) => {
       const x = (i - (items.length - 1) / 2) * 170;
+      if (icon === 'name') { // новая кличка: табличка цвета редкости
+        const nm = NAMES.find((x) => x.id === up.name);
+        const t = this.add.text(x, 80, nm.name, {
+          fontFamily: font, fontStyle: 'bold', fontSize: '26px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 6,
+        }).setOrigin(0.5);
+        const w = Math.max(130, t.width + 30);
+        const g2 = this.add.graphics();
+        g2.fillStyle(CONFIG.names.colors[nm.rarity], 1).fillRoundedRect(x - w / 2, 54, w, 52, 18);
+        g2.lineStyle(3, 0xffffff, 0.8).strokeRoundedRect(x - w / 2, 54, w, 52, 18);
+        box.add([g2, t, this.add.text(x, 128, 'Кличка', {
+          fontFamily: font, fontStyle: 'bold', fontSize: '22px', color: '#ffe066', stroke: '#2b1a66', strokeThickness: 5,
+        }).setOrigin(0.5)]);
+        return;
+      }
       if (icon === 'skin') { // новый окрас: голова кота этого окраса и подпись
         const k = CONFIG.skins.find((s) => s.id === up.skin);
         const head = this.add.image(x, 76, `cat_${k.file}_head`);

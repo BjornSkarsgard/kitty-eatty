@@ -3,7 +3,7 @@ import { CONFIG } from '../config.js';
 import { CatView } from '../view/CatView.js';
 import { MapView } from '../view/MapView.js';
 import { makeButton } from '../view/Button.js';
-import { counterPill, tabBar, iconButton } from '../view/ui.js';
+import { counterPill, tabBar, iconButton, plate } from '../view/ui.js';
 import { addSettingsMenu } from '../view/settings.js';
 import { panDuration, panFx, hud } from '../view/transition.js';
 import { music, sfx } from '../audio.js';
@@ -11,7 +11,7 @@ import { beatPhase } from '../beat.js';
 import { currentLevel, unlockedLevel, levelStars, coins, catLevel, lives, livesRefillLeft, selectedSkin, skinsOwned } from '../save.js';
 import { openCollection } from '../view/CollectionView.js';
 import { openBox, closedBox } from '../view/ChestView.js';
-import { chestsPending, chestStars, openChest, dailyAvailable, claimDaily } from '../save.js';
+import { chestsPending, chestStars, openChest, dailyAvailable, claimDaily, catName } from '../save.js';
 import { showPopup } from '../view/Popup.js';
 import { showNoLives, formatLeft } from '../view/lives.js';
 import LEVELS from '../levels/levels.json';
@@ -394,6 +394,7 @@ export class RoomScene extends Phaser.Scene {
     const play = makeButton(this, W / 2, HC.playY, `Играть ${LEVELS[level].id}`, () => this.startLevel(level),
       { w: 380, h: 150, size: 52, skin: 'yellow' });
     room.add([title, shadow, this.cat, play]);
+    this.refreshName();
     this.createBoxes(room);
   }
 
@@ -443,6 +444,7 @@ export class RoomScene extends Phaser.Scene {
   // После сундука или подарка: монеты, коллекция, кнопки.
   afterBox() {
     this.refreshTop();
+    this.refreshName();
     this.refreshBoxes();
     this.refreshCollectionWall();
   }
@@ -465,6 +467,13 @@ export class RoomScene extends Phaser.Scene {
       return showPopup(this, { title: 'Подарок дня', text: 'Следующий подарок — завтра', buttons: [{ label: 'Понятно' }] });
     }
     openBox(this, 'gift', got.items, () => this.afterBox());
+  }
+
+  // Кличка — табличкой над котом.
+  refreshName() {
+    this.namePlate?.destroy();
+    this.namePlate = plate(this, W / 2, HC.nameY, catName(), { depth: 0 });
+    this.homeRoom.add(this.namePlate);
   }
 
   // Кот на главной — выбранного в коллекции окраса; при смене окраса пересоздаётся на том же месте.
@@ -562,7 +571,7 @@ export class RoomScene extends Phaser.Scene {
 
   showCollection() {
     openCollection(this, {
-      onChange: () => { this.makeHomeCat(); this.refreshCollectionWall(); this.refreshTop(); },
+      onChange: () => { this.makeHomeCat(); this.refreshName(); this.refreshCollectionWall(); this.refreshTop(); },
     });
   }
 

@@ -98,7 +98,9 @@ export const CONFIG = {
   ],
 
   // Окно коллекции (src/view/CollectionView.js): панель, сетка рескинов, голова кота в клетке
-  collection: { width: 660, height: 950, offsetY: -12, cols: 4, cellW: 150, cellH: 160, gridTop: 130, head: 98 },
+  // клички: по 2 в ряд, namesPerPage на странице, листалка на pagerY (от середины панели)
+  collection: { width: 660, height: 950, offsetY: -12, cols: 4, cellW: 150, cellH: 160, gridTop: 130, head: 98,
+    nameW: 290, nameH: 74, namesPerPage: 18, pagerY: 330 },
 
   // Сундуки (docs/meta.md): за каждые everyStars новых звёзд и каждый everyCatLevels-й уровень кота; 7-й день подарка.
   // Внутри: монеты, отмены, с шансом skinChance — рескин обычного кота, которого ещё нет (не из тех, что за уровни кота);
@@ -123,6 +125,17 @@ export const CONFIG = {
     flash: 320,          // вспышка
     rewardsDelay: 160,   // между наградами
     lidOverlap: 0.16,    // насколько крышка заходит на коробку (доля высоты крышки)
+  },
+
+  // Клички (список — src/names.js): цена по редкости (легендарные не продаются), шанс из сундука и веса редкостей,
+  // шанс «именной таблички» (своя кличка), монеты за повтор.
+  names: {
+    price: { common: 300, rare: 1500 },
+    chestChance: 0.3,
+    weights: { common: 70, rare: 25, legendary: 5 },
+    uniqueChance: 0.01,
+    dupCoins: 150,
+    colors: { common: 0x6d52e8, rare: 0x2f7fd6, legendary: 0xd48a00 }, // клетка клички в коллекции
   },
 
   // Жизни (docs/meta.md): одна сгорает на «Заново» или при выходе из уровня, где уже был ход (после подтверждения).
@@ -394,6 +407,7 @@ export const CONFIG = {
     catScale: 2.6,
     catColor: 2,
     playY: 1020,
+    nameY: 428,          // табличка с кличкой над котом
     boxes: { x: 92, y: 1010, size: 120 }, // сундук (слева) и подарок дня (справа, зеркально) рядом с «Играть»
     wallTop: 0xf7e3c8, wall: 0xe9c9a3, floor: 0xb98258,
   },

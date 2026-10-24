@@ -8,13 +8,13 @@ import { loadFonts } from './fonts.js';
 import { applySettings } from './view/settings.js';
 import { devGive } from './save.js';
 
-// Разработка: ?give=coins2000,chests3,gifts3 — начислить в сохранение (один раз: параметр сразу убирается из адреса).
+// Разработка: ?give=coins2000,chests3,gifts3,tokens1 — начислить в сохранение (один раз: параметр сразу убирается из адреса).
 if (import.meta.env.DEV) {
   const url = new URL(location.href);
   const give = url.searchParams.get('give');
   if (give) {
     const n = (key) => Number((give.match(new RegExp(`${key}(\\d+)`)) || [])[1] || 0);
-    devGive({ coins: n('coins'), chests: n('chests'), gifts: n('gifts') });
+    devGive({ coins: n('coins'), chests: n('chests'), gifts: n('gifts'), tokens: n('tokens') });
     url.searchParams.delete('give');
     history.replaceState(null, '', url);
   }

@@ -33,9 +33,12 @@ const META = {
   price: { undo: 30, hint: 50, jar: 100 },
   skins: { count: 20, price: 600 },            // рескины обычного кота: сколько всего, цена в магазине
   // 15 ультракотов (пород): три ступени цены
-  ultra: [...Array(5).fill(10000), ...Array(5).fill(25000), ...Array(5).fill(40000)],
+  ultra: [...Array(5).fill(10000), ...Array(5).fill(17000), ...Array(5).fill(27000)],
   ultraBoosterSave: 0.2,                       // с ультракотом нужно на столько меньше бустеров (умения сильнее)
   start: { coins: 0, undo: 3, hint: 1, jar: 1 },
+  // Жизни: тратится одна, когда игрок жмёт «Заново» или выходит из начатого уровня; победа жизнь не тратит.
+  // Восполняются сами (по одной за regenMin минут, за ночь — полностью), за ролик (+adGives) или за монеты.
+  lives: { max: 6, regenMin: 20, adGives: 3, price: 40 },
 };
 
 const PLAYER = {
@@ -50,7 +53,10 @@ const PLAYER = {
   jarUse: (d) => (d > 0.4 ? 0.3 : 0.05),
   starsAvg: (d) => Math.max(1.3, 2.6 - 2.2 * d),
   ultraReserve: 300,               // покупает ультракота, если после покупки останется столько на бустеры
+  adForLives: 0.7,                 // жизни кончились: смотрит ролик с такой вероятностью, иначе покупает за монеты или ждёт
 };
+// --hard: игрок, который часто начинает заново (несколько раз подряд на трудных уровнях)
+if (process.argv.includes('--hard')) PLAYER.restartChance = (d) => Math.min(0.8, 1.5 * d + 0.05);
 if (SAVER) {
   PLAYER.starsAvg = () => 3;
   PLAYER.x2Share = Number(SAVER.split('=')[1] || 0);
@@ -61,7 +67,8 @@ const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 21474836
 
 const s = { coins: META.start.coins, undo: META.start.undo, hint: META.start.hint, jar: META.start.jar,
   xp: 0, cat: 1, chestStars: 0, sec: 0, earned: 0, earnedX2: 0, spentBoost: 0, spentUltra: 0,
-  missing: { undo: 0, hint: 0, jar: 0 }, skins: new Set(), chests: 0, ultra: 0, ultraAt: [], day: 0, undoProgress: 0 };
+  missing: { undo: 0, hint: 0, jar: 0 }, skins: new Set(), chests: 0, ultra: 0, ultraAt: [], day: 0, undoProgress: 0,
+  lives: META.lives.max, livesLost: 0, outOfLives: 0, livesAds: 0, livesBought: 0, livesWaits: 0 };
 const catLog = [];
 const rows = [];
 const acc = { undo: 0, hint: 0, jar: 0 }; // дробные «желания» копятся до целого
@@ -99,9 +106,24 @@ for (let i = 0; i < LEVELS.length; i++) {
   const l = LEVELS[i];
   const d = l.difficulty || 0;
   const t = l.minMoves * PLAYER.moveRatio(d) * PLAYER.secPerMove + PLAYER.overheadSec;
-  s.sec += t * (1 + PLAYER.restartChance(d) * 0.5);
-  // подарок дня — в начале каждого игрового дня
+  let restarts = 0; // сколько раз подряд начал заново (каждый раз — с той же вероятностью)
+  while (rand() < PLAYER.restartChance(d)) restarts++;
+  const spent = t * (1 + restarts * 0.5);
+  s.sec += spent;
+  s.lives = Math.min(META.lives.max, s.lives + spent / 60 / META.lives.regenMin); // восполнение за время игры
+  for (let r = 0; r < restarts; r++) {
+    s.livesLost++;
+    if (s.lives < 1) {
+      s.outOfLives++;
+      if (rand() < PLAYER.adForLives) { s.livesAds++; s.lives += META.lives.adGives; }
+      else if (s.coins >= META.lives.price * 3) { s.coins -= META.lives.price; s.livesBought++; s.lives += 1; }
+      else { s.livesWaits++; s.lives = 1; s.sec += (1 - s.lives % 1) * META.lives.regenMin * 60; } // ждёт ближайшую жизнь
+    }
+    s.lives -= 1;
+  }
+  // подарок дня — в начале каждого игрового дня; за ночь жизни восполнились
   const day = Math.floor(s.sec / 60 / PLAYER.minutesPerDay);
+  if (s.day <= day && s.day > 0) s.lives = META.lives.max;
   while (s.day <= day) {
     const g = META.daily[s.day % META.daily.length];
     if (g === 'chest') openChest(); else coins(g);
@@ -151,3 +173,4 @@ if (SHOW_LEVELS) {
     'бустеры': ['undo', 'hint', 'jar'].filter((k) => c.r[k]).join(' '), 'сундук': c.r.chest ? 'да' : '', 'рескин': c.r.skin ? 'да' : '' })));
 }
 console.log('ультракоты куплены:', s.ultraAt.join('; ') || 'ни одного');
+console.log(`жизни: потеряно ${s.livesLost}, кончались ${s.outOfLives} раз (ролик ${s.livesAds}, за монеты ${s.livesBought}, ждал ${s.livesWaits})`);

@@ -291,7 +291,7 @@ export class RoomScene extends Phaser.Scene {
     this.cat.on('pointerdown', () => this.cat.poke());
     const level = currentLevel(LEVELS.length);
     const play = makeButton(this, W / 2, HC.playY, `Играть ${LEVELS[level].id}`, () => this.startLevel(level),
-      { w: 380, h: 170, size: 54, skin: 'yellow' });
+      { w: 380, h: 150, size: 52, skin: 'yellow' });
     room.add([title, shadow, this.cat, play]);
   }
 

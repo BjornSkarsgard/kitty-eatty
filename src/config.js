@@ -50,6 +50,7 @@ export const CONFIG = {
       yellow: { stroke: '#a8560a', faceUp: 184, faceDown: 135 },
       green: { stroke: '#2b7a12', faceUp: 190, faceDown: 135 },
     },
+    skinCap: 0.3,        // круглые края кнопки — доля ширины картинки; середина между ними тянется по ширине
     pressBounce: 1.05,   // кнопку отпустили — чуть подпрыгивает
   },
 

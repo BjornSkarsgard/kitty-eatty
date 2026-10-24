@@ -10,23 +10,30 @@
 //   undoProgress — сколько новых уровней пройдено к следующей бесплатной отмене;
 //   catLevel, xp — уровень кота (общий на игрока) и опыт, набранный к следующему;
 //   lives, refillAt — жизни и момент (мс, Date.now), когда они разом станут полными (null — уже полные);
+//   skins, skin — открытые рескины обычного кота (id из CONFIG.skins) и выбранный;
 //   settings — { sound, music, fx, vibro }: переключатели под шестерёнкой.
 import { CONFIG } from './config.js';
 
 const KEY = 'kittyeatty.save';
-const VERSION = 4;
+const VERSION = 5;
 const E = CONFIG.economy;
 const C = CONFIG.catXp;
 const LV = CONFIG.lives;
+const START_SKINS = CONFIG.skins.filter((k) => k.start).map((k) => k.id);
 
 const SETTINGS = { sound: true, music: true, fx: true, vibro: true };
-const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, settings: { ...SETTINGS } });
+const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], settings: { ...SETTINGS } });
 
 // Старые версии сохранения дополняем до текущей, прогресс не теряется.
 function migrate(d) {
   if (d.v === 1) d = { ...d, v: 2, coins: E.startCoins, undos: E.startUndos, undoProgress: 0 };
   if (d.v === 2) d = { ...d, v: 3, catLevel: 1, xp: 0 };
   if (d.v === 3) d = { ...d, v: 4, lives: LV.max, refillAt: null };
+  if (d.v === 4) {
+    // рескины за уже пройденные уровни кота — сразу открыты
+    const byLevel = CONFIG.skins.filter((k) => k.catLevel && k.catLevel <= d.catLevel).map((k) => k.id);
+    d = { ...d, v: 5, skins: [...START_SKINS, ...byLevel], skin: START_SKINS[0] };
+  }
   if (d && !Number.isFinite(d.xp)) d.xp = 0; // битый опыт — с нуля, уровень кота не трогаем
   if (d && !d.settings) d.settings = {};
   if (d) d.settings = { ...SETTINGS, ...d.settings }; // новые переключатели — со значением по умолчанию
@@ -41,7 +48,7 @@ function read() {
   try {
     const raw = window.localStorage.getItem(KEY);
     const d = raw && migrate(JSON.parse(raw));
-    if (d && d.v === VERSION && Number.isInteger(d.coins) && Number.isInteger(d.undos) && Number.isInteger(d.current) && Number.isInteger(d.unlocked) && Number.isInteger(d.catLevel) && Number.isInteger(d.lives) && d.best) return d;
+    if (d && d.v === VERSION && Number.isInteger(d.coins) && Number.isInteger(d.undos) && Number.isInteger(d.current) && Number.isInteger(d.unlocked) && Number.isInteger(d.catLevel) && Number.isInteger(d.lives) && Array.isArray(d.skins) && d.best) return d;
   } catch (e) { /* нет доступа или битые данные — начинаем заново */ }
   return empty();
 }
@@ -108,6 +115,7 @@ export function recordWin(level, index, moves, count) {
     const up = catReward(d.catLevel);
     d.coins += up.coins;
     d.undos += up.undos;
+    if (up.skin && !d.skins.includes(up.skin)) d.skins.push(up.skin);
     reward.levelUps.push(up);
   }
   const next = Math.min(index + 1, count - 1);
@@ -146,10 +154,35 @@ export function catReward(level) {
     level,
     coins: C.rewardCoins + C.rewardCoinsPerLevel * level,
     undos: C.rewardUndos + (level % C.bonusUndoEvery === 0 ? 1 : 0),
+    skin: CONFIG.skins.find((k) => k.catLevel === level)?.id ?? null, // рескин за этот уровень кота
   };
 }
 
 export const catLevel = () => get().catLevel;
+
+// ---------- рескины обычного кота ----------
+
+export const skinsOwned = () => get().skins;
+export const selectedSkin = () => get().skin;
+
+export function selectSkin(id) {
+  const d = get();
+  if (!d.skins.includes(id)) return false;
+  d.skin = id;
+  write();
+  return true;
+}
+
+// Купить рескин за монеты (цена — в CONFIG.skins); false — нельзя купить, уже есть или не хватает монет.
+export function buySkin(id) {
+  const d = get();
+  const k = CONFIG.skins.find((s) => s.id === id);
+  if (!k?.price || d.skins.includes(id) || d.coins < k.price) return false;
+  d.coins -= k.price;
+  d.skins.push(id);
+  write();
+  return true;
+}
 
 // ---------- жизни ----------
 

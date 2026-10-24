@@ -823,9 +823,18 @@ export class GameScene extends Phaser.Scene {
     box.add(this.add.text(0, -72, String(up.level), {
       fontFamily: font, fontStyle: 'bold', fontSize: '96px', color: '#ffffff', stroke: '#7a3a00', strokeThickness: 12,
     }).setOrigin(0.5));
-    const items = [['coin', up.coins], ['undo', up.undos]].filter(([, n]) => n > 0);
+    const items = [['coin', up.coins], ['undo', up.undos], ['skin', up.skin ? 1 : 0]].filter(([, n]) => n > 0);
     items.forEach(([icon, n], i) => {
       const x = (i - (items.length - 1) / 2) * 170;
+      if (icon === 'skin') { // новый окрас: голова кота этого окраса и подпись
+        const k = CONFIG.skins.find((s) => s.id === up.skin);
+        const head = this.add.image(x, 76, `cat_${k.file}_head`);
+        head.setScale(110 / Math.max(head.width, head.height));
+        box.add([head, this.add.text(x, 128, k.name, {
+          fontFamily: font, fontStyle: 'bold', fontSize: '26px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 6,
+        }).setOrigin(0.5)]);
+        return;
+      }
       const ic = makeIcon(this, icon, 92).setPosition(x, 80);
       if (icon !== 'coin') ic.setScale(ic.scale * 0.8);
       box.add(icon === 'coin' ? ic : [this.add.circle(x, 80, 44, 0x7b5cf0), ic]);

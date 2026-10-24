@@ -8,7 +8,8 @@ import { addSettingsMenu } from '../view/settings.js';
 import { panDuration, panFx, hud } from '../view/transition.js';
 import { music, sfx } from '../audio.js';
 import { beatPhase } from '../beat.js';
-import { currentLevel, unlockedLevel, levelStars, coins, catLevel, lives, livesRefillLeft } from '../save.js';
+import { currentLevel, unlockedLevel, levelStars, coins, catLevel, lives, livesRefillLeft, selectedSkin, skinsOwned } from '../save.js';
+import { openCollection } from '../view/CollectionView.js';
 import { showNoLives, formatLeft } from '../view/lives.js';
 import LEVELS from '../levels/levels.json';
 
@@ -383,15 +384,27 @@ export class RoomScene extends Phaser.Scene {
     const shadow = this.add.graphics().fillStyle(0x000000, 0.18).fillEllipse(W / 2, HC.floorY + HC.shadowY, 260, 40);
     // кот сидит на полу, дышит в такт музыке, на тап — случайная реакция, как в игре
     const s = HC.catScale;
-    this.cat = new CatView(this, W / 2, HC.floorY - CONFIG.cat.origin[2] * s, HC.catColor);
-    this.cat.setBaseScale(s).startIdle();
-    this.cat.home = { x: this.cat.x, y: this.cat.y };
-    this.cat.setInteractive(new Phaser.Geom.Rectangle(-55, -75, 110, 145), Phaser.Geom.Rectangle.Contains);
-    this.cat.on('pointerdown', () => this.cat.poke());
+    this.homeRoom = room;
+    this.makeHomeCat();
     const level = currentLevel(LEVELS.length);
     const play = makeButton(this, W / 2, HC.playY, `Играть ${LEVELS[level].id}`, () => this.startLevel(level),
       { w: 380, h: 150, size: 52, skin: 'yellow' });
     room.add([title, shadow, this.cat, play]);
+  }
+
+  // Кот на главной — выбранного в коллекции окраса; при смене окраса пересоздаётся на том же месте.
+  makeHomeCat() {
+    const s = HC.catScale;
+    const old = this.cat;
+    this.cat = new CatView(this, W / 2, HC.floorY - CONFIG.cat.origin[2] * s, selectedSkin());
+    this.cat.setBaseScale(s).startIdle();
+    this.cat.home = { x: this.cat.x, y: this.cat.y };
+    this.cat.setInteractive(new Phaser.Geom.Rectangle(-55, -75, 110, 145), Phaser.Geom.Rectangle.Contains);
+    this.cat.on('pointerdown', () => this.cat.poke());
+    if (old) {
+      this.homeRoom.addAt(this.cat, this.homeRoom.getIndex(old));
+      old.destroy();
+    }
   }
 
   // Карта висит в большой рамке на стене bg_room_map и сразу показывает, где сейчас кот.
@@ -447,11 +460,40 @@ export class RoomScene extends Phaser.Scene {
   }
 
   // Неоткрытые породы — «?» в пустых рамках на стене. Сами породы — позже.
+  // В рамках на стене — открытые окрасы кота (головы), пустые рамки — «?». Тап по комнате — окно коллекции.
   createCollection(room) {
+    this.collectionRoom = room;
+    this.refreshCollectionWall();
+  }
+
+  refreshCollectionWall() {
+    const room = this.collectionRoom;
+    this.wallParts?.forEach((o) => o.destroy());
+    this.wallParts = [];
     const C = R.collection;
+    const owned = CONFIG.skins.filter((k) => skinsOwned().includes(k.id));
+    let i = 0;
     C.y.forEach((y) => C.x.forEach((x) => {
-      room.add(this.add.text(x, y, '?', { ...this.titleStyle(), fontSize: '80px', color: '#8d7aa8' }).setOrigin(0.5));
+      const k = owned[i++];
+      let o;
+      if (k) {
+        o = this.add.image(x, y, `cat_${k.file}_head`);
+        o.setScale(C.head / Math.max(o.width, o.height));
+      } else o = this.add.text(x, y, '?', { ...this.titleStyle(), fontSize: '80px', color: '#8d7aa8' }).setOrigin(0.5);
+      room.add(o);
+      this.wallParts.push(o);
     }));
+  }
+
+  showCollection() {
+    openCollection(this, {
+      onChange: () => { this.makeHomeCat(); this.refreshCollectionWall(); this.refreshTop(); },
+    });
+  }
+
+  // Какая арка сейчас перед нами (номер в SLOTS).
+  currentSlot() {
+    return Math.round((((this.pan.p % RING) + RING) % RING) / STEP) % SLOTS.length;
   }
 
   // Таблички со статистикой на пустой стене под полкой с кубками.
@@ -583,6 +625,7 @@ export class RoomScene extends Phaser.Scene {
       if (!g || g.axis || Math.hypot(p.x - g.x0, p.y - g.y0) >= TH) return;
       if (this.mapOpen) { const w = this.worldAt(p); this.map.tapAt(w.x, w.y); }
       else if (g.onPoster) this.expandMap();
+      else if (SLOTS[this.currentSlot()].key === 'collection') this.showCollection();
     });
     this.input.on('wheel', (p, objs, dx, dy) => {
       if (this.mapOpen) this.map.setScroll(this.map.scroll + dy / (this.cameras.main.zoom * this.map.root.scale));

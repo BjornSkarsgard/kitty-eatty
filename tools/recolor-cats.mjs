@@ -1,5 +1,6 @@
-// Коты всех цветов из синего: node tools/recolor-cats.mjs
+// Коты всех цветов из синего: node tools/recolor-cats.mjs [--skins]
 // - берёт src/assets/cat_blue_*.png и пишет cat_<цвет>_*.png для остальных цветов из CONFIG.colors;
+// - и для рескинов из CONFIG.skins, у которых есть recolor (цвет шерсти); --skins — только их;
 // - перекрашивается только голубая шерсть (и веки): оттенок сдвигается к цвету кота, насыщенность и яркость
 //   масштабируются, поэтому свет, блики и тени сохраняются; белые пятна, розовые уши и нос не трогаются;
 // - на границе шерсти с белым пятном перекраска плавно ослабевает — без каймы.
@@ -63,8 +64,12 @@ function furColor() {
 const [h0, s0, v0] = furColor();
 console.log(`шерсть синего кота: оттенок ${h0.toFixed(0)}°, насыщенность ${s0.toFixed(2)}, яркость ${v0.toFixed(2)}`);
 
-CONFIG.colors.forEach(({ fill, name }) => {
-  if (name === 'blue') return;
+const ONLY_SKINS = process.argv.includes('--skins');
+const targets = [
+  ...(ONLY_SKINS ? [] : CONFIG.colors.filter((c) => c.name !== 'blue')),
+  ...CONFIG.skins.filter((k) => k.recolor !== undefined).map((k) => ({ fill: k.recolor, name: k.file })),
+];
+targets.forEach(({ fill, name }) => {
   const [h1, s1, v1] = rgb2hsv((fill >> 16) & 255, (fill >> 8) & 255, fill & 255);
   for (const part of PARTS) {
     const img = decodePNG(readFileSync(join(ASSETS, `cat_blue_${part}.png`)));

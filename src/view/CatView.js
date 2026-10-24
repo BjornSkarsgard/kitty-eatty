@@ -15,11 +15,14 @@ const loc = ([x, y]) => ({ x: (x - C.origin[0]) * U, y: (y - C.origin[1]) * U + 
 // Каждая часть — в своём контейнере, точка контейнера — ось вращения (основание хвоста, плечо лапы…).
 // Если картинок нет — временные фигуры.
 export class CatView extends Phaser.GameObjects.Container {
+  // colorIndex — цвет кота на уровне (индекс в CONFIG.colors) или id рескина обычного кота (строка, CONFIG.skins).
   constructor(scene, x, y, colorIndex, { headOnly = false } = {}) {
     super(scene, x, y);
     scene.add.existing(this);
-    this.fill = CONFIG.colors[colorIndex].fill;
-    this.name = CONFIG.colors[colorIndex].name;
+    const skin = typeof colorIndex === 'string' ? CONFIG.skins.find((k) => k.id === colorIndex) : null;
+    const color = skin ? CONFIG.colors.find((c) => c.name === skin.file) : CONFIG.colors[colorIndex];
+    this.fill = skin?.recolor ?? color?.fill ?? 0xffd43b;
+    this.name = skin ? skin.file : color.name;
     this.baseScale = 1;
     this.mood = 'open';
     this.actions = [];

@@ -70,6 +70,36 @@ export const CONFIG = {
     undoPrice: 30,       // цена отмены в монетах
   },
 
+  // Рескины обычного кота (docs/meta.md): другой окрас, на силу не влияют. file — набор частей cat_<file>_*.png:
+  // у первых десяти — те же, что у котов на уровнях, остальные делает tools/recolor-cats.mjs (recolor — цвет шерсти).
+  // Откуда: start — есть с начала; catLevel — даётся за этот уровень кота; price — в магазине за монеты;
+  // без price и catLevel — только из сундуков.
+  skins: [
+    { id: 'yellow', name: 'Солнечный', file: 'yellow', start: true },
+    { id: 'orange', name: 'Рыжик', file: 'orange', price: 600 },
+    { id: 'red', name: 'Клубничка', file: 'red', price: 600 },
+    { id: 'pink', name: 'Зефирка', file: 'pink', price: 600 },
+    { id: 'blue', name: 'Голубчик', file: 'blue', price: 600 },
+    { id: 'teal', name: 'Бирюза', file: 'teal', price: 600 },
+    { id: 'green', name: 'Лайм', file: 'green', price: 600 },
+    { id: 'purple', name: 'Слива', file: 'purple', price: 600 },
+    { id: 'white', name: 'Снежок', file: 'white', price: 600 },
+    { id: 'brown', name: 'Какао', file: 'brown', price: 600 },
+    { id: 'gray', name: 'Дымок', file: 'gray', recolor: 0x9a9aa6, catLevel: 4 },
+    { id: 'cream', name: 'Сливка', file: 'cream', recolor: 0xf3dcb0, catLevel: 12 },
+    { id: 'chocolate', name: 'Шоколад', file: 'chocolate', recolor: 0x6b3f22, catLevel: 20 },
+    { id: 'gold', name: 'Золотой', file: 'gold', recolor: 0xf2b01e, catLevel: 30 },
+    { id: 'peach', name: 'Персик', file: 'peach', recolor: 0xffb38a, price: 600 },
+    { id: 'mint', name: 'Мятный', file: 'mint', recolor: 0x8fe3c0, price: 600 },
+    { id: 'lavender', name: 'Лаванда', file: 'lavender', recolor: 0xb9a3f0, price: 600 },
+    { id: 'smoke', name: 'Туман', file: 'smoke', recolor: 0x7d93b0, price: 600 },
+    { id: 'black', name: 'Уголёк', file: 'black', recolor: 0x3a3440 },
+    { id: 'lilac', name: 'Сирень', file: 'lilac', recolor: 0xd08fd8 },
+  ],
+
+  // Окно коллекции (src/view/CollectionView.js): панель, сетка рескинов, голова кота в клетке
+  collection: { width: 660, height: 950, offsetY: -12, cols: 4, cellW: 150, cellH: 160, gridTop: 130, head: 98 },
+
   // Жизни (docs/meta.md): одна сгорает на «Заново» или при выходе из уровня, где уже был ход (после подтверждения).
   // Сами — все сразу через refillHours после первой сгоревшей (таймер идёт и пока игра закрыта); за монеты — по одной.
   lives: {
@@ -375,7 +405,7 @@ export const CONFIG = {
     // рамка карты на картинке bg_room_map (px исходника 720×1192): края снаружи, ширина планки,
     // и прямой кусок планки (без уголков), который тянется по высоте вместе с картой
     mapFrame: { left: 212, right: 505, bar: 26, barY: 230, barH: 170 },
-    collection: { x: [255, 465], y: [221, 372, 518] }, // середины пустых рамок на стене bg_room_collection
+    collection: { x: [255, 465], y: [221, 372, 518], head: 120 }, // середины рамок на стене bg_room_collection; голова кота в рамке
     profile: { y: 305, step: 90, w: 470, h: 76 },        // таблички статистики на стене bg_room_profile
   },
 

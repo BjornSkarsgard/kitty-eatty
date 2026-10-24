@@ -27,7 +27,8 @@ export class MapView {
     this.current = unlockedLevel(N); // край прогресса: здесь кот, дальше — закрыто
     this.root = scene.add.container(x, y).setScale(scale);
     this.viewH = viewH; // высота окна в координатах карты; меняется твином при разворачивании
-    this.root.add(scene.add.rectangle(0, 0, W, H, M.background));
+    this.bg = scene.add.rectangle(0, 0, W, H, M.background); // тянется по высоте окна, если оно выше экрана
+    this.root.add(this.bg);
     this.content = scene.add.container(-W / 2, 0);
     // слои, чтобы следы всегда были под кружками, а звёзды и кот — над ними
     this.layers = [0, 1, 2].map(() => scene.add.container(0, 0));
@@ -40,9 +41,11 @@ export class MapView {
     this.setScroll(nodePos(this.current).y - H / 2);
   }
 
-  // scroll — верх окна в координатах карты.
+  // scroll — верх окна высотой с экран в координатах карты (середина окна — scroll + H / 2).
+  // Окно выше экрана (карта на весь экран из рамки на стене) не выходит за края карты.
   setScroll(s) {
-    this.scroll = Phaser.Math.Clamp(s, 0, mapH - H);
+    const e = Math.max(0, (this.viewH - H) / 2);
+    this.scroll = Phaser.Math.Clamp(s, e, Math.max(e, mapH - H - e));
     this.content.y = -this.scroll - H / 2;
     this.refresh();
   }
@@ -58,6 +61,11 @@ export class MapView {
     if (!dragging && Math.abs(this.velocity) > 0.2) {
       this.setScroll(this.scroll + this.velocity);
       this.velocity *= M.friction;
+    }
+    const fullH = Math.max(H, this.viewH);
+    if (this.bg.scaleY !== fullH / H) {
+      this.bg.scaleY = fullH / H;
+      this.setScroll(this.scroll);
     }
     const b = this.bounds();
     this.maskShape.clear().fillStyle(0xffffff).fillRect(b.x, b.y, b.width, b.height);
@@ -84,8 +92,9 @@ export class MapView {
 
   // Создаёт уровни, попавшие в окно (с запасом), и убирает ушедшие.
   refresh() {
-    const top = this.scroll - M.spacing;
-    const bottom = top + H + 2 * M.spacing;
+    const half = Math.max(H, this.viewH) / 2;
+    const top = this.scroll + H / 2 - half - M.spacing;
+    const bottom = this.scroll + H / 2 + half + M.spacing;
     const from = Math.max(0, Math.floor((mapH - M.padBottom - bottom) / M.spacing));
     const to = Math.min(N - 1, Math.ceil((mapH - M.padBottom - top) / M.spacing));
     for (const [i, v] of this.views) {

@@ -70,10 +70,29 @@ export class RoomScene extends Phaser.Scene {
     this.mapBack = iconButton(this, 62, U.topY + 110, 'close', () => this.collapseMap(), {
       size: 84, shape: 'round', color: CONFIG.ui.exitColor, depth: 26,
     }).setScrollFactor(0).setVisible(false);
+    this.setupHudCamera();
     this.setupInput();
     music(this, 'music_game');
     this.layout();
     if (this.fromKitchen) this.backFromKitchen();
+  }
+
+  // Монеты, настройки и вкладки — на своей камере: основная камера приближается (к карте, в дверь кухни),
+  // а интерфейс остаётся как есть. Всё, что появится позже (сердечки, струйки ветра), — только в основной.
+  setupHudCamera() {
+    const hud = this.children.list.filter((o) => o.scrollFactorX === 0);
+    this.hudCam = this.cameras.add(0, 0, W, H);
+    this.hudCam.ignore(this.children.list.filter((o) => !hud.includes(o)));
+    this.cameras.main.ignore(hud);
+    const onAdded = (o) => this.hudCam.ignore(o);
+    this.events.on(Phaser.Scenes.Events.ADDED_TO_SCENE, onAdded);
+    // события сцены переживают перезапуск — без этого старая подписка прятала бы новый интерфейс
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.ADDED_TO_SCENE, onAdded));
+  }
+
+  // Точка экрана → мир основной камеры (она бывает приближена).
+  worldAt(p) {
+    return this.cameras.main.getWorldPoint(p.x, p.y);
   }
 
   // ---------- холл ----------
@@ -82,8 +101,9 @@ export class RoomScene extends Phaser.Scene {
   createSlot(s, i) {
     const room = this.add.container(0, 0).setDepth(0);
     const key = s.key === 'kitchen' ? 'bg_game' : `bg_room_${s.key}`;
+    let bg = null;
     if (this.textures.exists(key)) {
-      const bg = this.add.image(W / 2, H / 2, key);
+      bg = this.add.image(W / 2, H / 2, key, '__BASE'); // кадр явно: к bg_room_map добавлены кусочки рамки
       room.add(bg.setScale(Math.max(W / bg.width, H / bg.height)));
     }
     // кухня — в натуральную величину: через открытую дверь въезжаем в неё зумом прямо в уровень
@@ -101,7 +121,7 @@ export class RoomScene extends Phaser.Scene {
     // кусок стены справа от арки — до следующей (hall_wall.jpg, tools/fit-hall-wall.mjs)
     const wall = this.textures.exists('hall_wall') && R.wallGap ? this.add.image(0, H / 2, 'hall_wall').setDepth(5) : null;
     wall?.setDisplaySize(R.wallGap, H);
-    return { i, room, mask, arch, wall };
+    return { i, room, mask, arch, wall, bg };
   }
 
   // Каждый кадр: всё на своих местах для текущего поворота pan.p.
@@ -119,17 +139,15 @@ export class RoomScene extends Phaser.Scene {
       s.d = d;
     }
     this.placeDoor(this.slots[KITCHEN].d);
-    if (!this.mapOpen && !this.mapMoving) {
-      const P = this.mapPlace();
-      this.map.root.setPosition(P.x, P.y).setScale(P.scale);
-    }
+    const P = this.mapPlace();
+    this.map.root.setPosition(P.x, P.y).setScale(P.scale);
     // вкладки: доля пути между арками; у кухни стекло упирается в крайнюю вкладку
     this.tabs.setPosition((((p % RING) + RING) % RING) / STEP - 1);
   }
 
   // Поворот к арке slot по кратчайшему пути (dir — куда ехать, если пути равны). ms и onDone — для проезда к кухне.
   goTo(slot, { dir = 1, ms = R.panDuration, ease = 'Cubic.easeInOut', onDone } = {}) {
-    if (this.mapOpen && slot !== MAP) this.collapseMap();
+    if (this.mapOpen && slot !== MAP) return this.collapseMap(() => this.goTo(slot, { dir, ms, ease, onDone }));
     this.pan.p = ((this.pan.p % RING) + RING) % RING;
     let delta = wrap(slot * STEP - this.pan.p);
     if (Math.abs(Math.abs(delta) - RING / 2) < 1) delta = (dir * RING) / 2;
@@ -185,7 +203,7 @@ export class RoomScene extends Phaser.Scene {
   // В уровень: быстрый проезд к двери кухни (с главной — через коллекцию и профиль, с карты — через магазин),
   // дверь распахивается, камера въезжает в проём.
   startLevel(index) {
-    if (this.mapOpen) this.collapseMap();
+    if (this.mapOpen) return this.collapseMap(() => this.startLevel(index));
     this.input.enabled = false;
     const go = () => this.swingDoor(true, R.door.openDuration, () =>
       zoomIn(this, R.doorZoom, R.doorZoomDuration, () => this.scene.start('Game', { levelIndex: index, fromHall: true })));
@@ -232,13 +250,45 @@ export class RoomScene extends Phaser.Scene {
   }
 
   // Карта висит в большой рамке на стене bg_room_map и сразу показывает, где сейчас кот.
-  // Любое касание — разворачивается на весь экран.
+  // Любое касание — камера влетает в комнату вплотную к рамке, и карта вытягивается на весь экран.
+  // Боковые планки рамки — кусочки той же картинки комнаты, тянутся вместе с картой.
   createMap() {
     const P = this.mapPlace();
     this.map = new MapView(this, P.x, P.y, P.scale, R.posterViewH);
     this.map.root.setDepth(1);
     this.mapOpen = false;
-    this.mapMoving = false;
+    this.mapBusy = false; // камера летит — пальцем не трогаем
+    const F = R.mapFrame;
+    if (this.slots[MAP].bg) {
+      const tex = this.textures.get('bg_room_map');
+      this.frameBars = [[F.left, 'map_bar_l'], [F.right - F.bar, 'map_bar_r']].map(([x, name]) => {
+        if (!tex.has(name)) tex.add(name, 0, x, F.barY, F.bar, F.barH);
+        return this.add.image(0, 0, 'bg_room_map', name).setDepth(19).setVisible(false);
+      });
+    }
+  }
+
+  // Точка картинки комнаты карты (px исходника) → мир.
+  mapRoomPoint(x, y) {
+    const s = this.slots[MAP];
+    const bg = s.bg;
+    return {
+      x: s.room.x + (bg.x + (x - bg.width / 2) * bg.scale) * s.room.scale,
+      y: s.room.y + (bg.y + (y - bg.height / 2) * bg.scale) * s.room.scale,
+      k: bg.scale * s.room.scale,
+    };
+  }
+
+  // Боковые планки рамки по высоте окна карты.
+  placeFrameBars() {
+    if (!this.frameBars) return;
+    const F = R.mapFrame;
+    const r = this.map.root;
+    const h = this.map.viewH * r.scale;
+    [F.left, F.right - F.bar].forEach((x, i) => {
+      const p = this.mapRoomPoint(x + F.bar / 2, 0);
+      this.frameBars[i].setPosition(p.x, r.y).setDisplaySize(F.bar * p.k, h);
+    });
   }
 
   // Где карта на экране сейчас: рамка в комнате карты, комната — за своей аркой.
@@ -290,37 +340,61 @@ export class RoomScene extends Phaser.Scene {
 
   // ---------- карта на весь экран ----------
 
+  // Камера влетает сквозь арку в кабинет и встаёт вплотную к рамке (рамка — во всю ширину экрана),
+  // потом окно карты вытягивается вверх и вниз на весь экран, а планки рамки — вместе с ним.
   expandMap() {
     if (this.mapOpen) return;
     this.mapOpen = true;
-    sfx(this, 'sfx_swipe', CONFIG.audio.swipe, 1.15);
-    this.goTo(MAP);
-    this.map.root.setDepth(19); // над стеной холла, под вкладками
-    this.tweens.add({ targets: this.map.root, x: W / 2, y: H / 2, scale: 1, duration: R.zoomDuration, ease: 'Cubic.easeInOut' });
-    this.tweens.add({ targets: this.map, viewH: H, duration: R.zoomDuration, ease: 'Cubic.easeInOut' });
-    this.mapBack.setVisible(true).setAlpha(0);
-    this.tweens.add({ targets: this.mapBack, alpha: 1, duration: R.zoomDuration });
+    this.mapBusy = true;
+    this.mapScroll0 = this.map.scroll; // окно выше экрана сдвигает прокрутку — при закрытии вернём
+    const fly = () => {
+      const F = R.mapFrame;
+      const r = this.map.root;
+      const zoom = W / (this.mapRoomPoint(F.right, 0).x - this.mapRoomPoint(F.left, 0).x);
+      const cam = this.cameras.main;
+      sfx(this, 'sfx_swipe', CONFIG.audio.swipe, 1.15);
+      this.tweens.add({
+        targets: cam, zoom, scrollX: r.x - W / 2, scrollY: r.y - H / 2, duration: R.mapFly, ease: 'Cubic.easeInOut',
+        onComplete: () => {
+          r.setDepth(19); // дальше окно выходит за рамку — над стеной холла
+          this.frameBars?.forEach((bar) => bar.setVisible(true));
+          this.placeFrameBars();
+          this.tweens.add({
+            targets: this.map, viewH: H / zoom / r.scale, duration: R.mapStretch, ease: 'Cubic.easeOut',
+            onUpdate: () => this.placeFrameBars(),
+            onComplete: () => { this.mapBusy = false; this.mapScrollOpen = this.map.scroll; },
+          });
+        },
+      });
+      this.mapBack.setVisible(true).setAlpha(0);
+      this.tweens.add({ targets: this.mapBack, alpha: 1, duration: R.mapFly });
+    };
+    if (Math.abs(wrap(MAP * STEP - this.pan.p)) > 1) this.goTo(MAP, { onDone: fly });
+    else fly();
   }
 
-  collapseMap() {
-    if (!this.mapOpen) return;
+  // Обратно: окно карты сжимается в рамку, камера отлетает. onDone — когда холл снова как был.
+  collapseMap(onDone) {
+    if (!this.mapOpen) return onDone?.();
+    if (this.mapBusy) return; // ещё летим — второй раз не начинаем
     this.mapOpen = false;
-    this.mapMoving = true;
-    sfx(this, 'sfx_swipe', CONFIG.audio.swipe, 0.85);
+    this.mapBusy = true;
     this.map.velocity = 0;
-    // догоняем рамку, даже если холл в это время поворачивается
-    const from = { x: this.map.root.x, y: this.map.root.y, scale: this.map.root.scale };
-    this.tweens.addCounter({
-      from: 0, to: 1, duration: R.zoomDuration, ease: 'Cubic.easeInOut',
-      onUpdate: (tw) => {
-        const t = tw.getValue();
-        const P = this.mapPlace();
-        this.map.root.setPosition(from.x + (P.x - from.x) * t, from.y + (P.y - from.y) * t).setScale(from.scale + (P.scale - from.scale) * t);
+    sfx(this, 'sfx_swipe', CONFIG.audio.swipe, 0.85);
+    const scroll = this.mapScroll0 + (this.map.scroll - this.mapScrollOpen); // с тем, что игрок прокрутил сам
+    this.tweens.add({ targets: this.mapBack, alpha: 0, duration: R.mapStretch, onComplete: () => this.mapBack.setVisible(false) });
+    this.tweens.add({
+      targets: this.map, viewH: R.posterViewH, duration: R.mapStretch, ease: 'Cubic.easeIn',
+      onUpdate: () => { this.map.setScroll(scroll); this.placeFrameBars(); },
+      onComplete: () => {
+        this.frameBars?.forEach((bar) => bar.setVisible(false));
+        this.map.root.setDepth(1);
+        this.tweens.add({
+          targets: this.cameras.main, zoom: 1, scrollX: 0, scrollY: 0, duration: R.mapFly, ease: 'Cubic.easeInOut',
+          onComplete: () => { this.mapBusy = false; onDone?.(); },
+        });
       },
-      onComplete: () => { this.mapMoving = false; this.map.root.setDepth(1); },
     });
-    this.tweens.add({ targets: this.map, viewH: R.posterViewH, duration: R.zoomDuration, ease: 'Cubic.easeInOut' });
-    this.tweens.add({ targets: this.mapBack, alpha: 0, duration: R.zoomDuration / 2, onComplete: () => this.mapBack.setVisible(false) });
   }
 
   // ---------- палец ----------
@@ -330,11 +404,11 @@ export class RoomScene extends Phaser.Scene {
   setupInput() {
     const TH = CONFIG.map.dragThreshold;
     this.input.on('pointerdown', (p, over) => {
-      if (over.length) { this.gesture = null; return; } // кнопка, кот, вкладка
+      if (over.length || this.mapBusy) { this.gesture = null; return; } // кнопка, кот, вкладка; камера летит
       this.tweens.killTweensOf(this.pan);
       this.gesture = {
         x0: p.x, y0: p.y, pan0: this.pan.p, axis: null, lastX: p.x, lastY: p.y, lastT: p.event.timeStamp, vx: 0,
-        onPoster: !this.mapOpen && !this.mapMoving && this.map.bounds().contains(p.worldX, p.worldY),
+        onPoster: !this.mapOpen && this.map.bounds().contains(this.worldAt(p).x, this.worldAt(p).y),
       };
       this.map.velocity = 0;
     });
@@ -352,9 +426,10 @@ export class RoomScene extends Phaser.Scene {
       if (g.axis === 'x' && !this.mapOpen) {
         g.vx = ((g.lastX - p.x) / dt) * 16.7;
         this.pan.p = g.pan0 - dx; // круг замкнут — краёв нет
-      } else if (g.axis === 'y' && this.mapOpen) {
-        this.map.velocity = ((g.lastY - p.y) / dt) * 16.7;
-        this.map.setScroll(this.map.scroll + (g.lastY - p.y));
+      } else if (g.axis === 'y' && this.mapOpen && !this.mapBusy) {
+        const k = this.cameras.main.zoom * this.map.root.scale; // экранные px → px карты
+        this.map.velocity = ((g.lastY - p.y) / dt / k) * 16.7;
+        this.map.setScroll(this.map.scroll + (g.lastY - p.y) / k);
       }
       g.lastX = p.x;
       g.lastY = p.y;
@@ -370,7 +445,7 @@ export class RoomScene extends Phaser.Scene {
         g.vx = (g.x0 - p.x) / 10;
       }
       if (!g.axis) {
-        if (this.mapOpen) this.map.tapAt(p.worldX, p.worldY);
+        if (this.mapOpen) { const w = this.worldAt(p); this.map.tapAt(w.x, w.y); }
         else if (g.onPoster) this.expandMap();
         return;
       }
@@ -382,7 +457,9 @@ export class RoomScene extends Phaser.Scene {
         this.goTo(((i % SLOTS.length) + SLOTS.length) % SLOTS.length, { dir: Math.sign(dx) || 1 });
       }
     });
-    this.input.on('wheel', (p, objs, dx, dy) => { if (this.mapOpen) this.map.setScroll(this.map.scroll + dy); });
+    this.input.on('wheel', (p, objs, dx, dy) => {
+      if (this.mapOpen) this.map.setScroll(this.map.scroll + dy / (this.cameras.main.zoom * this.map.root.scale));
+    });
   }
 
   update() {

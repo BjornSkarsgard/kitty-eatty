@@ -15,7 +15,18 @@ const W = CONFIG.width;
 const H = CONFIG.height;
 const R = CONFIG.room;
 const HC = CONFIG.home;
-const O = R.opening;
+// Стена холла (арка, дверь, кусок стены) крупнее экрана в archScale раз от середины экрана — края обрезаны,
+// проём больше, откосы уже. Все размеры стены в конфиге — до этого увеличения.
+const SX = R.archScale;
+const zoomY = (y) => H / 2 + (y - H / 2) * SX;
+const O = {
+  x: W / 2 + (R.opening.x - W / 2) * SX, w: R.opening.w * SX,
+  top: zoomY(R.opening.top), bottom: zoomY(R.opening.bottom), vault: R.opening.vault * SX,
+};
+const ARCH_W = R.archWidth * SX;
+const WALL_W = R.wallGap * SX;
+// зум сквозь открытую дверь: проём заполняет экран целиком
+const DOOR_ZOOM = Math.max(W / O.w, H / (O.bottom - O.top));
 
 // Арки по кругу холла слева направо; круг замкнут (за профилем — снова кухня). Кухня — не вкладка,
 // остальные пять — вкладки нижней панели в том же порядке.
@@ -31,7 +42,7 @@ const TABS = SLOTS.slice(1);
 const KITCHEN = 0;
 const MAP = SLOTS.findIndex((s) => s.key === 'map');
 const HOME = SLOTS.findIndex((s) => s.key === 'home');
-const STEP = R.archWidth + R.wallGap; // от арки до соседней на экране
+const STEP = ARCH_W + WALL_W; // от арки до соседней на экране
 const RING = SLOTS.length * STEP; // длина круга в пикселях поворота
 const slotOf = (key) => Math.max(1, SLOTS.findIndex((s) => s.key === key));
 // Сдвиг по кругу в пределах [-RING/2, RING/2).
@@ -117,11 +128,11 @@ export class RoomScene extends Phaser.Scene {
     let arch = null;
     if (this.textures.exists('hall_arch')) {
       arch = this.add.image(0, H / 2, 'hall_arch').setDepth(5);
-      arch.setScale(H / arch.height);
+      arch.setScale((H / arch.height) * SX);
     }
     // кусок стены справа от арки — до следующей (hall_wall.jpg, tools/fit-hall-wall.mjs)
     const wall = this.textures.exists('hall_wall') && R.wallGap ? this.add.image(0, H / 2, 'hall_wall').setDepth(5) : null;
-    wall?.setDisplaySize(R.wallGap, H);
+    wall?.setDisplaySize(WALL_W, H * SX);
     return { i, room, mask, arch, wall, bg };
   }
 
@@ -130,13 +141,13 @@ export class RoomScene extends Phaser.Scene {
     const p = this.pan.p;
     for (const s of this.slots) {
       const d = wrap(s.i * STEP - p); // где арка относительно экрана
-      const on = Math.abs(d) < (W + R.archWidth) / 2; // хоть краем на экране
+      const on = Math.abs(d) < (W + ARCH_W) / 2; // хоть краем на экране
       const k = s.room.scale;
       s.room.setVisible(on).setPosition(W / 2 - (W / 2) * k + R.depth * d, O.top * (1 - k));
       s.mask.x = d;
       s.arch?.setVisible(on).setX(W / 2 + d);
       const dw = d + STEP / 2; // середина стены после арки
-      s.wall?.setVisible(Math.abs(dw) < (W + R.wallGap) / 2).setX(W / 2 + dw);
+      s.wall?.setVisible(Math.abs(dw) < (W + WALL_W) / 2).setX(W / 2 + dw);
       s.d = d;
     }
     this.placeDoor(this.slots[KITCHEN].d);
@@ -172,7 +183,7 @@ export class RoomScene extends Phaser.Scene {
   createDoor() {
     if (!this.textures.exists('kitchen_door')) return;
     this.leaves = [0, 1].map((side) => {
-      const leaf = this.add.image(0, 0, 'kitchen_door').setDepth(3).setOrigin(side, 1).setScale(R.door.scale);
+      const leaf = this.add.image(0, 0, 'kitchen_door').setDepth(3).setOrigin(side, 1).setScale(R.door.scale * SX);
       leaf.setCrop(side * leaf.width / 2, 0, leaf.width / 2, leaf.height);
       return leaf;
     });
@@ -180,7 +191,7 @@ export class RoomScene extends Phaser.Scene {
 
   placeDoor(d) {
     const cx = O.x + d;
-    this.leaves?.forEach((leaf, side) => leaf.setPosition(cx + (side ? 1 : -1) * (leaf.width / 2) * R.door.scale, R.door.bottom));
+    this.leaves?.forEach((leaf, side) => leaf.setPosition(cx + (side ? 1 : -1) * (leaf.width / 2) * R.door.scale * SX, zoomY(R.door.bottom)));
   }
 
   // Створки: open — распахнуты (сжаты к петлям и затенены) или закрыты; ms = 0 — сразу.
@@ -192,7 +203,7 @@ export class RoomScene extends Phaser.Scene {
       // створки при закрытии пружинят (t чуть меньше 0) — тень не дальше «нет тени», иначе цвет переполняется и мигает
       const c = Phaser.Display.Color.Interpolate.ColorWithColor(white, shade, 1, Phaser.Math.Clamp(t, 0, 1));
       this.leaves.forEach((leaf) => {
-        leaf.scaleX = R.door.scale * (1 - (1 - R.door.open) * t);
+        leaf.scaleX = R.door.scale * SX * (1 - (1 - R.door.open) * t);
         leaf.setTint(Phaser.Display.Color.GetColor(c.r, c.g, c.b));
       });
     };
@@ -229,17 +240,18 @@ export class RoomScene extends Phaser.Scene {
   }
 
   // Холл и уровень за дверью на доле пути t (0 — стоим перед открытой дверью, 1 — проём во весь экран).
-  // Камера холла приближается в doorZoom и сдвигается так, чтобы середина проёма встала в середину экрана.
-  // Уровень — «дальше» холла: его зум в doorZoom раз меньше и он стоит ровно в проёме; к концу — зум 1, весь экран.
+  // Камера холла приближается в DOOR_ZOOM и сдвигается так, чтобы середина проёма встала в середину экрана.
+  // Уровень — «дальше» холла: сначала он шириной ровно с проём (сверху и снизу лишнее прячет стена), дальше растёт
+  // вместе с проёмом, пока не займёт весь экран, и остаётся во весь экран — по бокам щелей нет ни на каком шаге.
   kitchenView(t) {
     const cam = this.cameras.main;
     const gcam = this.scene.get('Game').cameras.main;
     const dy = (O.top + O.bottom) / 2 - H / 2; // середина проёма ниже/выше середины экрана
-    const zr = 1 + (R.doorZoom - 1) * t;
+    const zr = 1 + (DOOR_ZOOM - 1) * t;
     cam.setZoom(zr);
     cam.scrollY = dy * t;
     const cy = H / 2 + (1 - t) * dy * zr; // где сейчас на экране середина проёма
-    const zg = zr / R.doorZoom;
+    const zg = Math.min(1, (zr * O.w) / W);
     gcam.setZoom(zg);
     gcam.scrollY = (H / 2 - cy) / zg;
   }

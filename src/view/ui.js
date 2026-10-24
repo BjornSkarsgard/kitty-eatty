@@ -8,18 +8,14 @@ import { sfx } from '../audio.js';
 const U = CONFIG.ui;
 const font = () => `"${CONFIG.font}", sans-serif`;
 
-// Глянцевая плашка: тень, тёмный «бок» снизу, лицо, блик сверху. shape: 'square' | 'round'.
+// Глянцевая плашка: тень, тёмный «бок» снизу, лицо, мягкий блик сверху слева. shape: 'square' | 'round'.
 function drawBlank(g, w, h, color, shape) {
   const r = shape === 'round' ? Math.min(w, h) / 2 : Math.min(w, h) * 0.26;
   const dark = Phaser.Display.Color.ValueToColor(color).darken(28).color;
-  const light = Phaser.Display.Color.ValueToColor(color).lighten(14).color;
   g.fillStyle(0x000000, 0.25).fillRoundedRect(-w / 2 + 3, -h / 2 + 9, w, h, r);
   g.fillStyle(dark, 1).fillRoundedRect(-w / 2, -h / 2 + 6, w, h, r);
   g.fillStyle(color, 1).fillRoundedRect(-w / 2, -h / 2, w, h - 4, r);
-  const hh = (h - 4) * 0.5;
-  const rr = Math.min(r - 6, hh / 2);
-  g.fillStyle(light, 1).fillRoundedRect(-w / 2 + 6, -h / 2 + 6, w - 12, hh, { tl: rr, tr: rr, bl: 6, br: 6 });
-  g.fillStyle(0xffffff, 0.35).fillEllipse(-w * 0.22, -h * 0.3, w * 0.28, h * 0.12);
+  g.fillStyle(0xffffff, 0.3).fillEllipse(-w * 0.2, -h * 0.28, w * 0.26, h * 0.11); // блик сверху слева
 }
 
 // Иконки кодом: белые фигуры в квадрате size×size вокруг (0, 0).
@@ -257,7 +253,6 @@ export function tabBar(scene, tabs, onSelect, { depth = 20 } = {}) {
   const glass = scene.add.graphics();
   glass.fillStyle(0x000000, 0.18).fillRoundedRect(-gw / 2 + 2, -gh / 2 + 6, gw, gh, 30);
   glass.fillStyle(0xffffff, 0.16).fillRoundedRect(-gw / 2, -gh / 2, gw, gh, 30);
-  glass.fillStyle(0xffffff, 0.14).fillRoundedRect(-gw / 2 + 4, -gh / 2 + 4, gw - 8, gh * 0.42, { tl: 26, tr: 26, bl: 10, br: 10 });
   glass.lineStyle(3, 0xffffff, 0.65).strokeRoundedRect(-gw / 2, -gh / 2, gw, gh, 30);
   glass.lineStyle(2, 0x000000, 0.15).strokeRoundedRect(-gw / 2 + 3, -gh / 2 + 3, gw - 6, gh - 6, 27);
   const label = scene.add.text(0, gh / 2 - 34, '', {

@@ -202,19 +202,39 @@ export class RoomScene extends Phaser.Scene {
 
   // ---------- кухня ----------
 
-  // Дверь — две створки из одной картинки (левая и правая половины), каждая сжимается к своей петле.
+  // Дверь вписана в проём так, чтобы декоративная канавка вокруг створок шла на одном расстоянии (door.gap)
+  // от края проёма и по бокам, и по своду. Пропорции двери и проёма разные, поэтому верх (свод и табличка)
+  // и прямой низ масштабируются по высоте отдельно: верх — под свод, низ тянется до пола.
+  // Каждая створка — два кусочка (верх и низ), у обоих петля на внешнем краю.
   createDoor() {
     if (!this.textures.exists('kitchen_door')) return;
-    this.leaves = [0, 1].map((side) => {
-      const leaf = this.add.image(0, 0, 'kitchen_door').setDepth(3).setOrigin(side, 1).setScale(R.door.scale);
-      leaf.setCrop(side * leaf.width / 2, 0, leaf.width / 2, leaf.height);
-      return leaf;
+    const D = R.door;
+    const src = this.textures.get('kitchen_door').get('__BASE');
+    const dw = src.width;
+    const dh = src.height;
+    const sx = (OK.w / 2 - D.gap) / (dw / 2 - D.side);
+    const arcY = OK.top + OK.vault; // центр свода на экране
+    const syTop = (OK.vault - D.gap) / (D.arc - D.groove);
+    const splitY = arcY + (D.split - D.arc) * syTop;
+    const syBottom = (D.bottom - splitY) / (dh - D.split);
+    this.doorSX = sx;
+    this.leaves = [];
+    [0, 1].forEach((side) => {
+      const top = this.add.image(0, arcY, 'kitchen_door', '__BASE').setOrigin(side, D.arc / dh).setScale(sx, syTop);
+      top.setCrop(side * dw / 2, 0, dw / 2, D.split);
+      const bottom = this.add.image(0, splitY, 'kitchen_door', '__BASE').setOrigin(side, D.split / dh).setScale(sx, syBottom);
+      bottom.setCrop(side * dw / 2, D.split, dw / 2, dh - D.split);
+      for (const leaf of [top, bottom]) {
+        leaf.setDepth(3);
+        leaf.side = side;
+        this.leaves.push(leaf);
+      }
     });
   }
 
   placeDoor(d) {
     const cx = OK.x + d;
-    this.leaves?.forEach((leaf, side) => leaf.setPosition(cx + (side ? 1 : -1) * (leaf.width / 2) * R.door.scale, R.door.bottom));
+    this.leaves?.forEach((leaf) => leaf.setX(cx + (leaf.side ? 1 : -1) * (leaf.width / 2) * this.doorSX));
   }
 
   // Створки: open — распахнуты (сжаты к петлям и затенены) или закрыты; ms = 0 — сразу.
@@ -226,7 +246,7 @@ export class RoomScene extends Phaser.Scene {
       // створки при закрытии пружинят (t чуть меньше 0) — тень не дальше «нет тени», иначе цвет переполняется и мигает
       const c = Phaser.Display.Color.Interpolate.ColorWithColor(white, shade, 1, Phaser.Math.Clamp(t, 0, 1));
       this.leaves.forEach((leaf) => {
-        leaf.scaleX = R.door.scale * (1 - (1 - R.door.open) * t);
+        leaf.scaleX = this.doorSX * (1 - (1 - R.door.open) * t);
         leaf.setTint(Phaser.Display.Color.GetColor(c.r, c.g, c.b));
       });
     };

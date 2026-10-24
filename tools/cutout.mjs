@@ -23,6 +23,9 @@ const SPLIT_PINK = args.includes('--split-pink');
 const HOLES = args.includes('--holes');
 // --key=magenta: фон пурпурный #FF00FF — для зелёных предметов (кошачья мята), которые зелёный фон съел бы
 const MAGENTA = (args.find((a) => a.startsWith('--key=')) || '').slice(6) === 'magenta';
+// --thresh=N: насколько цвет фона должен выделяться, чтобы считаться фоном (0..255, по умолчанию 90). Больше — строже:
+// для предметов близкого к фону цвета (фиолетовый подарок на пурпурном)
+const THRESH = Number((args.find((a) => a.startsWith('--thresh=')) || '--thresh=90').slice(9));
 const files = args.filter((a) => !a.startsWith('--'));
 if (!files.length) {
   console.log('Использование: node tools/cutout.mjs src/assets/cat_head.png [--max=512]');
@@ -36,7 +39,7 @@ const greenness = MAGENTA
   ? (d, i) => Math.min(d[i], d[i + 2]) - d[i + 1]
   : (d, i) => d[i + 1] - Math.max(d[i], d[i + 2]);
 let alphaOnly = false; // фон уже прозрачный — зелёное не трогаем (корм может быть зелёным)
-const isKey = (d, i) => d[i + 3] < 16 || (!alphaOnly && greenness(d, i) > 90);
+const isKey = (d, i) => d[i + 3] < 16 || (!alphaOnly && greenness(d, i) > THRESH);
 
 function cutout({ w, h, rgba }) {
   const d = rgba;

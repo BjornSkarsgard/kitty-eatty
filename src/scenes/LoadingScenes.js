@@ -1,11 +1,12 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { LOADING_KEYS, queueAssets } from '../assets.js';
-import { unlockedLevel } from '../save.js';
-import LEVELS from '../levels/levels.json';
-import { CatView } from '../view/CatView.js';
+import { unlockedLevel } from '../core/save.js';
+import { LEVELS } from '../core/levels.js';
+import { CatView } from '../theme/cats/CatView.js';
 import { Capsule } from '../view/Capsule.js';
 import { music } from '../audio.js';
+import { STR } from '../theme/cats/strings.ru.js';
 
 // 1) Boot: грузит только то, что нужно самому экрану загрузки (голова, музыка).
 export class BootScene extends Phaser.Scene {
@@ -40,7 +41,7 @@ export class PreloadScene extends Phaser.Scene {
 
     // Объёмная надпись: заливка светлеет кверху, толстая обводка и тень вниз (свет сверху).
     const T = Lc.title;
-    const title = this.add.text(this.center.x, this.center.y + T.y, 'Загрузка…', {
+    const title = this.add.text(this.center.x, this.center.y + T.y, STR.loading, {
       fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: `${T.size}px`,
       stroke: T.stroke, strokeThickness: T.strokeWidth,
       shadow: { offsetX: 0, offsetY: T.shadowY, color: T.shadow, blur: 0, stroke: true, fill: true },

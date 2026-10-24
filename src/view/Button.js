@@ -1,12 +1,13 @@
 import { CONFIG } from '../config.js';
 import { sfx } from '../audio.js';
+import { PALETTE as PAL } from '../theme/cats/palette.js';
 
 // Кнопка с надписью. skin ('yellow', 'green') — объёмная из арта: btn_<skin>.png поднятая и btn_<skin>_pressed.png
 // прожатая (нижний край у обеих на одной высоте). Палец прижал — картинка прожатой, надпись опускается вместе
 // с лицевой стороной; отпустил на кнопке — она выпрямляется, чуть подпрыгивает, и срабатывает onTap;
 // увёл палец — просто выпрямляется. Без skin (или без картинок) — заглушка: скруглённый прямоугольник,
 // пружинит и срабатывает сразу при нажатии. scrollFactor 0 — если кнопка не должна уезжать с прокруткой.
-export function makeButton(scene, x, y, label, onTap, { depth = 0, w = 220, h, size = 34, color = 0x5f4b8b, skin } = {}) {
+export function makeButton(scene, x, y, label, onTap, { depth = 0, w = 220, h, size = 34, color = PAL.buttonPlain, skin } = {}) {
   const font = `"${CONFIG.font}", sans-serif`;
   const S = skin && CONFIG.ui.skins[skin];
   if (S && scene.textures.exists(`btn_${skin}`) && scene.textures.exists(`btn_${skin}_pressed`)) {
@@ -18,7 +19,7 @@ export function makeButton(scene, x, y, label, onTap, { depth = 0, w = 220, h, s
   g.fillRoundedRect(-w / 2, -h / 2, w, h, 20);
   g.lineStyle(CONFIG.outlineWidth, CONFIG.outline, 1);
   g.strokeRoundedRect(-w / 2, -h / 2, w, h, 20);
-  const t = scene.add.text(0, 0, label, { fontFamily: font, fontStyle: 'bold', fontSize: `${size}px`, color: '#ffffff' }).setOrigin(0.5);
+  const t = scene.add.text(0, 0, label, { fontFamily: font, fontStyle: 'bold', fontSize: `${size}px`, color: PAL.text }).setOrigin(0.5);
   const btn = scene.add.container(x, y, [g, t]).setDepth(depth).setSize(w, h).setInteractive();
   btn.setLabel = (s) => { t.setText(s); return btn; };
   btn.on('pointerdown', () => {
@@ -53,7 +54,7 @@ function skinButton(scene, x, y, label, onTap, { depth, w, h, size, skin, S, fon
   const k = h / base.height; // вся картинка — в этом масштабе (прожатая ниже — так нарисована)
   const parts = ['l', 'm', 'r'].map((s, i) => scene.add.image(0, h / 2, up, `${up}_${s}`).setOrigin(i === 2 ? 1 : 0, 1));
   const t = scene.add.text(0, 0, label, {
-    fontFamily: font, fontStyle: 'bold', fontSize: `${size}px`, color: '#ffffff', stroke: S.stroke, strokeThickness: Math.round(size / 6),
+    fontFamily: font, fontStyle: 'bold', fontSize: `${size}px`, color: PAL.text, stroke: S.stroke, strokeThickness: Math.round(size / 6),
   }).setOrigin(0.5);
   const btn = scene.add.container(x, y, [...parts, t]).setDepth(depth).setSize(w, h).setInteractive();
   const press = (pressed) => {

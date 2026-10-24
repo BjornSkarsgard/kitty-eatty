@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
-import { CONFIG } from '../config.js';
-import { sfx, sfxRandom } from '../audio.js';
-import LAYOUT from '../theme/cats/cat-layout.json';
+import { CONFIG } from '../../config.js';
+import { sfx, sfxRandom } from '../../audio.js';
+import LAYOUT from './cat-layout.json';
 
 const C = CONFIG.cat;
 const P = C.pivots;

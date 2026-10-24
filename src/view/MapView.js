@@ -1,9 +1,10 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
-import { CatView } from './CatView.js';
+import { CatView } from '../theme/cats/CatView.js';
 import { sfx } from '../audio.js';
-import { unlockedLevel, levelStars, selectedSkin } from '../save.js';
-import LEVELS from '../levels/levels.json';
+import { unlockedLevel, levelStars, selectedSkin } from '../core/save.js';
+import { LEVELS } from '../core/levels.js';
+import { PALETTE as PAL } from '../theme/cats/palette.js';
 
 const M = CONFIG.map;
 const W = CONFIG.width;
@@ -68,7 +69,7 @@ export class MapView {
       this.setScroll(this.scroll);
     }
     const b = this.bounds();
-    this.maskShape.clear().fillStyle(0xffffff).fillRect(b.x, b.y, b.width, b.height);
+    this.maskShape.clear().fillStyle(PAL.white).fillRect(b.x, b.y, b.width, b.height);
   }
 
   // Тап по точке мира: уровень открыт — запуск, закрыт — покачивание.
@@ -136,7 +137,7 @@ export class MapView {
     node.add(this.makeNodeFace(state, level.puzzle));
     node.add(scene.add.text(0, -2, String(level.id), {
       fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '46px',
-      color: state === 'locked' ? '#8d7b6a' : '#ffffff', stroke: '#6b3d1f', strokeThickness: state === 'locked' ? 0 : 8,
+      color: state === 'locked' ? PAL.textMapLocked : PAL.text, stroke: PAL.textBrown, strokeThickness: state === 'locked' ? 0 : 8,
     }).setOrigin(0.5));
     nodes.add(node);
     parts.push(node);
@@ -173,10 +174,10 @@ export class MapView {
     const fill = state === 'locked' ? C.locked : state === 'current' ? C.current : puzzle ? C.puzzle : C.done;
     const r = M.nodeSize / 2;
     const g = scene.add.graphics();
-    g.fillStyle(0x000000, 0.18).fillCircle(4, 8, r);
+    g.fillStyle(PAL.black, 0.18).fillCircle(4, 8, r);
     g.fillStyle(C.edge, 1).fillCircle(0, 0, r);
     g.fillStyle(fill, 1).fillCircle(0, -3, r - 8);
-    g.fillStyle(0xffffff, 0.35).fillEllipse(-r * 0.3, -r * 0.42, r * 0.7, r * 0.35);
+    g.fillStyle(PAL.white, 0.35).fillEllipse(-r * 0.3, -r * 0.42, r * 0.7, r * 0.35);
     return g;
   }
 

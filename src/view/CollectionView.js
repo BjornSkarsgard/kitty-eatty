@@ -3,11 +3,13 @@ import { showPopup } from './Popup.js';
 import { iconButton, plate, makeIcon, panel } from './ui.js';
 import { makeButton } from './Button.js';
 import { sfx } from '../audio.js';
-import { NAMES, checkCustomName } from '../names.js';
+import { NAMES, checkCustomName } from '../theme/cats/names.js';
 import {
   skinsOwned, selectedSkin, selectSkin, buySkin, coins,
   namesOwned, selectedName, selectName, buyName, customName, nameTokens, setCustomName, CUSTOM,
-} from '../save.js';
+} from '../core/save.js';
+import { STR } from '../theme/cats/strings.ru.js';
+import { PALETTE as PAL } from '../theme/cats/palette.js';
 
 // Окно коллекции, две вкладки внизу: «Окрасы» и «Клички».
 // Окрасы — сетка голов кота. Открытый — в цвете, с именем; выбранный — в золотой рамке с галочкой.
@@ -24,7 +26,7 @@ export function openCollection(scene, { onChange } = {}) {
   const parts = [];
   const close = () => parts.forEach((o) => o.destroy());
 
-  const shade = scene.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.6).setDepth(depth).setScrollFactor(0).setInteractive();
+  const shade = scene.add.rectangle(W / 2, H / 2, W, H, PAL.black, 0.6).setDepth(depth).setScrollFactor(0).setInteractive();
   shade.on('pointerdown', close);
   parts.push(shade);
   const box = scene.add.container(W / 2, H / 2 + V.offsetY).setDepth(depth).setScrollFactor(0);
@@ -34,30 +36,30 @@ export function openCollection(scene, { onChange } = {}) {
   box.add(panel(scene, pw + 20, ph + 20));
   // панель ловит тапы, чтобы они не закрывали окно
   box.add(scene.add.zone(0, 0, pw, ph).setInteractive());
-  box.add(plate(scene, 0, -ph / 2 + 4, 'Коллекция', { depth: 0, color: 0x4b33a8 }).setScale(1.2));
+  box.add(plate(scene, 0, -ph / 2 + 4, STR.collection, { depth: 0, color: PAL.plate }).setScale(1.2));
   box.add(iconButton(scene, pw / 2 - 26, -ph / 2 + 4, 'close', close, { size: 84, shape: 'round', color: CONFIG.ui.exitColor, depth: 0 }));
 
   let tab = 'skins';
   let page = 0;
   let grid = null;
-  const text = (x, y, s, size, color = '#ffffff') => scene.add.text(x, y, s, {
-    fontFamily: font, fontStyle: 'bold', fontSize: `${size}px`, color, stroke: '#2b1a66', strokeThickness: Math.round(size / 4.5),
+  const text = (x, y, s, size, color = PAL.text) => scene.add.text(x, y, s, {
+    fontFamily: font, fontStyle: 'bold', fontSize: `${size}px`, color, stroke: PAL.textStroke, strokeThickness: Math.round(size / 4.5),
   }).setOrigin(0.5);
   const check = (x, y) => {
     const ok = scene.add.graphics();
-    ok.fillStyle(0x43c43a, 1).fillCircle(x, y, 18);
-    ok.lineStyle(5, 0xffffff, 1).beginPath().moveTo(x - 9, y).lineTo(x - 2, y + 7).lineTo(x + 10, y - 7).strokePath();
+    ok.fillStyle(PAL.okGreen, 1).fillCircle(x, y, 18);
+    ok.lineStyle(5, PAL.white, 1).beginPath().moveTo(x - 9, y).lineTo(x - 2, y + 7).lineTo(x + 10, y - 7).strokePath();
     return ok;
   };
   const cell = (x, y, cw, ch, color, alpha, selected) => {
     const cg = scene.add.graphics();
-    cg.fillStyle(0x000000, 0.25).fillRoundedRect(x - cw / 2 + 3, y - ch / 2 + 6, cw, ch, 20);
+    cg.fillStyle(PAL.black, 0.25).fillRoundedRect(x - cw / 2 + 3, y - ch / 2 + 6, cw, ch, 20);
     cg.fillStyle(color, alpha).fillRoundedRect(x - cw / 2, y - ch / 2, cw, ch, 20);
-    if (selected) cg.lineStyle(6, 0xffc83d, 1).strokeRoundedRect(x - cw / 2, y - ch / 2, cw, ch, 20);
+    if (selected) cg.lineStyle(6, PAL.goldLight, 1).strokeRoundedRect(x - cw / 2, y - ch / 2, cw, ch, 20);
     return cg;
   };
   const priceLabel = (x, y, price) => {
-    const t = text(x + 14, y, String(price), 22, '#ffe066');
+    const t = text(x + 14, y, String(price), 22, PAL.textGold);
     return [t, makeIcon(scene, 'coin', 30).setPosition(x + 14 - t.width / 2 - 18, y)];
   };
 
@@ -73,15 +75,15 @@ export function openCollection(scene, { onChange } = {}) {
       const have = owned.includes(k.id);
       const cw = V.cellW - 14;
       const ch = V.cellH - 14;
-      grid.add(cell(x, y, cw, ch, have ? 0x6d52e8 : 0x3b27a0, 1, k.id === cur));
+      grid.add(cell(x, y, cw, ch, have ? PAL.panelLight : PAL.deep, 1, k.id === cur));
       const head = scene.add.image(x, y - 14, `cat_${k.file}_head`);
       head.setScale(V.head / Math.max(head.width, head.height));
-      if (!have) head.setTint(0x1b1033).setAlpha(0.75); // силуэт
+      if (!have) head.setTint(PAL.silhouette).setAlpha(0.75); // силуэт
       grid.add(head);
       const ly = y + ch / 2 - 24;
       if (have) grid.add(text(x, ly, k.name, 22));
       else if (k.price) grid.add(priceLabel(x - 14, ly, k.price));
-      else grid.add(text(x, ly, k.catLevel ? `Ур. кота ${k.catLevel}` : 'Сундук', 22, '#c9b8ff'));
+      else grid.add(text(x, ly, k.catLevel ? STR.catLevelShort(k.catLevel) : STR.chest, 22, PAL.textMuted));
       if (k.id === cur) grid.add(check(x + cw / 2 - 18, y - ch / 2 + 18));
       const zone = scene.add.zone(x, y, cw, ch).setInteractive();
       zone.on('pointerdown', () => tapSkin(k, have));
@@ -98,12 +100,12 @@ export function openCollection(scene, { onChange } = {}) {
       return draw();
     }
     if (k.price) {
-      return offerBuy(k.name, `Купить окрас за ${k.price} монет?`, k.price, () => buySkin(k.id) && selectSkin(k.id));
+      return offerBuy(k.name, STR.buySkinQ(k.price), k.price, () => buySkin(k.id) && selectSkin(k.id));
     }
     showPopup(scene, {
       title: k.name,
-      text: k.catLevel ? `Откроется на ${k.catLevel} уровне кота` : 'Выпадает только из сундуков',
-      buttons: [{ label: 'Понятно' }],
+      text: k.catLevel ? STR.unlocksAtCatLevel(k.catLevel) : STR.chestOnly,
+      buttons: [{ label: STR.ok }],
     });
   };
 
@@ -111,7 +113,7 @@ export function openCollection(scene, { onChange } = {}) {
   // своя кличка (есть или можно придумать) — первой клеткой, потом весь список
   const nameItems = () => {
     const list = NAMES.map((n) => ({ ...n }));
-    if (customName() || nameTokens() > 0) list.unshift({ id: CUSTOM, name: customName() || 'Придумать кличку', rarity: 'legendary', custom: true });
+    if (customName() || nameTokens() > 0) list.unshift({ id: CUSTOM, name: customName() || STR.inventName, rarity: 'legendary', custom: true });
     return list;
   };
 
@@ -134,10 +136,10 @@ export function openCollection(scene, { onChange } = {}) {
       if (have) grid.add(text(x, y, n.name, 26));
       else if (n.custom) grid.add(text(x, y, `✎ ${n.name} (${nameTokens()})`, 24));
       else {
-        grid.add(text(x, y - 13, n.name, 22, '#e0d6ff'));
+        grid.add(text(x, y - 13, n.name, 22, PAL.textLocked));
         const price = !n.catLevel && CONFIG.names.price[n.rarity];
         if (price) grid.add(priceLabel(x - 14, y + 16, price));
-        else grid.add(text(x, y + 16, n.catLevel ? `Ур. кота ${n.catLevel}` : 'Сундук', 18, '#c9b8ff'));
+        else grid.add(text(x, y + 16, n.catLevel ? STR.catLevelShort(n.catLevel) : STR.chest, 18, PAL.textMuted));
       }
       if (n.id === cur) grid.add(check(x + cw / 2 - 20, y - ch / 2 + 16));
       const zone = scene.add.zone(x, y, cw, ch).setInteractive();
@@ -171,11 +173,11 @@ export function openCollection(scene, { onChange } = {}) {
       return draw();
     }
     const price = !n.catLevel && CONFIG.names.price[n.rarity];
-    if (price) return offerBuy(n.name, `Купить кличку за ${price} монет?`, price, () => buyName(n.id) && selectName(n.id));
+    if (price) return offerBuy(n.name, STR.buyNameQ(price), price, () => buyName(n.id) && selectName(n.id));
     showPopup(scene, {
       title: n.name,
-      text: n.catLevel ? `Откроется на ${n.catLevel} уровне кота` : 'Легендарная кличка — только из сундуков',
-      buttons: [{ label: 'Понятно' }],
+      text: n.catLevel ? STR.unlocksAtCatLevel(n.catLevel) : STR.legendaryChestOnly,
+      buttons: [{ label: STR.ok }],
     });
   };
 
@@ -183,10 +185,10 @@ export function openCollection(scene, { onChange } = {}) {
   const offerBuy = (title, question, price, buy) => {
     showPopup(scene, {
       title,
-      text: `${question}\nМонет: ${coins()}`,
+      text: `${question}\n${STR.coinsLeft(coins())}`,
       buttons: [
         {
-          label: 'Купить', color: 0x4caf50, disabled: coins() < price,
+          label: STR.buy, color: PAL.buyGreen, disabled: coins() < price,
           onTap: () => {
             if (!buy()) return;
             sfx(scene, 'sfx_coins', CONFIG.audio.coins);
@@ -194,7 +196,7 @@ export function openCollection(scene, { onChange } = {}) {
             draw();
           },
         },
-        { label: 'Не надо' },
+        { label: STR.noThanks },
       ],
     });
   };
@@ -206,9 +208,9 @@ export function openCollection(scene, { onChange } = {}) {
     if (tab === 'skins') drawSkins();
     else drawNames();
     // вкладки внизу: выбранная — жёлтая
-    [['skins', 'Окрасы', -150], ['names', 'Клички', 150]].forEach(([key, label, x]) => {
+    [['skins', STR.tabSkins, -150], ['names', STR.tabNames, 150]].forEach(([key, label, x]) => {
       grid.add(makeButton(scene, x, ph / 2 - 52, label, () => { if (tab !== key) { tab = key; page = 0; draw(); } }, {
-        w: 260, h: 74, size: 34, color: tab === key ? 0xf5b301 : 0x4b33a8,
+        w: 260, h: 74, size: 34, color: tab === key ? PAL.gold : PAL.plate,
       }));
     });
   };
@@ -229,21 +231,21 @@ function promptName(scene, onOk) {
   const k = rect.width / W;
   const input = document.createElement('input');
   input.maxLength = 16;
-  input.placeholder = 'Кличка';
+  input.placeholder = STR.nameLabel;
   Object.assign(input.style, {
     position: 'fixed', left: `${rect.left + (W / 2 - 220) * k}px`, top: `${rect.top + (H / 2 - 125) * k}px`, // над строкой текста окна — туда пишется ошибка
     width: `${440 * k}px`, height: `${64 * k}px`, fontSize: `${30 * k}px`, textAlign: 'center',
     borderRadius: `${20 * k}px`, border: `${4 * k}px solid #8f6be8`, outline: 'none', zIndex: 10,
-    fontFamily: `"${CONFIG.font}", sans-serif`, fontWeight: 'bold', color: '#3b2a55', background: '#fff3e0',
+    fontFamily: `"${CONFIG.font}", sans-serif`, fontWeight: 'bold', color: PAL.textStrokeSoft, background: PAL.inputBg,
   });
   document.body.appendChild(input);
   setTimeout(() => input.focus(), 50);
   const popup = showPopup(scene, {
-    title: 'Своя кличка',
+    title: STR.customNameTitle,
     text: '\n\n',
     buttons: [
       {
-        label: 'Готово', color: 0x4caf50, keep: true,
+        label: STR.done, color: PAL.buyGreen, keep: true,
         onTap: () => {
           const s = input.value.trim().replace(/\s+/g, ' ');
           const err = checkCustomName(s);
@@ -254,7 +256,7 @@ function promptName(scene, onOk) {
           onOk(s);
         },
       },
-      { label: 'Отмена' },
+      { label: STR.cancel },
     ],
   });
   // окно закрыли (отмена, тап мимо) — убрать и поле

@@ -1,6 +1,6 @@
 // Отрисовка корма, когтеточки, света и частиц: где есть картинки из src/assets — спрайты, где нет — фигуры Phaser.Graphics.
 import * as Phaser from 'phaser';
-import { CONFIG } from '../config.js';
+import { CONFIG } from '../../config.js';
 
 // Значок формы корма с центром в (0, 0), s — «радиус».
 function drawShape(g, shape, s) {

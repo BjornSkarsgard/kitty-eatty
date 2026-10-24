@@ -1,18 +1,18 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { Board } from '../core/Board.js';
-import { makePortion, makeFxTextures, makeJuteWrap, makePortionHalo, makeSoftTexture } from '../view/draw.js';
-import { beatPulse, beatPhase } from '../beat.js';
-import { CatView } from '../view/CatView.js';
-import { makeButton } from '../view/Button.js';
-import { sfx, sfxRandom, music } from '../audio.js';
-import { currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo, catNeed, lives, loseLife } from '../save.js';
+import { CatsLevel } from '../theme/cats/kitchen.js';
+import { beatPulse } from '../beat.js';
+import { sfx, music } from '../audio.js';
+import { currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo, lives, loseLife } from '../core/save.js';
 import { confirmLife, showNoLives } from '../view/lives.js';
-import { NAMES } from '../names.js';
+import { showWinPopup } from '../view/WinPopup.js';
 import { showPopup } from '../view/Popup.js';
-import { iconButton, counterPill, plate, tray, makeIcon, panel } from '../view/ui.js';
+import { iconButton, counterPill, plate, tray } from '../view/ui.js';
 import { addSettingsMenu } from '../view/settings.js';
-import LEVELS from '../levels/levels.json';
+import { LEVELS } from '../core/levels.js';
+import { STR } from '../theme/cats/strings.ru.js';
+import { PALETTE as PAL } from '../theme/cats/palette.js';
 
 const L = CONFIG.layout;
 
@@ -45,35 +45,22 @@ export class GameScene extends Phaser.Scene {
     this.moved = false; // был ли ход — тогда «Заново» и выход сжигают жизнь
     this.pulsing = new Set(); // порции, которые пульсируют в такт музыке
     this.glass = null;
-    this.lastFeedMeow = -Infinity;
-    // Порядок хрустов на уровень, например 2 1 3: каждый кот берёт следующий, по кругу (2 1 3 2 1 …)
-    this.chewOrder = Phaser.Utils.Array.Shuffle([1, 2, 3]);
-    this.chewNext = 0;
-
-    if (this.textures.exists('bg_game')) {
-      const bg = this.add.image(CONFIG.width / 2, CONFIG.height / 2, 'bg_game');
-      bg.setScale(Math.max(CONFIG.width / bg.width, CONFIG.height / bg.height));
-      // за краями экрана — зеркальные продолжения кухни: видны, только пока уровень маленький в проёме двери холла
-      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-        this.add.image(bg.x + dx * bg.displayWidth, bg.y + dy * bg.displayHeight, 'bg_game')
-          .setScale(bg.scaleX, bg.scaleY).setFlip(dx !== 0, dy !== 0);
-      }
-      this.createWallPaws(bg);
-    }
-    makeFxTextures(this);
+    // всё про котиков — фон кухни, банки, корм, коты, кормление — в теме (src/theme/cats/kitchen.js)
+    this.theme = new CatsLevel(this);
+    this.theme.createBackground();
     this.createEffects();
     music(this, 'music_game');
 
     // верхняя полоса: монеты, табличка уровня (у головоломки — сиреневая), настройки
     const U = CONFIG.ui;
     this.coinPill = counterPill(this, 30 + U.pillWidth / 2, U.topY, 'coin', coins());
-    plate(this, CONFIG.width / 2, U.topY, `Уровень ${level.id}`, { color: level.puzzle ? 0x6b2fa8 : undefined });
+    plate(this, CONFIG.width / 2, U.topY, STR.level(level.id), { color: level.puzzle ? PAL.platePuzzle : undefined });
     addSettingsMenu(this, { onExit: () => this.leave() });
 
     this.layoutBowls();
     this.createBowls();
     this.createPortions();
-    this.createCats();
+    this.theme.createCats(this.board);
     this.createButtons();
     if (this.behindDoor) {
       this.scene.moveBelow('Room'); // виден только в проёме двери, холл — сверху
@@ -84,7 +71,7 @@ export class GameScene extends Phaser.Scene {
   // Выход из уровня: если уровень начат и не пройден — сначала предупреждение, что сгорит жизнь.
   leave() {
     if (this.won || !this.moved || lives() <= 0) return this.goHome();
-    confirmLife(this, 'Выйти из уровня?', () => { loseLife(); this.goHome(); });
+    confirmLife(this, STR.leaveTitle, () => { loseLife(); this.goHome(); });
   }
 
   // «Заново»: начатый уровень — за жизнь (с предупреждением); жизней нет — окно «Жизни кончились».
@@ -92,7 +79,7 @@ export class GameScene extends Phaser.Scene {
     const again = () => this.scene.restart({ levelIndex: this.levelIndex });
     if (!this.moved) return again();
     if (lives() <= 0) return showNoLives(this);
-    confirmLife(this, 'Начать заново?', () => { loseLife(); again(); });
+    confirmLife(this, STR.restartTitle, () => { loseLife(); again(); });
   }
 
   // Домой: холл запускается поверх уровня у открытой двери кухни, сам уводит камеру назад, закрывает дверь
@@ -103,48 +90,6 @@ export class GameScene extends Phaser.Scene {
     this.scene.launch('Room', { fromKitchen: true });
   }
 
-  // Лапки на обоях: штамп paw.png ровной сеткой по стене (ряды через dy, соседние сдвинуты на полшага dx).
-  // Каждая — тёмный отпечаток и поверх него светлый слой, который в разнобой плавно проявляется и гаснет
-  // (не больше glow.max за раз; это эффект — без fx.enabled только отпечатки).
-  createWallPaws(bg) {
-    const P = CONFIG.wallPaws;
-    if (!this.textures.exists('paw')) return;
-    const s = bg.scaleX;
-    const src = bg.texture.getSourceImage();
-    const toScreen = (x, y) => ({ x: bg.x + (x - src.width / 2) * s, y: bg.y + (y - src.height / 2) * s });
-    const scale = (P.size * s) / this.textures.get('paw').getSourceImage().width;
-    const half = P.size / 2;
-    const lit = [];
-    for (let k = Math.ceil((P.top + half - P.y0) / P.dy); P.y0 + k * P.dy <= P.bottom - half; k++) {
-      const y = P.y0 + k * P.dy;
-      const shift = Math.abs(k) % 2 ? P.dx / 2 : 0;
-      // по краям лапки могут уходить за экран наполовину, как обрезанный рисунок обоев
-      for (let x = P.x0 + shift - Math.floor((P.x0 + shift + half) / P.dx) * P.dx; x <= src.width + half; x += P.dx) {
-        const pos = toScreen(x, y);
-        this.add.image(pos.x, pos.y, 'paw').setScale(scale).setTint(P.color).setAlpha(P.alpha);
-        lit.push(this.add.image(pos.x, pos.y, 'paw').setScale(scale).setTint(P.glow.color).setAlpha(0));
-      }
-    }
-    if (!CONFIG.fx.enabled) return;
-    const G = P.glow;
-    let active = 0;
-    const next = () => {
-      const idle = lit.filter((p) => !p.glowing);
-      if (active < G.max && idle.length) {
-        const p = Phaser.Utils.Array.GetRandom(idle);
-        p.glowing = true;
-        active++;
-        this.tweens.add({
-          targets: p, alpha: Phaser.Math.FloatBetween(...G.alpha), duration: G.fade, hold: G.hold,
-          yoyo: true, ease: 'Sine.easeInOut',
-          onComplete: () => { p.glowing = false; active--; },
-        });
-      }
-      this.time.delayedCall(Phaser.Math.Between(...G.gap), next);
-    };
-    next();
-  }
-
   // ---------- раскладка ----------
 
   // Подбираем число рядов так, чтобы банки были как можно крупнее, и масштабируем размеры под экран.
@@ -152,8 +97,8 @@ export class GameScene extends Phaser.Scene {
   // bowlRects: top — верх стенок (горлышко выше него), bottom — низ донышка (стоит на столе).
   layoutBowls() {
     const n = this.board.bowls.length;
-    const tex = this.textures.get('jar_back').getSourceImage();
-    const art = CONFIG.jar.art;
+    const art = this.theme.jarArt();
+    const tex = art; // width / height картинки банки
     const neck = (bw) => (art.top * bw) / tex.width;
     const base = (bw) => ((tex.height - art.bottom) * bw) / tex.width;
     const floor = (bw) => ((tex.height - art.floor) * bw) / tex.width;
@@ -211,20 +156,11 @@ export class GameScene extends Phaser.Scene {
 
   // ---------- создание объектов ----------
 
+  // Банка — от темы: стекло сзади (под кормом) и спереди (над ним).
   createBowls() {
-    // Банка из двух картинок: jar_back (стекло, тёмное нутро) под кормом, jar_front (горлышко, донышко, блики) над ним.
-    for (const key of ['jar_back', 'jar_front']) {
-      const tex = this.textures.get(key);
-      if (tex.has('top')) continue;
-      const { width: W, height: H } = tex.getSourceImage();
-      const { top, bottom } = CONFIG.jar.art;
-      tex.add('top', 0, 0, 0, W, top);
-      tex.add('mid', 0, 0, top, W, bottom - top);
-      tex.add('bot', 0, 0, bottom, W, H - bottom);
-    }
-    this.jarBack = this.bowlRects.map((r) => this.makeJar('jar_back', r).setDepth(0));
-    this.jarFront = this.bowlRects.map((r) => this.makeJar('jar_front', r).setDepth(1));
-    this.wraps = this.bowlRects.map(() => null); // обмотка-когтеточка съеденной банки
+    const jars = this.bowlRects.map((r) => this.theme.createJar(r, this.dim));
+    this.jarBack = jars.map((j) => j.back.setDepth(0));
+    this.jarFront = jars.map((j) => j.front.setDepth(1));
     this.bowlRects.forEach((r, i) => {
       const zone = this.add.zone(r.x, (r.top - this.dim.neck + r.bottom) / 2, this.dim.bw + this.dim.gx * 0.9,
         r.bottom - r.top + this.dim.neck + this.dim.gy * 0.9).setInteractive();
@@ -232,44 +168,15 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  // Банка из трёх кусков картинки: горлышко и донышко как есть, стенки растянуты по высоте.
-  makeJar(key, r) {
-    const { k, neck, base } = this.dim;
-    const top = this.add.image(0, r.top - neck, key, 'top').setOrigin(0.5, 0).setScale(k);
-    const mid = this.add.image(0, r.top, key, 'mid').setOrigin(0.5, 0).setScale(k);
-    mid.setDisplaySize(mid.displayWidth, r.bottom - base - r.top);
-    const bot = this.add.image(0, r.bottom - base, key, 'bot').setOrigin(0.5, 0).setScale(k);
-    return this.add.container(r.x, 0, [top, mid, bot]);
-  }
-
   createPortions() {
-    const w = this.dim.bw - CONFIG.jar.art.edge * 2 * this.dim.k - 2;
+    const w = this.dim.bw - this.theme.jarArt().edge * 2 * this.dim.k - 2;
     const h = this.dim.ph - 4 * this.dim.scale;
     this.portions = this.board.bowls.map((bowl, i) => bowl.map((color, slot) => {
-      const p = makePortion(this, color, w, h);
+      const p = this.theme.createPortion(color, w, h);
       const pos = this.slotPos(i, slot);
       p.setPosition(pos.x, pos.y);
       return p;
     }));
-  }
-
-  createCats() {
-    const colors = new Set(this.board.bowls.flat());
-    const n = Math.max(...colors) + 1;
-    const spacing = Math.min(L.catSpacing, (CONFIG.width - 60) / n);
-    const x0 = CONFIG.width / 2 - ((n - 1) * spacing) / 2;
-    this.cats = [];
-    for (let c = 0; c < n; c++) {
-      const scale = Math.min(1, spacing / L.catSpacing);
-      const cat = new CatView(this, x0 + c * spacing, L.catsFloorY - CONFIG.cat.origin[2] * scale, c);
-      cat.setDepth(10).setBaseScale(scale).startIdle();
-      cat.home = { x: cat.x, y: cat.y };
-      cat.fedBowl = null;
-      // тап по коту — случайная реакция (только если сидит на месте)
-      cat.setInteractive(new Phaser.Geom.Rectangle(-55, -75, 110, 145), Phaser.Geom.Rectangle.Contains);
-      cat.on('pointerdown', () => cat.poke());
-      this.cats.push(cat);
-    }
   }
 
   // Лоток внизу — игровые действия: отмена (с бейджем — сколько осталось), заново; на этапе 6 — «+1 банка».
@@ -318,7 +225,7 @@ export class GameScene extends Phaser.Scene {
 
   // Сдвинуть банку по вертикали вместе с кормом и обмоткой (dy = 0 — на место).
   liftJar(i, dy, ease = 'Quad.easeOut') {
-    const layers = [this.jarBack[i], this.jarFront[i], this.wraps[i]].filter(Boolean);
+    const layers = [this.jarBack[i], this.jarFront[i], ...this.theme.jarExtras(i)];
     this.tweens.killTweensOf(layers);
     this.tweens.add({ targets: layers, y: dy, duration: A.liftDuration, ease });
     this.portions[i].forEach((p, slot) => {
@@ -332,7 +239,7 @@ export class GameScene extends Phaser.Scene {
   // Порция из выбранной серии пульсирует в такт музыке (update): чуть увеличивается, вокруг — золотой ореол.
   pulse(p) {
     this.pulsing.add(p);
-    if (CONFIG.fx.enabled && !p.halo) p.halo = makePortionHalo(this, p, CONFIG.fx.selectGlow, this.dim.bw - 2);
+    if (CONFIG.fx.enabled && !p.halo) p.halo = this.theme.portionHalo(p, CONFIG.fx.selectGlow, this.dim.bw - 2);
   }
 
   stopPulse(p) {
@@ -348,14 +255,14 @@ export class GameScene extends Phaser.Scene {
   glassGlow(i) {
     this.clearGlassGlow();
     if (!CONFIG.fx.enabled) return;
-    makeSoftTexture(this);
+    const soft = this.theme.softTexture();
     const run = this.portions[i].slice(-this.board.topRun(i));
     const ys = run.map((p) => p.y);
     const d = this.dim;
-    const w = d.bw - CONFIG.jar.art.edge * 2 * d.k;
+    const w = d.bw - this.theme.jarArt().edge * 2 * d.k;
     const h = Math.max(...ys) - Math.min(...ys) + d.ph * 1.6;
     const y = (Math.max(...ys) + Math.min(...ys)) / 2 - A.liftY * d.scale;
-    this.glass = this.add.image(this.bowlRects[i].x, y, 'fx_soft').setDisplaySize(w, h).setDepth(2)
+    this.glass = this.add.image(this.bowlRects[i].x, y, soft).setDisplaySize(w, h).setDepth(2)
       .setTint(CONFIG.fx.selectGlow).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
   }
 
@@ -374,8 +281,7 @@ export class GameScene extends Phaser.Scene {
       }
       if (this.glass) this.glass.setAlpha(env * CONFIG.fx.glassAlpha);
     }
-    const breath = beatPhase(this, A.idleBreathBeats);
-    this.cats.forEach((cat, k) => cat.breathe(breath + (k % 2) * 0.5));
+    this.theme.update();
   }
 
   deselect() {
@@ -394,7 +300,7 @@ export class GameScene extends Phaser.Scene {
 
   shake(i) {
     sfx(this, 'sfx_invalid');
-    const layers = [this.jarBack[i], this.jarFront[i], this.wraps[i]].filter(Boolean);
+    const layers = [this.jarBack[i], this.jarFront[i], ...this.theme.jarExtras(i)];
     const x = this.bowlRects[i].x;
     this.tweens.killTweensOf(layers);
     layers.forEach((l) => { l.x = x; });
@@ -418,7 +324,7 @@ export class GameScene extends Phaser.Scene {
     this.settleBowl(from); // если серия влезла не вся — остаток опускается обратно
 
     if (this.board.isComplete(to)) {
-      this.feed(this.board.bowls[to][0], to);
+      this.theme.jarComplete(to, this.board.bowls[to][0]);
     }
     if (this.board.isSolved()) {
       this.won = true;
@@ -442,7 +348,7 @@ export class GameScene extends Phaser.Scene {
     if (!spendUndo()) return this.offerUndo();
     this.refreshUndo();
     sfx(this, 'sfx_undo', CONFIG.audio.undo);
-    if (this.board.isComplete(last.to)) this.unfeed(this.board.bowls[last.to][0]);
+    if (this.board.isComplete(last.to)) this.theme.jarUndone(this.board.bowls[last.to][0]);
 
     const startSlot = this.portions[last.from].length;
     const rec = this.board.undo();
@@ -480,18 +386,11 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  // ---------- коты ----------
+  // ---------- эффекты ----------
 
+  // Звёздочки (собранная банка, звёзды победы) и конфетти; текстуры — от темы (createBackground).
   createEffects() {
     const fx = (key, cfg) => this.add.particles(0, 0, key, { emitting: false, ...cfg }).setDepth(12);
-    this.fxCrumbs = fx('fx_dot', {
-      speed: { min: 90, max: 240 }, angle: { min: 200, max: 340 }, gravityY: 900,
-      lifespan: 650, scale: { start: 0.8, end: 0.25 }, alpha: { start: 1, end: 0 },
-    });
-    this.fxHearts = fx('fx_heart', {
-      speedX: { min: -60, max: 60 }, speedY: { min: -170, max: -90 }, gravityY: -30,
-      lifespan: 1200, scale: { start: 0.7, end: 1.2 }, alpha: { start: 1, end: 0 },
-    });
     this.fxStars = fx('fx_star', {
       speed: { min: 120, max: 280 }, lifespan: 500, scale: { start: 0.8, end: 0 },
       rotate: { min: 0, max: 360 }, tint: CONFIG.bowlDoneStroke,
@@ -503,367 +402,36 @@ export class GameScene extends Phaser.Scene {
     }).setDepth(22);
   }
 
-  // Банка собрана: кот мяукает, прыгает к банке, ест (голова ныряет, крошки, хруст),
-  // радуется (сердечки) и прыгает обратно. Ввод всё это время не блокируется.
-  feed(color, bowl) {
-    const cat = this.cats[color];
-    const r = this.bowlRects[bowl];
-    cat.fedBowl = bowl;
-    cat.stopActions().setMood('open');
-
-    sfx(this, 'sfx_complete');
-    const mouthY = this.mouthY(bowl);
-    this.fxStars.explode(10, r.x, mouthY);
-    // в конце уровня банки собираются одна за другой — мяукает только первый кот, остальные молча
-    if (this.time.now - this.lastFeedMeow >= CONFIG.audio.feedMeowCooldown) {
-      this.lastFeedMeow = this.time.now;
-      cat.meow();
-    }
-    cat.disableInteractive(); // пока кот у банки, он не перехватывает тапы по соседним банкам
-
-    const eatY = mouthY - A.catEatOffsetY * cat.baseScale;
-    cat.walkTo(r.x, eatY, () => {
-      cat.setMood('happy');
-      const food = this.portions[bowl].slice().reverse(); // сверху вниз
-      cat.eat(food.length, (k) => {
-        if (k === 0) sfx(this, `sfx_chew_${this.chewOrder[this.chewNext++ % this.chewOrder.length]}`, 0.8);
-        // порция подлетает ко рту и исчезает
-        cat.track(this.tweens.add({
-          targets: food[k], y: mouthY, scale: 0, alpha: 0, duration: A.eatPerPortion * 0.5, ease: 'Back.easeIn',
-        }));
-        this.fxCrumbs.setParticleTint(CONFIG.colors[color].fill);
-        this.fxCrumbs.explode(A.crumbs, r.x, mouthY);
-      }, () => {
-        sfxRandom(this, 'sfx_purr', 3);
-        this.wrapJar(bowl, color);
-        this.fxHearts.explode(A.hearts, cat.x, cat.y - 60 * cat.baseScale);
-        cat.track(this.time.delayedCall(A.catReturnDelay, () => cat.walkTo(cat.home.x, cat.home.y, () => cat.setInteractive())));
-      });
-    });
-  }
-
-  // Отмена хода «разобрала» банку: кот бросает есть и, ворча, возвращается. Корм на место.
-  unfeed(color) {
-    const cat = this.cats[color];
-    if (cat.fedBowl === null) return;
-    const bowl = cat.fedBowl;
-    cat.fedBowl = null;
-    cat.stopActions().setMood('grumpy');
-    this.portions[bowl].forEach((p) => {
-      this.tweens.killTweensOf(p);
-      p.setScale(1).setAlpha(1);
-    });
-    this.unwrapJar(bowl);
-    cat.walkTo(cat.home.x, cat.home.y, () => cat.setMood('open').setInteractive());
-  }
-
-  // Банку снизу вверх обматывает джутовая верёвка цвета корма, затем выскакивает картинка корма.
-  wrapJar(bowl, color) {
-    this.unwrapJar(bowl, true);
-    const J = CONFIG.jute;
-    const r = this.bowlRects[bowl];
-    const top = r.top;
-    const bottom = r.bottom - this.dim.base;
-    const wrap = makeJuteWrap(this, color, this.dim.bw, top, bottom, `jute_anim_${bowl}`).setPosition(r.x, 0).setDepth(2);
-    this.wraps[bowl] = wrap;
-    wrap.reveal(0);
-    wrap.t = 0;
-    const wrapTime = J.coilDuration * wrap.coils;
-    this.tweens.add({ targets: wrap, t: 1, duration: wrapTime, onUpdate: () => wrap.reveal(wrap.t) });
-    wrap.icon.setScale(0);
-    this.tweens.add({ targets: wrap.icon, scale: wrap.iconScale, delay: wrapTime, duration: J.iconDuration, ease: 'Back.easeOut' });
-  }
-
-  unwrapJar(bowl, instant = false) {
-    const wrap = this.wraps[bowl];
-    if (!wrap) return;
-    this.wraps[bowl] = null;
-    const parts = [wrap.rope, wrap.icon];
-    this.tweens.killTweensOf(parts);
-    this.tweens.killTweensOf(wrap);
-    if (instant) return wrap.destroy();
-    this.tweens.add({ targets: wrap, alpha: 0, duration: CONFIG.jute.unwrapDuration, onComplete: () => wrap.destroy() });
-  }
-
   offerUndo() {
     const price = CONFIG.economy.undoPrice;
     const buttons = [{
-      label: `Купить за ${price} монет`, color: 0x4caf50, disabled: coins() < price,
+      label: STR.buyFor(price), color: PAL.buyGreen, disabled: coins() < price,
       onTap: () => { if (buyUndo()) { sfx(this, 'sfx_coins', CONFIG.audio.coins); this.refreshUndo(); this.undo(); } },
     }];
-    if (CONFIG.ads.enabled) buttons.push({ label: 'Смотреть рекламу', color: 0xf0a020, onTap: () => {} }); // этап 6
-    buttons.push({ label: 'Не надо' });
-    showPopup(this, { title: 'Отмены кончились', text: `Монет: ${coins()}`, buttons });
+    if (CONFIG.ads.enabled) buttons.push({ label: STR.watchAd, color: PAL.adOrange, onTap: () => {} }); // этап 6
+    buttons.push({ label: STR.noThanks });
+    showPopup(this, { title: STR.noUndosTitle, text: STR.coinsLeft(coins()), buttons });
   }
 
   // ---------- победа ----------
 
-  // Окно победы (как в референсе): панель с табличкой «Уровень N» и крестиком, звёзды, похвала по звёздам,
-  // число ходов, «Награды:» на подставке, зелёная «Продолжить». Крестик — домой.
+  // Записать победу и показать окно победы (src/view/WinPopup.js); новые уровни кота — окнами поверх.
   showWin() {
     const W = CONFIG.width;
     const H = CONFIG.height;
-    const WC = CONFIG.win;
     sfx(this, 'music_win');
     const level = LEVELS[this.levelIndex];
     const reward = recordWin(level, this.levelIndex, this.board.history.length, LEVELS.length);
     this.refreshUndo();
     for (let k = 0; k < 5; k++) this.fxConfetti.explode(Math.round(A.confetti / 5), W * (0.1 + k * 0.2), H);
     const isLast = this.levelIndex === LEVELS.length - 1;
-    const font = `"${CONFIG.font}", sans-serif`;
-    this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.6).setDepth(20).setInteractive();
-
-    // всё, кроме звёзд, — в одном контейнере, он «выпрыгивает»; звёзды появляются следом
-    const cy = H / 2 + WC.offsetY;
-    const box = this.add.container(W / 2, cy).setDepth(21);
-    const pw = WC.width;
-    const ph = WC.height;
-    box.add(panel(this, pw + 20, ph + 20));
-    const g = this.add.graphics();
-    g.fillStyle(0xffffff, 0.08).fillRoundedRect(-pw / 2 + 24, -ph / 2 + 24, pw - 48, ph * 0.43, 34); // светлее под звёздами
-    // подставка под награды
-    g.fillStyle(0x3b27a0, 1).fillEllipse(0, WC.rewardsY + 58, 380, 70);
-    g.fillStyle(0x4a33c0, 1).fillEllipse(0, WC.rewardsY + 46, 380, 64);
-    box.add(g);
-    box.add(plate(this, 0, -ph / 2 + 4, `Уровень ${level.id}`, { depth: 0, color: 0x4b33a8 }).setScale(1.25));
-
-    const praise = this.add.text(0, WC.praiseY, WC.praise[reward.stars - 1], {
-      fontFamily: font, fontStyle: 'bold', fontSize: '84px', stroke: '#7a3a00', strokeThickness: 14,
-      shadow: { offsetX: 0, offsetY: 6, color: '#4a2000', blur: 0, stroke: true, fill: true },
-    }).setOrigin(0.5);
-    const grad = praise.context.createLinearGradient(0, 0, 0, praise.height);
-    grad.addColorStop(0.25, '#fff3a0');
-    grad.addColorStop(0.75, '#ffa800');
-    praise.setFill(grad);
-    box.add(praise);
-
-    // ходы — на тёмной полоске, в стиле табличек окна
-    const moves = this.add.text(0, WC.movesY, `Ходов: ${this.board.history.length}  ·  минимум ${level.minMoves}`, {
-      fontFamily: font, fontStyle: 'bold', fontSize: '32px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 6,
-    }).setOrigin(0.5);
-    const mw = moves.width + 48;
-    const mg = this.add.graphics();
-    mg.fillStyle(0x3b27a0, 1).fillRoundedRect(-mw / 2, WC.movesY - 26, mw, 52, 26);
-    mg.lineStyle(3, 0x8f6be8, 1).strokeRoundedRect(-mw / 2, WC.movesY - 26, mw, 52, 26);
-    box.add([mg, moves]);
-
-    box.add(this.add.text(0, WC.rewardsY - 92, 'Награды:', {
-      fontFamily: font, fontStyle: 'bold', fontSize: '36px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 7,
-    }).setOrigin(0.5));
-    const items = [['coin', reward.coins], ['undo', reward.undos], ['chest', reward.chests]].filter(([, n]) => n > 0);
-    items.forEach(([icon, n], i) => {
-      const x = (i - (items.length - 1) / 2) * 170;
-      const plain = icon === 'coin' || icon === 'chest'; // свои картинки — без кружка под иконкой
-      const ic = makeIcon(this, icon, icon === 'chest' ? 118 : 104).setPosition(x, WC.rewardsY);
-      if (!plain) ic.setScale(ic.scale * 0.8);
-      box.add(plain ? ic : [this.add.circle(x, WC.rewardsY, 48, 0x7b5cf0), ic]);
-      box.add(this.add.text(x + 40, WC.rewardsY + 38, String(n), {
-        fontFamily: font, fontStyle: 'bold', fontSize: '50px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 9,
-      }).setOrigin(0.5));
-    });
-    if (!items.length) {
-      box.add(this.add.text(0, WC.rewardsY, 'Уровень уже пройден', {
-        fontFamily: font, fontStyle: 'bold', fontSize: '32px', color: '#d9cfff',
-      }).setOrigin(0.5));
-    }
-    const xpBar = this.xpBar(box, WC.xpY, reward);
-
-    // полоска опыта кота доезжает, когда звёзды отпрыгали; новые уровни кота — окном поверх
-    this.time.delayedCall(400 + reward.stars * CONFIG.stars.popDelay + 300, () => this.fillXpBar(xpBar, reward));
-
     // следующий уровень — только если есть жизни (иначе окно «Жизни кончились»; купил — сразу дальше)
     const go = () => this.scene.restart({ levelIndex: isLast ? 0 : this.levelIndex + 1 });
-    const next = () => (lives() > 0 ? go() : showNoLives(this, go));
-    box.add(makeButton(this, 0, WC.buttonY, isLast ? 'С начала' : 'Продолжить', next, { w: 380, h: 150, size: 50, skin: 'green' }));
-    box.add(iconButton(this, pw / 2 - 6, -ph / 2 + 4, 'close', () => this.leave(), {
-      size: 92, shape: 'round', color: CONFIG.ui.exitColor, depth: 0,
-    }));
-
-    box.setScale(0.5).setAlpha(0);
-    sfx(this, 'sfx_popup', CONFIG.audio.popup);
-    // монеты звенят, когда звёзды отпрыгали
-    if (reward.coins) this.time.delayedCall(400 + reward.stars * CONFIG.stars.popDelay + 200, () => sfx(this, 'sfx_coins', CONFIG.audio.coins));
-    this.tweens.add({ targets: box, scale: 1, alpha: 1, duration: 320, ease: 'Back.easeOut' });
-    this.showStars(box, WC.starsY, reward.stars);
-  }
-
-
-  // Три звезды в ряд внутри окна победы (box): сначала все пустые — выпрыгивают вместе с окном,
-  // потом заработанные по очереди заполняются со вспышкой. Картинки ui_star / ui_star_empty;
-  // пока их нет — растянутая искорка fx_star (пустая — бледная).
-  showStars(box, y, count) {
-    const S = CONFIG.stars;
-    const full = this.textures.exists('ui_star') ? 'ui_star' : 'fx_star';
-    const hasEmpty = this.textures.exists('ui_star_empty');
-    const fit = (img) => img.setScale(S.size / Math.max(img.width, img.height));
-    for (let i = 0; i < 3; i++) {
-      const sx = (i - 1) * (S.size + S.gap);
-      const sy = y + (i === 1 ? 0 : S.size * 0.12); // средняя чуть выше — дугой
-      box.add(fit(this.add.image(sx, sy, hasEmpty ? 'ui_star_empty' : full)).setAlpha(hasEmpty ? 1 : S.emptyAlpha));
-      if (i >= count) continue;
-      const star = fit(this.add.image(sx, sy, full));
-      box.add(star);
-      const target = star.scale;
-      star.setScale(0);
-      this.tweens.add({
-        targets: star, scale: target, duration: 380, ease: 'Back.easeOut', delay: 400 + i * S.popDelay,
-        onStart: () => sfx(this, 'sfx_star', CONFIG.audio.star, CONFIG.audio.starPitch[i]), // до — ми — соль
-        onComplete: () => this.fxStars.setDepth(23).explode(10, box.x + sx, box.y + sy),
-      });
-    }
-  }
-
-  // ---------- опыт кота ----------
-
-  // Полоска опыта в окне победы: слева кружок с уровнем кота, в полоске «опыт / нужно», справа сверху «+N опыта».
-  // Сначала показывает, каким кот был до победы; fillXpBar доводит.
-  xpBar(box, y, reward) {
-    const C = CONFIG.catXp;
-    const font = `"${CONFIG.font}", sans-serif`;
-    const w = C.barWidth;
-    const h = C.barHeight;
-    const x0 = -w / 2 + 30; // полоска чуть правее — слева кружок уровня
-    const track = this.add.graphics();
-    track.fillStyle(0x2b1a66, 1).fillRoundedRect(x0, y - h / 2, w, h, h / 2);
-    track.lineStyle(3, 0x8f6be8, 1).strokeRoundedRect(x0, y - h / 2, w, h, h / 2);
-    const fill = this.add.graphics();
-    const text = this.add.text(x0 + w / 2, y, '', {
-      fontFamily: font, fontStyle: 'bold', fontSize: '26px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 5,
-    }).setOrigin(0.5);
-    const badge = this.add.container(x0 - 6, y);
-    const bg = this.add.graphics();
-    bg.fillStyle(0xd48a00, 1).fillCircle(0, 4, 40);
-    bg.fillStyle(0xf5b301, 1).fillCircle(0, 0, 40);
-    bg.fillStyle(0xffffff, 0.3).fillEllipse(-10, -16, 34, 16);
-    const num = this.add.text(0, 2, '', {
-      fontFamily: font, fontStyle: 'bold', fontSize: '40px', color: '#ffffff', stroke: '#7a3a00', strokeThickness: 7,
-    }).setOrigin(0.5);
-    badge.add([bg, num]);
-    const gain = this.add.text(x0 + w, y - h / 2 - 22, reward.xp ? `+${reward.xp} опыта` : '', {
-      fontFamily: font, fontStyle: 'bold', fontSize: '28px', color: '#ffe066', stroke: '#2b1a66', strokeThickness: 6,
-    }).setOrigin(1, 0.5);
-    box.add([track, fill, text, badge, gain]);
-    const bar = {
-      level: reward.cat.level,
-      set: (level, xp) => {
-        const need = catNeed(level);
-        const k = Phaser.Math.Clamp(xp / need, 0, 1);
-        fill.clear();
-        if (k > 0) fill.fillStyle(0xffc83d, 1).fillRoundedRect(x0 + 4, y - h / 2 + 4, Math.max(h - 8, (w - 8) * k), h - 8, (h - 8) / 2);
-        if (k > 0) fill.fillStyle(0xffffff, 0.35).fillRoundedRect(x0 + 10, y - h / 2 + 7, Math.max(0, (w - 8) * k - 12), 6, 3);
-        text.setText(`${Math.floor(xp)} / ${need}`);
-        num.setText(String(level));
-      },
-      badge,
-    };
-    bar.set(reward.cat.level, reward.cat.xp);
-    return bar;
-  }
-
-  // Полоска доезжает до нового опыта; на каждом новом уровне кота — до конца, кружок подпрыгивает с новым числом,
-  // и с нуля дальше. Потом — окна «Новый уровень кота!» по очереди.
-  fillXpBar(bar, reward) {
-    const C = CONFIG.catXp;
-    if (!reward.xp) return;
-    const steps = []; // [уровень, от, до]
-    let level = reward.cat.level;
-    let from = reward.cat.xp;
-    let left = reward.xp;
-    while (left > 0) {
-      const room = catNeed(level) - from;
-      const take = Math.min(left, room);
-      steps.push([level, from, from + take]);
-      left -= take;
-      if (take === room) { level++; from = 0; } else from += take;
-    }
-    const run = (i) => {
-      if (i >= steps.length) return this.showCatLevelUps(reward.levelUps);
-      const [lv, a, b] = steps[i];
-      this.tweens.addCounter({
-        from: a, to: b, duration: C.barFillMs * Math.max(0.3, (b - a) / catNeed(lv)), ease: 'Cubic.easeOut',
-        onUpdate: (tw) => bar.set(lv, tw.getValue()),
-        onComplete: () => {
-          if (b < catNeed(lv)) return run(i + 1);
-          // новый уровень кота
-          sfx(this, 'sfx_star', CONFIG.audio.star, CONFIG.audio.starPitch[2]);
-          bar.set(lv + 1, 0);
-          this.tweens.add({ targets: bar.badge, scale: 1.35, duration: 140, yoyo: true, ease: 'Quad.easeOut' });
-          this.time.delayedCall(260, () => run(i + 1));
-        },
-      });
-    };
-    run(0);
-  }
-
-  // Окно «Новый уровень кота!»: кружок с номером, награды, «Забрать». Награды уже начислены при победе —
-  // здесь их только показываем и обновляем счётчик монет. Несколько уровней подряд — несколько окон по очереди.
-  showCatLevelUps(ups) {
-    const up = ups[0];
-    if (!up) return;
-    const W = CONFIG.width;
-    const H = CONFIG.height;
-    const font = `"${CONFIG.font}", sans-serif`;
-    const shade = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.45).setDepth(30).setInteractive();
-    const box = this.add.container(W / 2, H / 2).setDepth(31);
-    const pw = 520;
-    const ph = 560;
-    box.add(panel(this, pw + 20, ph + 20));
-    const g = this.add.graphics();
-    // большой кружок уровня
-    g.fillStyle(0xd48a00, 1).fillCircle(0, -70, 86);
-    g.fillStyle(0xf5b301, 1).fillCircle(0, -76, 86);
-    g.fillStyle(0xffffff, 0.3).fillEllipse(-24, -116, 70, 30);
-    box.add(g);
-    box.add(plate(this, 0, -ph / 2 + 4, 'Новый уровень кота!', { depth: 0, color: 0x4b33a8 }).setScale(1.1));
-    box.add(this.add.text(0, -72, String(up.level), {
-      fontFamily: font, fontStyle: 'bold', fontSize: '96px', color: '#ffffff', stroke: '#7a3a00', strokeThickness: 12,
-    }).setOrigin(0.5));
-    const items = [['coin', up.coins], ['undo', up.undos], ['skin', up.skin ? 1 : 0], ['chest', up.chest ? 1 : 0], ['name', up.name ? 1 : 0]].filter(([, n]) => n > 0);
-    items.forEach(([icon, n], i) => {
-      const x = (i - (items.length - 1) / 2) * 170;
-      if (icon === 'name') { // новая кличка: табличка цвета редкости
-        const nm = NAMES.find((x) => x.id === up.name);
-        const t = this.add.text(x, 80, nm.name, {
-          fontFamily: font, fontStyle: 'bold', fontSize: '26px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 6,
-        }).setOrigin(0.5);
-        const w = Math.max(130, t.width + 30);
-        const g2 = this.add.graphics();
-        g2.fillStyle(CONFIG.names.colors[nm.rarity], 1).fillRoundedRect(x - w / 2, 54, w, 52, 18);
-        g2.lineStyle(3, 0xffffff, 0.8).strokeRoundedRect(x - w / 2, 54, w, 52, 18);
-        box.add([g2, t, this.add.text(x, 128, 'Кличка', {
-          fontFamily: font, fontStyle: 'bold', fontSize: '22px', color: '#ffe066', stroke: '#2b1a66', strokeThickness: 5,
-        }).setOrigin(0.5)]);
-        return;
-      }
-      if (icon === 'skin') { // новый окрас: голова кота этого окраса и подпись
-        const k = CONFIG.skins.find((s) => s.id === up.skin);
-        const head = this.add.image(x, 76, `cat_${k.file}_head`);
-        head.setScale(110 / Math.max(head.width, head.height));
-        box.add([head, this.add.text(x, 128, k.name, {
-          fontFamily: font, fontStyle: 'bold', fontSize: '26px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 6,
-        }).setOrigin(0.5)]);
-        return;
-      }
-      const plain = icon === 'coin' || icon === 'chest';
-      const ic = makeIcon(this, icon, icon === 'chest' ? 108 : 92).setPosition(x, 80);
-      if (!plain) ic.setScale(ic.scale * 0.8);
-      box.add(plain ? ic : [this.add.circle(x, 80, 44, 0x7b5cf0), ic]);
-      box.add(this.add.text(x + 38, 114, String(n), {
-        fontFamily: font, fontStyle: 'bold', fontSize: '44px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 8,
-      }).setOrigin(0.5));
+    showWinPopup(this, {
+      level, moves: this.board.history.length, reward, isLast, fxStars: this.fxStars,
+      onNext: () => (lives() > 0 ? go() : showNoLives(this, go)),
+      onHome: () => this.leave(),
+      onTake: () => { this.coinPill.setValue(coins()); this.refreshUndo(); },
     });
-    const take = () => {
-      sfx(this, 'sfx_coins', CONFIG.audio.coins);
-      this.coinPill.setValue(coins());
-      this.refreshUndo();
-      shade.destroy();
-      box.destroy();
-      this.showCatLevelUps(ups.slice(1));
-    };
-    box.add(makeButton(this, 0, 205, 'Забрать', take, { w: 340, h: 130, size: 46, skin: 'green' }));
-    box.setScale(0.5).setAlpha(0);
-    sfx(this, 'sfx_popup', CONFIG.audio.popup);
-    this.tweens.add({ targets: box, scale: 1, alpha: 1, duration: 320, ease: 'Back.easeOut' });
-    this.fxStars.setDepth(32).explode(16, W / 2, H / 2 - 76);
   }
 }

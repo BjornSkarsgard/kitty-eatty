@@ -1,7 +1,9 @@
 import { CONFIG } from '../config.js';
 import { showPopup } from './Popup.js';
-import { lives, livesRefillLeft, buyLife, coins } from '../save.js';
+import { lives, livesRefillLeft, buyLife, coins } from '../core/save.js';
 import { sfx } from '../audio.js';
+import { STR } from '../theme/cats/strings.ru.js';
+import { PALETTE as PAL } from '../theme/cats/palette.js';
 
 // Окна про жизни: предупреждение «сгорит 1 жизнь» и «жизни кончились».
 
@@ -18,10 +20,10 @@ export function formatLeft(ms) {
 export function confirmLife(scene, title, onYes) {
   showPopup(scene, {
     title,
-    text: `Сгорит 1 жизнь. Сейчас жизней: ${lives()}/${CONFIG.lives.max}`,
+    text: STR.lifeWillBurn(lives(), CONFIG.lives.max),
     buttons: [
-      { label: 'Да', color: CONFIG.ui.exitColor, onTap: onYes },
-      { label: 'Нет' },
+      { label: STR.yes, color: CONFIG.ui.exitColor, onTap: onYes },
+      { label: STR.no },
     ],
   });
 }
@@ -30,13 +32,13 @@ export function confirmLife(scene, title, onYes) {
 export function showNoLives(scene, onGot) {
   const L = CONFIG.lives;
   const buttons = [{
-    label: `Купить жизнь за ${L.price}`, color: 0x4caf50, disabled: coins() < L.price,
+    label: STR.buyLife(L.price), color: PAL.buyGreen, disabled: coins() < L.price,
     onTap: () => { if (buyLife()) { sfx(scene, 'sfx_coins', CONFIG.audio.coins); onGot?.(); } },
   }];
-  if (CONFIG.ads.enabled) buttons.push({ label: `Ролик: +${L.adGives} жизни`, color: 0xf0a020, onTap: () => {} }); // этап 6
-  buttons.push({ label: 'Подождать' });
-  const text = () => `Все жизни вернутся через ${formatLeft(livesRefillLeft())}\nМонет: ${coins()}`;
-  const popup = showPopup(scene, { title: 'Жизни кончились', text: text(), buttons });
+  if (CONFIG.ads.enabled) buttons.push({ label: STR.adLives(L.adGives), color: PAL.adOrange, onTap: () => {} }); // этап 6
+  buttons.push({ label: STR.wait });
+  const text = () => STR.livesBackIn(formatLeft(livesRefillLeft()), coins());
+  const popup = showPopup(scene, { title: STR.noLivesTitle, text: text(), buttons });
   // таймер тикает; дотикал — жизни вернулись: окно закрывается, и дальше как после покупки
   const tick = scene.time.addEvent({
     delay: 1000, loop: true,

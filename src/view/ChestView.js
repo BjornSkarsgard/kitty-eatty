@@ -3,7 +3,9 @@ import { CONFIG } from '../config.js';
 import { makeButton } from './Button.js';
 import { makeIcon } from './ui.js';
 import { sfx } from '../audio.js';
-import { NAMES } from '../names.js';
+import { NAMES } from '../theme/cats/names.js';
+import { STR } from '../theme/cats/strings.ru.js';
+import { PALETTE as PAL } from '../theme/cats/palette.js';
 
 // Открытие сундука или подарка (kind: 'chest' | 'gift'), награды уже начислены — здесь только показ:
 // коробка падает сверху с подскоком → раскачивается всё сильнее, сзади разгораются лучи → вспышка, крышка улетает →
@@ -20,7 +22,7 @@ export function openBox(scene, kind, items, onDone) {
   const cx = W / 2;
   const cy = H / 2 + 120;
 
-  add(scene.add.rectangle(W / 2, H / 2, W, H, 0x120a2a, 0.82).setInteractive()); // тапы не проходят вниз
+  add(scene.add.rectangle(W / 2, H / 2, W, H, PAL.dim, 0.82).setInteractive()); // тапы не проходят вниз
   raysTexture(scene);
   const rays = add(scene.add.image(cx, cy - 40, 'fx_rays').setAlpha(0).setScale(0.4).setBlendMode(Phaser.BlendModes.ADD));
   const box = add(closedBox(scene, kind, A.size)).setPosition(cx, -A.size);
@@ -53,7 +55,7 @@ export function openBox(scene, kind, items, onDone) {
   const burst = () => {
     box.setAngle(0).setScale(1);
     sfx(scene, 'sfx_star', CONFIG.audio.star, CONFIG.audio.starPitch[2]);
-    const flash = add(scene.add.rectangle(W / 2, H / 2, W, H, 0xffffff, 1).setAlpha(0));
+    const flash = add(scene.add.rectangle(W / 2, H / 2, W, H, PAL.white, 1).setAlpha(0));
     scene.tweens.add({ targets: flash, alpha: 1, duration: A.flash * 0.3, yoyo: true, hold: 40, onComplete: () => flash.destroy() });
     const lid = box.lid;
     scene.tweens.add({ targets: lid, y: lid.y - 520, angle: -25, alpha: 0, duration: 650, ease: 'Cubic.easeOut' });
@@ -74,7 +76,7 @@ export function openBox(scene, kind, items, onDone) {
       });
     });
     scene.time.delayedCall(items.length * A.rewardsDelay + 300, () => {
-      const btn = add(makeButton(scene, cx, H - 270, 'Забрать', () => {
+      const btn = add(makeButton(scene, cx, H - 270, STR.take, () => {
         parts.forEach((o) => o.destroy());
         onDone?.();
       }, { w: 360, h: 140, size: 50, skin: 'green' }));
@@ -91,7 +93,7 @@ export function closedBox(scene, kind, size) {
   const lidKey = `${kind}_lid`;
   if (!scene.textures.exists(bodyKey) || !scene.textures.exists(lidKey)) {
     const g = scene.add.graphics();
-    g.fillStyle(kind === 'gift' ? 0x7a3fe0 : 0xa0602a, 1).fillRoundedRect(-size / 2, -size * 0.35, size, size * 0.7, 24);
+    g.fillStyle(kind === 'gift' ? PAL.giftStub : PAL.chestStub, 1).fillRoundedRect(-size / 2, -size * 0.35, size, size * 0.7, 24);
     c.add(g);
     c.lid = g;
     return c;
@@ -112,17 +114,17 @@ function rewardItem(scene, it, font) {
   if (it.name || it.token) {
     const n = NAMES.find((x) => x.id === it.name);
     const color = it.token ? CONFIG.names.colors.legendary : CONFIG.names.colors[n.rarity];
-    const label = it.token ? '✎ Своя кличка' : n.name;
+    const label = it.token ? STR.customNameReward : n.name;
     const t = scene.add.text(0, 6, label, {
-      fontFamily: font, fontStyle: 'bold', fontSize: '30px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 7,
+      fontFamily: font, fontStyle: 'bold', fontSize: '30px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 7,
     }).setOrigin(0.5);
     const w = Math.max(150, t.width + 40);
     const g = scene.add.graphics();
-    g.fillStyle(0x000000, 0.3).fillRoundedRect(-w / 2 + 3, -30 + 6, w, 66, 22);
+    g.fillStyle(PAL.black, 0.3).fillRoundedRect(-w / 2 + 3, -30 + 6, w, 66, 22);
     g.fillStyle(color, 1).fillRoundedRect(-w / 2, -30, w, 66, 22);
-    g.lineStyle(4, 0xffffff, 0.8).strokeRoundedRect(-w / 2, -30, w, 66, 22);
-    c.add([g, t, scene.add.text(0, -52, 'Кличка', {
-      fontFamily: font, fontStyle: 'bold', fontSize: '24px', color: '#ffe066', stroke: '#2b1a66', strokeThickness: 5,
+    g.lineStyle(4, PAL.white, 0.8).strokeRoundedRect(-w / 2, -30, w, 66, 22);
+    c.add([g, t, scene.add.text(0, -52, STR.nameLabel, {
+      fontFamily: font, fontStyle: 'bold', fontSize: '24px', color: PAL.textGold, stroke: PAL.textStroke, strokeThickness: 5,
     }).setOrigin(0.5)]);
     return c;
   }
@@ -131,17 +133,17 @@ function rewardItem(scene, it, font) {
     const head = scene.add.image(0, -6, `cat_${k.file}_head`);
     head.setScale(130 / Math.max(head.width, head.height));
     c.add([head, scene.add.text(0, 70, k.name, {
-      fontFamily: font, fontStyle: 'bold', fontSize: '30px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 7,
+      fontFamily: font, fontStyle: 'bold', fontSize: '30px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 7,
     }).setOrigin(0.5)]);
     return c;
   }
   const ic = makeIcon(scene, it.icon, 120);
   if (it.icon !== 'coin') {
     ic.setScale(ic.scale * 0.8);
-    c.add(scene.add.circle(0, 0, 56, 0x7b5cf0));
+    c.add(scene.add.circle(0, 0, 56, PAL.button));
   }
   c.add([ic, scene.add.text(44, 48, String(it.n), {
-    fontFamily: font, fontStyle: 'bold', fontSize: '54px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 10,
+    fontFamily: font, fontStyle: 'bold', fontSize: '54px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 10,
   }).setOrigin(0.5)]);
   return c;
 }
@@ -155,13 +157,13 @@ function raysTexture(scene) {
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2;
     const w = (Math.PI / n) * 0.55;
-    g.fillStyle(0xffd75a, 0.3);
+    g.fillStyle(PAL.ray, 0.3);
     g.fillTriangle(s / 2, s / 2,
       s / 2 + Math.cos(a - w) * s / 2, s / 2 + Math.sin(a - w) * s / 2,
       s / 2 + Math.cos(a + w) * s / 2, s / 2 + Math.sin(a + w) * s / 2);
   }
-  g.fillStyle(0xfff2b0, 0.5).fillCircle(s / 2, s / 2, s * 0.16);
-  g.fillStyle(0xffffff, 0.6).fillCircle(s / 2, s / 2, s * 0.08);
+  g.fillStyle(PAL.rayCore, 0.5).fillCircle(s / 2, s / 2, s * 0.16);
+  g.fillStyle(PAL.white, 0.6).fillCircle(s / 2, s / 2, s * 0.08);
   g.generateTexture('fx_rays', s, s);
   g.destroy();
 }

@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
-import { CatView } from '../view/CatView.js';
+import { CatView } from '../theme/cats/CatView.js';
 import { MapView } from '../view/MapView.js';
 import { makeButton } from '../view/Button.js';
 import { counterPill, tabBar, iconButton, plate } from '../view/ui.js';
@@ -11,12 +11,14 @@ import { beatPhase } from '../beat.js';
 import {
   currentLevel, unlockedLevel, levelStars, coins, catLevel, lives, livesRefillLeft, selectedSkin, skinsOwned,
   chestsPending, chestStars, openChest, dailyAvailable, claimDaily, catName,
-} from '../save.js';
+} from '../core/save.js';
 import { openCollection } from '../view/CollectionView.js';
 import { openBox, closedBox } from '../view/ChestView.js';
 import { showPopup } from '../view/Popup.js';
 import { showNoLives, formatLeft } from '../view/lives.js';
-import LEVELS from '../levels/levels.json';
+import { LEVELS } from '../core/levels.js';
+import { STR } from '../theme/cats/strings.ru.js';
+import { PALETTE as PAL } from '../theme/cats/palette.js';
 
 const W = CONFIG.width;
 const H = CONFIG.height;
@@ -54,11 +56,11 @@ const DOOR_ZOOM = coverZoom(OK);
 // остальные пять — вкладки нижней панели в том же порядке.
 const SLOTS = [
   { key: 'kitchen' },
-  { key: 'shop', icon: 'shop', label: 'Магазин', enabled: () => CONFIG.shop.enabled },
-  { key: 'map', icon: 'map', label: 'Карта' },
-  { key: 'home', icon: 'home', label: 'Главная' },
-  { key: 'collection', icon: 'collection', label: 'Коллекция' },
-  { key: 'profile', icon: 'profile', label: 'Профиль' },
+  { key: 'shop', icon: 'shop', label: STR.tabs.shop, enabled: () => CONFIG.shop.enabled },
+  { key: 'map', icon: 'map', label: STR.tabs.map },
+  { key: 'home', icon: 'home', label: STR.tabs.home },
+  { key: 'collection', icon: 'collection', label: STR.tabs.collection },
+  { key: 'profile', icon: 'profile', label: STR.tabs.profile },
 ];
 const TABS = SLOTS.slice(1);
 const KITCHEN = 0;
@@ -137,7 +139,7 @@ export class RoomScene extends Phaser.Scene {
     const x = 30 + U.pillWidth + 20 + w / 2;
     this.livesPill = counterPill(this, x, U.topY, 'heart', '', { w, depth: 25 }).setScrollFactor(0);
     this.livesTimer = this.add.text(x, U.topY + 46, '', {
-      fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '24px', color: '#ffffff', stroke: '#3b2a55', strokeThickness: 6,
+      fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '24px', color: PAL.text, stroke: PAL.textStrokeSoft, strokeThickness: 6,
     }).setOrigin(0.5).setDepth(25).setScrollFactor(0);
     this.refreshTop();
     this.time.addEvent({ delay: 1000, loop: true, callback: () => this.refreshTop() });
@@ -166,7 +168,7 @@ export class RoomScene extends Phaser.Scene {
     // кухня — в натуральную величину: через открытую дверь въезжаем в неё зумом прямо в уровень
     room.setScale(s.key === 'kitchen' ? 1 : R.roomScale);
     const mask = this.make.graphics({}, false);
-    mask.fillStyle(0xffffff)
+    mask.fillStyle(PAL.white)
       .fillEllipse(O.x, O.top + O.vault, O.w + 6, 2 * O.vault + 6)
       .fillRect(O.x - O.w / 2 - 3, O.top + O.vault, O.w + 6, O.bottom - O.top - O.vault + 6);
     room.setMask(mask.createGeometryMask());
@@ -268,7 +270,7 @@ export class RoomScene extends Phaser.Scene {
   // Створки: open — распахнуты (сжаты к петлям и затенены) или закрыты; ms = 0 — сразу.
   swingDoor(open, ms, onDone) {
     if (!this.leaves) return onDone?.();
-    const white = Phaser.Display.Color.ValueToColor(0xffffff);
+    const white = Phaser.Display.Color.ValueToColor(PAL.white);
     const shade = Phaser.Display.Color.ValueToColor(R.door.shade);
     const set = (t) => {
       // створки при закрытии пружинят (t чуть меньше 0) — тень не дальше «нет тени», иначе цвет переполняется и мигает
@@ -381,19 +383,19 @@ export class RoomScene extends Phaser.Scene {
       title.setScale(k);
       this.tweens.add({ targets: title, scale: k * HC.logoPulse, duration: HC.logoPulseMs, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     } else {
-      title = this.add.text(W / 2, HC.titleY, 'Накорми котиков', {
-        fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '54px', color: '#ffffff',
-        stroke: '#6b3d1f', strokeThickness: 12,
+      title = this.add.text(W / 2, HC.titleY, STR.gameTitle, {
+        fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '54px', color: PAL.text,
+        stroke: PAL.textBrown, strokeThickness: 12,
       }).setOrigin(0.5);
     }
-    const shadow = this.add.graphics().fillStyle(0x000000, 0.18).fillEllipse(W / 2, HC.floorY + HC.shadowY, 260, 40);
+    const shadow = this.add.graphics().fillStyle(PAL.black, 0.18).fillEllipse(W / 2, HC.floorY + HC.shadowY, 260, 40);
     // кот сидит на полу, дышит в такт музыке, на тап — случайная реакция, как в игре
     const s = HC.catScale;
     this.homeRoom = room;
     this.cat = null; // сцена переиспользуется — кот с прошлого раза уже уничтожен
     this.makeHomeCat();
     const level = currentLevel(LEVELS.length);
-    const play = makeButton(this, W / 2, HC.playY, `Играть ${LEVELS[level].id}`, () => this.startLevel(level),
+    const play = makeButton(this, W / 2, HC.playY, STR.play(LEVELS[level].id), () => this.startLevel(level),
       { w: 380, h: 150, size: 52, skin: 'yellow' });
     room.add([title, shadow, this.cat, play]);
     this.refreshName();
@@ -409,9 +411,9 @@ export class RoomScene extends Phaser.Scene {
       const box = closedBox(this, kind, B.size);
       const badge = this.add.container(B.size * 0.42, -B.size * 0.42);
       const bg = this.add.graphics();
-      bg.fillStyle(0x7a0f2a, 1).fillCircle(0, 3, 24).fillStyle(CONFIG.ui.badgeColor, 1).fillCircle(0, 0, 24);
-      bg.lineStyle(4, 0xffffff, 1).strokeCircle(0, 0, 24);
-      const num = this.add.text(0, -1, '', { fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '28px', color: '#ffffff' }).setOrigin(0.5);
+      bg.fillStyle(PAL.badgeShadow, 1).fillCircle(0, 3, 24).fillStyle(CONFIG.ui.badgeColor, 1).fillCircle(0, 0, 24);
+      bg.lineStyle(4, PAL.white, 1).strokeCircle(0, 0, 24);
+      const num = this.add.text(0, -1, '', { fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '28px', color: PAL.text }).setOrigin(0.5);
       badge.add([bg, num]);
       const label = this.add.text(0, B.size * 0.5 + 20, '', this.noteStyle()).setOrigin(0.5).setFontSize(26);
       c.add([box, badge, label]);
@@ -434,7 +436,7 @@ export class RoomScene extends Phaser.Scene {
     this.chestBtn.label.setText(`★ ${chestStars()}/${CONFIG.chest.everyStars}`);
     const gift = dailyAvailable();
     this.giftBtn.badge(gift ? '!' : '');
-    this.giftBtn.label.setText('Подарок');
+    this.giftBtn.label.setText(STR.gift);
     // есть что открыть — покачивается
     for (const [btn, on] of [[this.chestBtn, n > 0], [this.giftBtn, gift]]) {
       this.tweens.killTweensOf(btn.box);
@@ -455,9 +457,9 @@ export class RoomScene extends Phaser.Scene {
     const items = openChest();
     if (!items) {
       return showPopup(this, {
-        title: 'Сундук',
-        text: `Сундук даётся за каждые ${CONFIG.chest.everyStars} звёзд и каждый ${CONFIG.chest.everyCatLevels}-й уровень кота.\nЗвёзд: ${chestStars()}/${CONFIG.chest.everyStars}`,
-        buttons: [{ label: 'Понятно' }],
+        title: STR.chest,
+        text: STR.chestInfo(CONFIG.chest.everyStars, CONFIG.chest.everyCatLevels, chestStars()),
+        buttons: [{ label: STR.ok }],
       });
     }
     openBox(this, 'chest', items, () => this.afterBox());
@@ -466,7 +468,7 @@ export class RoomScene extends Phaser.Scene {
   tapGift() {
     const got = claimDaily();
     if (!got) {
-      return showPopup(this, { title: 'Подарок дня', text: 'Следующий подарок — завтра', buttons: [{ label: 'Понятно' }] });
+      return showPopup(this, { title: STR.dailyTitle, text: STR.dailyTomorrow, buttons: [{ label: STR.ok }] });
     }
     openBox(this, 'gift', got.items, () => this.afterBox());
   }
@@ -542,7 +544,7 @@ export class RoomScene extends Phaser.Scene {
   }
 
   createShop(room) {
-    room.add(this.add.text(W / 2, 940, 'Скоро откроется', this.noteStyle()).setOrigin(0.5));
+    room.add(this.add.text(W / 2, 940, STR.soon, this.noteStyle()).setOrigin(0.5));
   }
 
   // Неоткрытые породы — «?» в пустых рамках на стене. Сами породы — позже.
@@ -565,7 +567,7 @@ export class RoomScene extends Phaser.Scene {
       if (k) {
         o = this.add.image(x, y, `cat_${k.file}_head`);
         o.setScale(C.head / Math.max(o.width, o.height));
-      } else o = this.add.text(x, y, '?', { ...this.titleStyle(), fontSize: '80px', color: '#8d7aa8' }).setOrigin(0.5);
+      } else o = this.add.text(x, y, '?', { ...this.titleStyle(), fontSize: '80px', color: PAL.textQuestion }).setOrigin(0.5);
       room.add(o);
       this.wallParts.push(o);
     }));
@@ -587,28 +589,28 @@ export class RoomScene extends Phaser.Scene {
     const P = R.profile;
     const passed = unlockedLevel(LEVELS.length);
     const stars = LEVELS.reduce((sum, l) => sum + levelStars(l), 0);
-    const rows = [['Уровень кота', catLevel()], ['Пройдено уровней', passed], ['Звёзд собрано', stars]];
+    const rows = [[STR.profile.catLevel, catLevel()], [STR.profile.passed, passed], [STR.profile.stars, stars]];
     const x0 = W / 2 - P.w / 2;
     rows.forEach(([name, value], k) => {
       const y = P.y + k * P.step;
       const g = this.add.graphics();
-      g.fillStyle(0x000000, 0.18).fillRoundedRect(x0 + 4, y - P.h / 2 + 8, P.w, P.h, 24);
-      g.fillStyle(0xfff3e0, 1).fillRoundedRect(x0, y - P.h / 2, P.w, P.h, 24);
-      g.lineStyle(4, 0x9c6a3c, 1).strokeRoundedRect(x0, y - P.h / 2, P.w, P.h, 24);
+      g.fillStyle(PAL.black, 0.18).fillRoundedRect(x0 + 4, y - P.h / 2 + 8, P.w, P.h, 24);
+      g.fillStyle(PAL.cream, 1).fillRoundedRect(x0, y - P.h / 2, P.w, P.h, 24);
+      g.lineStyle(4, PAL.brownRim, 1).strokeRoundedRect(x0, y - P.h / 2, P.w, P.h, 24);
       room.add([
         g,
-        this.add.text(x0 + 28, y, name, { ...this.noteStyle(), fontSize: '30px', color: '#6b3d1f', strokeThickness: 0 }).setOrigin(0, 0.5),
+        this.add.text(x0 + 28, y, name, { ...this.noteStyle(), fontSize: '30px', color: PAL.textBrown, strokeThickness: 0 }).setOrigin(0, 0.5),
         this.add.text(x0 + P.w - 28, y, String(value), { ...this.titleStyle(), fontSize: '44px' }).setOrigin(1, 0.5),
       ]);
     });
   }
 
   titleStyle() {
-    return { fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '60px', color: '#ffffff', stroke: '#6b3d1f', strokeThickness: 12 };
+    return { fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '60px', color: PAL.text, stroke: PAL.textBrown, strokeThickness: 12 };
   }
 
   noteStyle() {
-    return { fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '34px', color: '#ffffff', stroke: '#6b3d1f', strokeThickness: 7 };
+    return { fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '34px', color: PAL.text, stroke: PAL.textBrown, strokeThickness: 7 };
   }
 
   // ---------- карта на весь экран ----------

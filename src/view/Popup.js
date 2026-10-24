@@ -2,6 +2,7 @@ import { CONFIG } from '../config.js';
 import { makeButton } from './Button.js';
 import { panel } from './ui.js';
 import { sfx } from '../audio.js';
+import { PALETTE as PAL } from '../theme/cats/palette.js';
 
 // Окно поверх экрана: затемнение (тап по нему закрывает), панель, заголовок, текст и кнопки столбиком.
 // buttons: [{ label, onTap, color, disabled, keep }] — после onTap окно закрывается, если не keep
@@ -15,7 +16,7 @@ export function showPopup(scene, { title, text = '', buttons = [], depth = 50 })
   const close = () => parts.forEach((o) => o.destroy());
   sfx(scene, 'sfx_popup', CONFIG.audio.popup);
 
-  const shade = scene.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.55).setDepth(depth).setScrollFactor(0).setInteractive();
+  const shade = scene.add.rectangle(W / 2, H / 2, W, H, PAL.black, 0.55).setDepth(depth).setScrollFactor(0).setInteractive();
   shade.on('pointerdown', close);
   parts.push(shade);
 
@@ -23,7 +24,7 @@ export function showPopup(scene, { title, text = '', buttons = [], depth = 50 })
   const font = `"${CONFIG.font}", sans-serif`;
   // текст меряем заранее: окно растёт под него, чтобы длинный текст не наезжал на кнопки
   const body = scene.add.text(W / 2, 0, text, {
-    fontFamily: font, fontStyle: 'bold', fontSize: '32px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 6, align: 'center', wordWrap: { width: pw - 80 },
+    fontFamily: font, fontStyle: 'bold', fontSize: '32px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 6, align: 'center', wordWrap: { width: pw - 80 },
   }).setOrigin(0.5).setDepth(depth).setScrollFactor(0);
   const textH = text ? Math.max(110, body.height + 30) : 0;
   const ph = 135 + textH + buttons.length * 110;
@@ -33,7 +34,7 @@ export function showPopup(scene, { title, text = '', buttons = [], depth = 50 })
   // панель ловит тапы, чтобы они не закрывали окно
   parts.push(scene.add.zone(W / 2, top + ph / 2, pw, ph).setDepth(depth).setScrollFactor(0).setInteractive());
   parts.push(scene.add.text(W / 2, top + 70, title, {
-    fontFamily: font, fontStyle: 'bold', fontSize: '50px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 10,
+    fontFamily: font, fontStyle: 'bold', fontSize: '50px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 10,
   }).setOrigin(0.5).setDepth(depth).setScrollFactor(0));
   parts.push(body);
   scene.children.bringToTop(body); // создан раньше панели — поднимаем над ней
@@ -46,7 +47,7 @@ export function showPopup(scene, { title, text = '', buttons = [], depth = 50 })
       if (b.keep) return b.onTap?.(btn);
       close();
       b.onTap?.();
-    }, { depth, w: 420, h: 90, color: b.disabled ? 0xa89a8c : b.color ?? 0x5f4b8b }).setScrollFactor(0);
+    }, { depth, w: 420, h: 90, color: b.disabled ? PAL.buttonDisabled : b.color ?? PAL.buttonPlain }).setScrollFactor(0);
     parts.push(btn);
   });
   return close;

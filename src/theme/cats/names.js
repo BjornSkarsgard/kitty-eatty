@@ -1,3 +1,4 @@
+import { STR } from './strings.ru.js';
 // Клички кота (docs/meta.md). rarity: common / rare / legendary — от неё цена и шанс выпасть из сундука.
 // start — есть с начала; catLevel — даётся за этот уровень кота; легендарные в магазине не продаются.
 // Список можно свободно дополнять: id — латиницей, не менять у уже выпущенных (по нему хранится в сохранении).
@@ -63,12 +64,12 @@ const BAD = [
 // null — можно; иначе — почему нельзя (показать игроку).
 export function checkCustomName(raw) {
   const s = raw.trim().replace(/\s+/g, ' ');
-  if (s.length < 2) return 'Слишком коротко';
-  if (s.length > 16) return 'Не длиннее 16 букв';
-  if (!/^[A-Za-zА-Яа-яЁё][A-Za-zА-Яа-яЁё -]*$/.test(s)) return 'Только буквы, пробел и дефис';
+  if (s.length < 2) return STR.nameTooShort;
+  if (s.length > 16) return STR.nameTooLong;
+  if (!/^[A-Za-zА-Яа-яЁё][A-Za-zА-Яа-яЁё -]*$/.test(s)) return STR.nameBadChars;
   // склеиваем, заменяем похожие латинские буквы на русские — чтобы не обходили фильтр пробелами и «латиницей»
   const flat = s.toLowerCase().replace(/[\s-]/g, '')
     .replace(/a/g, 'а').replace(/e/g, 'е').replace(/o/g, 'о').replace(/p/g, 'р').replace(/c/g, 'с').replace(/x/g, 'х').replace(/y/g, 'у');
-  if (BAD.some((w) => flat.includes(w) || s.toLowerCase().replace(/[\s-]/g, '').includes(w))) return 'Такую кличку нельзя';
+  if (BAD.some((w) => flat.includes(w) || s.toLowerCase().replace(/[\s-]/g, '').includes(w))) return STR.nameForbidden;
   return null;
 }

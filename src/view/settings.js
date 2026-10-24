@@ -1,5 +1,5 @@
 import { CONFIG } from '../config.js';
-import { setting, setSetting } from '../save.js';
+import { setting, setSetting } from '../core/save.js';
 import { applyMusicSetting } from '../audio.js';
 import { settingsMenu } from './ui.js';
 

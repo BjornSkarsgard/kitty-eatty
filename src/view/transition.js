@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { sfx } from '../audio.js';
+import { PALETTE as PAL } from '../theme/cats/palette.js';
 
 // Эффекты переходов между холлом (RoomScene) и кухней (уровнем).
 // - Быстрый проезд по кругу холла к двери кухни и обратно: размытие в движении, мультяшные струйки ветра,
@@ -65,7 +66,7 @@ function windTextures(scene) {
       top.push(new Phaser.Math.Vector2(x, y - w / 2));
       bottom.unshift(new Phaser.Math.Vector2(x, y + w / 2));
     }
-    g.fillStyle(0xffffff, 1).fillPoints([...top, ...bottom], true);
+    g.fillStyle(PAL.white, 1).fillPoints([...top, ...bottom], true);
     g.generateTexture(key, len, pad * 2);
     g.destroy();
   }

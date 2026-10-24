@@ -13,11 +13,10 @@
 //   skins, skin — открытые рескины обычного кота (id из CONFIG.skins) и выбранный;
 //   chests, chestStars — неоткрытые сундуки и звёзды, накопленные к следующему;
 //   daily — { last: 'ГГГГ-ММ-ДД' последнего подарка, day: какой по счёту следующий };
-//   names, name — открытые клички (id из src/names.js) и выбранная ('#custom' — своя); custom — своя кличка (или null);
+//   names, name — открытые клички (id из src/theme/cats/names.js) и выбранная ('#custom' — своя); custom — своя кличка (или null);
 //   nameTokens — неиспользованные «именные таблички» (можно придумать кличку самому);
 //   settings — { sound, music, fx, vibro }: переключатели под шестерёнкой.
-import { CONFIG } from './config.js';
-import { NAMES } from './names.js';
+import { CONFIG } from '../config.js';
 
 const KEY = 'kittyeatty.save';
 const VERSION = 7;
@@ -25,6 +24,7 @@ const E = CONFIG.economy;
 const C = CONFIG.catXp;
 const LV = CONFIG.lives;
 const START_SKINS = CONFIG.skins.filter((k) => k.start).map((k) => k.id);
+const NAMES = CONFIG.nameList; // список кличек — из темы (theme/cats/names.js), сюда приходит через CONFIG
 const START_NAMES = NAMES.filter((n) => n.start).map((n) => n.id);
 export const CUSTOM = '#custom';
 

@@ -1,6 +1,6 @@
 // Звук с защитой от отсутствующих файлов: нет файла — тишина, без ошибок.
 import { CONFIG } from './config.js';
-import { setting } from './save.js';
+import { setting } from './core/save.js';
 
 const has = (scene, key) => scene.cache.audio.exists(key);
 

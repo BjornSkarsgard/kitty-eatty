@@ -6,7 +6,7 @@ import { RoomScene } from './scenes/RoomScene.js';
 import { setupAudioFocus } from './audio.js';
 import { loadFonts } from './fonts.js';
 import { applySettings } from './view/settings.js';
-import { devGive } from './save.js';
+import { devGive } from './core/save.js';
 
 // Разработка: ?give=coins2000,chests3,gifts3,tokens1 — начислить в сохранение (один раз: параметр сразу убирается из адреса).
 if (import.meta.env.DEV) {

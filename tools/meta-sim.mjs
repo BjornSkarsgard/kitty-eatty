@@ -33,7 +33,7 @@ const META = {
   price: { undo: 30, hint: 50, jar: 100 },
   skins: { count: 20, price: 600 },            // рескины обычного кота: сколько всего, цена в магазине
   // 15 ультракотов (пород): три ступени цены
-  ultra: [...Array(5).fill(15000), ...Array(5).fill(25000), ...Array(5).fill(40000)],
+  ultra: [...Array(5).fill(10000), ...Array(5).fill(25000), ...Array(5).fill(40000)],
   ultraBoosterSave: 0.2,                       // с ультракотом нужно на столько меньше бустеров (умения сильнее)
   start: { coins: 0, undo: 3, hint: 1, jar: 1 },
 };
@@ -94,7 +94,7 @@ function useBooster(kind, want) {
   }
 }
 
-const milestones = new Set([10, 25, 50, 75, 100, 130, 160, 200, 250, 300]);
+const milestones = new Set(process.argv.includes("--all") ? LEVELS.map((_, i) => i + 1) : [10, 25, 50, 75, 100, 130, 160, 200, 250, 300]);
 for (let i = 0; i < LEVELS.length; i++) {
   const l = LEVELS[i];
   const d = l.difficulty || 0;

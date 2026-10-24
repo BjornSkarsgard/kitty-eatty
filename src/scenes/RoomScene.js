@@ -38,7 +38,7 @@ const slotOf = (key) => Math.max(1, SLOTS.findIndex((s) => s.key === key));
 const wrap = (x) => ((((x + RING / 2) % RING) + RING) % RING) - RING / 2;
 
 // Главный экран — круглый холл дома кота. Стоим в центре, вокруг арки (hall_arch.png), за каждой своя комната
-// (bg_room_<key>.jpg), за аркой сзади — закрытая дверь кухни (kitchen_door.png) с кнопкой «Играть».
+// (bg_room_<key>.jpg), за аркой сзади — закрытая дверь кухни (kitchen_door.png).
 // Листаем пальцем или вкладками — поворачиваемся на месте: стена с арками едет со скоростью пальца, комнаты за
 // ними — медленнее (R.depth), так видна глубина. Каждая комната видна только в своём проёме (маска по форме проёма).
 // «Играть» — быстрый проезд с размытием и ветром к двери кухни, створки распахиваются, камера въезжает в проём
@@ -161,29 +161,22 @@ export class RoomScene extends Phaser.Scene {
   // ---------- кухня ----------
 
   // Дверь — две створки из одной картинки (левая и правая половины), каждая сжимается к своей петле.
-  // Кнопка «Играть» — на двери.
   createDoor() {
-    if (this.textures.exists('kitchen_door')) {
-      this.leaves = [0, 1].map((side) => {
-        const leaf = this.add.image(0, 0, 'kitchen_door').setDepth(3).setOrigin(side, 1).setScale(R.door.scale);
-        leaf.setCrop(side * leaf.width / 2, 0, leaf.width / 2, leaf.height);
-        return leaf;
-      });
-    }
-    const level = currentLevel(LEVELS.length);
-    this.playButton = makeButton(this, 0, R.door.playY, `Играть ${LEVELS[level].id}`, () => this.startLevel(level),
-      { w: 400, h: 116, size: 52, color: 0xf5b301 }).setDepth(4);
+    if (!this.textures.exists('kitchen_door')) return;
+    this.leaves = [0, 1].map((side) => {
+      const leaf = this.add.image(0, 0, 'kitchen_door').setDepth(3).setOrigin(side, 1).setScale(R.door.scale);
+      leaf.setCrop(side * leaf.width / 2, 0, leaf.width / 2, leaf.height);
+      return leaf;
+    });
   }
 
   placeDoor(d) {
     const cx = O.x + d;
     this.leaves?.forEach((leaf, side) => leaf.setPosition(cx + (side ? 1 : -1) * (leaf.width / 2) * R.door.scale, R.door.bottom));
-    this.playButton.setX(cx).setVisible(!this.doorOpen && Math.abs(d) < STEP);
   }
 
   // Створки: open — распахнуты (сжаты к петлям и затенены) или закрыты; ms = 0 — сразу.
   swingDoor(open, ms, onDone) {
-    this.doorOpen = open; // кнопка «Играть» — только на закрытой двери
     if (!this.leaves) return onDone?.();
     const white = Phaser.Display.Color.ValueToColor(0xffffff);
     const shade = Phaser.Display.Color.ValueToColor(R.door.shade);
@@ -452,16 +445,15 @@ export class RoomScene extends Phaser.Scene {
 
   // ---------- палец ----------
 
-  // Первое движение решает направление: вбок — поворачиваемся по холлу, вверх-вниз — прокручиваем развёрнутую карту.
-  // Касание рамки с картой (тап или протяжка вверх-вниз) — разворачивает её.
+  // Холл пальцем не листается — только вкладками. Палец нужен карте: касание рамки (тап или протяжка вверх-вниз)
+  // разворачивает её, на развёрнутой — протяжка вверх-вниз прокручивает, тап по уровню запускает его.
+  // Первое движение решает направление: вбок — ничего (и это уже не тап), вверх-вниз — карта.
   setupInput() {
     const TH = CONFIG.map.dragThreshold;
     this.input.on('pointerdown', (p, over) => {
       if (over.length || this.mapBusy) { this.gesture = null; return; } // кнопка, кот, вкладка; камера летит
-      this.tweens.killTweensOf(this.pan);
-      this.pan.p = ((this.pan.p % RING) + RING) % RING;
       this.gesture = {
-        x0: p.x, y0: p.y, pan0: this.pan.p, axis: null, lastX: p.x, lastY: p.y, lastT: p.event.timeStamp, vx: 0,
+        x0: p.x, y0: p.y, axis: null, lastY: p.y, lastT: p.event.timeStamp,
         onPoster: !this.mapOpen && this.map.bounds().contains(this.worldAt(p).x, this.worldAt(p).y),
       };
       this.map.velocity = 0;
@@ -476,46 +468,22 @@ export class RoomScene extends Phaser.Scene {
         g.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
         if (g.axis === 'y' && g.onPoster) this.expandMap();
       }
-      const dt = Math.max(1, p.event.timeStamp - g.lastT);
-      if (g.axis === 'x' && !this.mapOpen) {
-        g.vx = ((g.lastX - p.x) / dt) * 16.7;
-        // листаем от магазина до профиля; за краем — тянется с сопротивлением
-        const lo = 1 * STEP;
-        const hi = (SLOTS.length - 1) * STEP;
-        let pan = g.pan0 - dx;
-        if (pan < lo) pan = lo - (lo - pan) * 0.35;
-        if (pan > hi) pan = hi + (pan - hi) * 0.35;
-        this.pan.p = pan;
-      } else if (g.axis === 'y' && this.mapOpen && !this.mapBusy) {
+      if (g.axis === 'y' && this.mapOpen && !this.mapBusy) {
+        const dt = Math.max(1, p.event.timeStamp - g.lastT);
         const k = this.cameras.main.zoom * this.map.root.scale; // экранные px → px карты
         this.map.velocity = ((g.lastY - p.y) / dt / k) * 16.7;
         this.map.setScroll(this.map.scroll + (g.lastY - p.y) / k);
       }
-      g.lastX = p.x;
       g.lastY = p.y;
       g.lastT = p.event.timeStamp;
     });
     this.input.on('pointerup', (p) => {
       const g = this.gesture;
       this.gesture = null;
-      if (!g) return;
-      // движения пальца могли не дойти (медленный кадр) — решаем по итоговому сдвигу
-      if (!g.axis && Math.abs(p.x - g.x0) >= TH && Math.abs(p.x - g.x0) > Math.abs(p.y - g.y0)) {
-        g.axis = 'x';
-        g.vx = (g.x0 - p.x) / 10;
-      }
-      if (!g.axis) {
-        if (this.mapOpen) { const w = this.worldAt(p); this.map.tapAt(w.x, w.y); }
-        else if (g.onPoster) this.expandMap();
-        return;
-      }
-      if (g.axis === 'x' && !this.mapOpen) {
-        // протащили дальше swipeShare экрана или быстро взмахнули — к соседней арке, иначе — обратно
-        const dx = g.x0 - p.x;
-        let i = Math.round(g.pan0 / STEP);
-        if (Math.abs(dx) > W * R.swipeShare || Math.abs(g.vx) > R.flick) i += Math.sign(dx);
-        this.goTo(Phaser.Math.Clamp(i, 1, SLOTS.length - 1));
-      }
+      // движения пальца могли не дойти (медленный кадр) — тапом считаем только короткое касание
+      if (!g || g.axis || Math.hypot(p.x - g.x0, p.y - g.y0) >= TH) return;
+      if (this.mapOpen) { const w = this.worldAt(p); this.map.tapAt(w.x, w.y); }
+      else if (g.onPoster) this.expandMap();
     });
     this.input.on('wheel', (p, objs, dx, dy) => {
       if (this.mapOpen) this.map.setScroll(this.map.scroll + dy / (this.cameras.main.zoom * this.map.root.scale));

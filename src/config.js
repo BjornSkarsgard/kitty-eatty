@@ -297,9 +297,6 @@ export const CONFIG = {
 
     // кот: кормление
     meowDuration: 260,
-    hopHeight: 90,        // высота прыжка
-    hopSpeed: 900,        // px/с
-    hopMinDuration: 320,
     squash: 0.12,         // сплющивание при приземлении
     squashDuration: 90,
     catEatOffsetY: 62,    // где кот стоит относительно верха банки
@@ -324,7 +321,7 @@ export const CONFIG = {
     confetti: 60,
   },
 
-  // Кот из частей (src/assets/cat_<name>_*.png). Где лежит каждая картинка — tools/cat-layout.json (в пикселях
+  // Кот из частей (src/assets/cat_<name>_*.png). Где лежит каждая картинка — src/theme/cats/cat-layout.json (в пикселях
   // референса art-src/cat_ref.png). Здесь — как референс переводится в координаты кота и где оси вращения.
   cat: {
     unit: 0.1145,               // единиц кота на 1 px референса (размер кота)

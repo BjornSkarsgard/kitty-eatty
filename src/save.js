@@ -148,12 +148,12 @@ export function recordWin(level, index, moves, count) {
   return reward;
 }
 
-export function bestMoves(id) {
+function bestMoves(id) {
   return get().best[id];
 }
 
 // Сколько звёзд за прохождение: 3, 2 или 1 (правило — CONFIG.stars).
-export function starsFor(moves, minMoves) {
+function starsFor(moves, minMoves) {
   const S = CONFIG.stars;
   if (moves <= minMoves + Math.ceil(minMoves * S.three)) return 3;
   if (moves <= minMoves + Math.ceil(minMoves * S.two)) return 2;
@@ -172,7 +172,7 @@ export function levelStars(level) {
 export const catNeed = (level) => C.needBase + C.needStep * (level - 1);
 
 // Награда за достижение уровня кота level.
-export function catReward(level) {
+function catReward(level) {
   return {
     level,
     coins: C.rewardCoins + C.rewardCoinsPerLevel * level,
@@ -392,7 +392,7 @@ export function buyLife() {
   return true;
 }
 
-// Жизни за ролик (этап 6).
+// Жизни за ролик. Пока не вызывается — понадобится на этапе 6 (реклама).
 export function addLives(n) {
   const d = get();
   giveLives(d, n);
@@ -423,7 +423,7 @@ export function buyUndo() {
   return true;
 }
 
-// Начислить отмены (за рекламу, из ящиков — позже).
+// Начислить отмены. Пока не вызывается — понадобится на этапе 6 (отмена за рекламу).
 export function addUndos(n) {
   get().undos += n;
   write();

@@ -8,10 +8,12 @@ import { addSettingsMenu } from '../view/settings.js';
 import { panDuration, panFx, hud } from '../view/transition.js';
 import { music, sfx } from '../audio.js';
 import { beatPhase } from '../beat.js';
-import { currentLevel, unlockedLevel, levelStars, coins, catLevel, lives, livesRefillLeft, selectedSkin, skinsOwned } from '../save.js';
+import {
+  currentLevel, unlockedLevel, levelStars, coins, catLevel, lives, livesRefillLeft, selectedSkin, skinsOwned,
+  chestsPending, chestStars, openChest, dailyAvailable, claimDaily, catName,
+} from '../save.js';
 import { openCollection } from '../view/CollectionView.js';
 import { openBox, closedBox } from '../view/ChestView.js';
-import { chestsPending, chestStars, openChest, dailyAvailable, claimDaily, catName } from '../save.js';
 import { showPopup } from '../view/Popup.js';
 import { showNoLives, formatLeft } from '../view/lives.js';
 import LEVELS from '../levels/levels.json';

@@ -3,7 +3,7 @@ import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 
 // Значок формы корма с центром в (0, 0), s — «радиус».
-export function drawShape(g, shape, s) {
+function drawShape(g, shape, s) {
   switch (shape) {
     case 'circle':
       g.fillCircle(0, 0, s);

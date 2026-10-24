@@ -121,7 +121,7 @@ export function musicPosition() {
   return { key: current.key, seek: snd.seek };
 }
 
-export function stopMusic() {
+function stopMusic() {
   if (!current) return;
   const state = current;
   current = null;

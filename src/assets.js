@@ -9,7 +9,7 @@ const files = import.meta.glob(['./assets/**/*.{png,webp,jpg,svg,mp3,ogg}', '!./
   import: 'default',
 });
 
-export const ASSETS = { images: {}, svg: {}, audio: {} };
+const ASSETS = { images: {}, svg: {}, audio: {} };
 
 for (const [path, url] of Object.entries(files)) {
   const name = path.split('/').pop().replace(/\.[^.]+$/, '');

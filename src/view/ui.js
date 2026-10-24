@@ -13,7 +13,7 @@ const font = () => `"${CONFIG.font}", sans-serif`;
 // во все стороны (работает и без WebGL). inset — [слева, сверху, справа, снизу] в px картинки: сколько занимают углы;
 // k — во сколько раз их уменьшить на экране. Кусочки — кадры той же текстуры (<key>#ij).
 // Возвращает контейнер с серединой в (0, 0).
-export function sliceImage(scene, key, w, h, inset, k) {
+function sliceImage(scene, key, w, h, inset, k) {
   const tex = scene.textures.get(key);
   const src = tex.get('__BASE');
   const [l, t, r, b] = inset;

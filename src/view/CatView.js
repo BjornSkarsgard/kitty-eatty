@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { sfx, sfxRandom } from '../audio.js';
-import LAYOUT from '../../tools/cat-layout.json';
+import LAYOUT from '../theme/cats/cat-layout.json';
 
 const C = CONFIG.cat;
 const P = C.pivots;
@@ -61,7 +61,7 @@ export class CatView extends Phaser.GameObjects.Container {
     return box;
   }
 
-  // Картинка в контейнере части: левый верхний угол — из tools/cat-layout.json (layoutKey).
+  // Картинка в контейнере части: левый верхний угол — из src/theme/cats/cat-layout.json (layoutKey).
   image(box, layoutKey, key, pivot = layoutKey) {
     if (!this.scene.textures.exists(key)) return null;
     const [x0, y0] = LAYOUT[layoutKey];
@@ -359,28 +359,6 @@ export class CatView extends Phaser.GameObjects.Container {
     }));
   }
 
-  // Прыжок дугой в точку.
-  hopTo(x, y, onDone) {
-    const A = CONFIG.anim;
-    const x0 = this.x;
-    const y0 = this.y;
-    const height = A.hopHeight * this.baseScale;
-    const dist = Phaser.Math.Distance.Between(x0, y0, x, y);
-    const duration = Math.max(A.hopMinDuration, dist / A.hopSpeed * 1000);
-    this.track(this.scene.tweens.add({
-      targets: this, x, duration, ease: 'Sine.easeInOut',
-      onUpdate: (tw) => {
-        const p = tw.progress;
-        this.y = y0 + (y - y0) * p - Math.sin(Math.PI * p) * height;
-      },
-      onComplete: () => {
-        this.y = y;
-        this.squash();
-        if (onDone) onDone();
-      },
-    }));
-  }
-
   squash() {
     const s = this.baseScale;
     const A = CONFIG.anim;
@@ -446,10 +424,6 @@ const drawFallback = {
     g.strokeEllipse(0, -28, 76, 56);
     g.fillStyle(0xffffff, 0.85);
     g.fillEllipse(0, -22, 30, 22);
-  },
-  chest(g) {
-    g.fillStyle(0xffffff, 0.85);
-    g.fillEllipse(0, -36, 26, 22);
   },
   head(g, fill) {
     g.lineStyle(5, O(), 1).fillStyle(fill, 1);

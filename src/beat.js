@@ -7,7 +7,7 @@ import { musicPosition } from './audio.js';
 const mod1 = (x) => x - Math.floor(x);
 
 // Время в долях от первой доли трека (дробная часть — фаза текущей доли, 0 — удар).
-export function beatTime(scene) {
+function beatTime(scene) {
   const B = CONFIG.audio;
   const m = musicPosition();
   const b = m && B.beats[m.key];

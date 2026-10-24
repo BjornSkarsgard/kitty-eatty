@@ -13,8 +13,10 @@
   <div id="game"></div>
   <div id="debug" hidden style="position:fixed;left:0;right:0;top:0;padding:12px;color:#fff;background:rgba(0,0,0,.6);font:14px monospace;white-space:pre-wrap;word-break:break-all;z-index:9"></div>
   <script>
-    // Отладка на телефоне: ошибки выводятся прямо на экран, консоли там нет.
+    // Отладка на телефоне: ошибки выводятся прямо на экран, консоли там нет. Только в режиме разработки:
+    // Vite подставляет %DEV% (true / false); в релизе игрок стек ошибок не видит.
     (function () {
+      if ('%DEV%' !== 'true') return;
       var box = document.getElementById('debug');
       box.textContent = navigator.userAgent;
       function log(msg) { box.hidden = false; box.textContent += '\n' + msg; }

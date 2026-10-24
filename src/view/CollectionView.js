@@ -222,7 +222,7 @@ export function openCollection(scene, { onChange } = {}) {
 
 // Ввод своей клички: поле ввода страницы поверх игры (в Phaser своего нет), под ним «Готово» и «Отмена».
 // Проверка — checkCustomName; ошибка показывается в окне. onOk(кличка) — только для прошедшей проверку.
-export function promptName(scene, onOk) {
+function promptName(scene, onOk) {
   const W = CONFIG.width;
   const H = CONFIG.height;
   const rect = scene.game.canvas.getBoundingClientRect();

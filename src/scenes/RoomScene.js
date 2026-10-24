@@ -5,7 +5,7 @@ import { MapView } from '../view/MapView.js';
 import { makeButton } from '../view/Button.js';
 import { counterPill, tabBar, iconButton } from '../view/ui.js';
 import { addSettingsMenu } from '../view/settings.js';
-import { panDuration, panFx, zoomIn, enterZoom } from '../view/transition.js';
+import { panDuration, panFx, hud } from '../view/transition.js';
 import { music, sfx } from '../audio.js';
 import { beatPhase } from '../beat.js';
 import { currentLevel, unlockedLevel, levelStars, coins } from '../save.js';
@@ -145,12 +145,13 @@ export class RoomScene extends Phaser.Scene {
     this.tabs.setPosition((((p % RING) + RING) % RING) / STEP - 1);
   }
 
-  // Поворот к арке slot по кратчайшему пути (dir — куда ехать, если пути равны). ms и onDone — для проезда к кухне.
-  goTo(slot, { dir = 1, ms = R.panDuration, ease = 'Cubic.easeInOut', onDone } = {}) {
-    if (this.mapOpen && slot !== MAP) return this.collapseMap(() => this.goTo(slot, { dir, ms, ease, onDone }));
+  // Поворот к арке slot. Между вкладками — напрямую (магазин … профиль, мимо кухни не ездим);
+  // ring — по кругу кратчайшим путём (к двери кухни и обратно; dir — куда ехать, если пути равны).
+  goTo(slot, { ring = false, dir = 1, ms = R.panDuration, ease = 'Cubic.easeInOut', onDone } = {}) {
+    if (this.mapOpen && slot !== MAP) return this.collapseMap(() => this.goTo(slot, { ring, dir, ms, ease, onDone }));
     this.pan.p = ((this.pan.p % RING) + RING) % RING;
-    let delta = wrap(slot * STEP - this.pan.p);
-    if (Math.abs(Math.abs(delta) - RING / 2) < 1) delta = (dir * RING) / 2;
+    let delta = ring ? wrap(slot * STEP - this.pan.p) : slot * STEP - this.pan.p;
+    if (ring && Math.abs(Math.abs(delta) - RING / 2) < 1) delta = (dir * RING) / 2;
     if (Math.abs(delta) > 1 && !onDone) sfx(this, 'sfx_swipe', CONFIG.audio.swipe);
     this.tweens.killTweensOf(this.pan);
     this.tweens.add({ targets: this.pan, p: this.pan.p + delta, duration: ms, ease, onComplete: onDone });
@@ -200,31 +201,82 @@ export class RoomScene extends Phaser.Scene {
       onUpdate: () => set(k.t), onComplete: onDone });
   }
 
-  // В уровень: быстрый проезд к двери кухни (с главной — через коллекцию и профиль, с карты — через магазин),
-  // дверь распахивается, камера въезжает в проём.
+  // В уровень: уровень сразу запускается под холлом (за дверью кухни его видно, когда она откроется),
+  // быстрый проезд к двери (с главной — через коллекцию и профиль, с карты — через магазин), дверь распахивается —
+  // за ней уже коты и банки, — и камера влетает в проём, а уровень одновременно доезжает до полного экрана.
   startLevel(index) {
     if (this.mapOpen) return this.collapseMap(() => this.startLevel(index));
     this.input.enabled = false;
-    const go = () => this.swingDoor(true, R.door.openDuration, () =>
-      zoomIn(this, R.doorZoom, R.doorZoomDuration, () => this.scene.start('Game', { levelIndex: index, fromHall: true })));
+    const game = this.scene.get('Game');
+    this.scene.launch('Game', { levelIndex: index, behindDoor: true });
+    let arrived = false;
+    let ready = false;
+    const go = () => {
+      if (!arrived || !ready) return;
+      this.slots[KITCHEN].bg?.setVisible(false); // вместо картинки кухни — живой уровень
+      this.kitchenView(0);
+      this.swingDoor(true, R.door.openDuration, () => this.flyIntoKitchen());
+    };
+    game.events.once(Phaser.Scenes.Events.CREATE, () => { ready = true; go(); });
     const span = wrap(KITCHEN * STEP - this.pan.p);
-    if (Math.abs(span) < 2) return go();
+    if (Math.abs(span) < 2) { arrived = true; return go(); }
     const ms = panDuration(span);
-    const delta = this.goTo(KITCHEN, { dir: 1, ms, onDone: go });
+    const delta = this.goTo(KITCHEN, { ring: true, dir: 1, ms, onDone: () => { arrived = true; go(); } });
     panFx(this, Math.sign(delta), ms);
   }
 
-  // Из уровня: начинаем в проёме открытой двери, отъезжаем, дверь закрывается, и быстро едем на главную
-  // обратно тем же путём — через профиль и коллекцию.
+  // Холл и уровень за дверью на доле пути t (0 — стоим перед открытой дверью, 1 — проём во весь экран).
+  // Камера холла приближается в doorZoom и сдвигается так, чтобы середина проёма встала в середину экрана.
+  // Уровень — «дальше» холла: его зум в doorZoom раз меньше и он стоит ровно в проёме; к концу — зум 1, весь экран.
+  kitchenView(t) {
+    const cam = this.cameras.main;
+    const gcam = this.scene.get('Game').cameras.main;
+    const dy = (O.top + O.bottom) / 2 - H / 2; // середина проёма ниже/выше середины экрана
+    const zr = 1 + (R.doorZoom - 1) * t;
+    cam.setZoom(zr);
+    cam.scrollY = dy * t;
+    const cy = H / 2 + (1 - t) * dy * zr; // где сейчас на экране середина проёма
+    const zg = zr / R.doorZoom;
+    gcam.setZoom(zg);
+    gcam.scrollY = (H / 2 - cy) / zg;
+  }
+
+  flyIntoKitchen() {
+    const game = this.scene.get('Game');
+    this.tweens.add({ targets: hud(this), alpha: 0, duration: R.doorZoomDuration * 0.5 });
+    this.tweens.addCounter({
+      from: 0, to: 1, duration: R.doorZoomDuration, ease: 'Cubic.easeIn',
+      onUpdate: (tw) => this.kitchenView(tw.getValue()),
+      onComplete: () => {
+        game.cameras.main.setZoom(1).setScroll(0, 0);
+        game.input.enabled = true;
+        this.scene.stop();
+      },
+    });
+  }
+
+  // Из уровня — то же в обратную сторону: холл запускается поверх ещё живого уровня у открытой двери,
+  // уровень уменьшается обратно в проём, камера отъезжает, дверь закрывается перед котами и банками,
+  // и только тогда уровень выключается; потом быстро едем на главную тем же путём — через профиль и коллекцию.
   backFromKitchen() {
+    this.input.enabled = false;
+    this.slots[KITCHEN].bg?.setVisible(false);
     this.swingDoor(true, 0);
-    enterZoom(this, R.doorZoom, R.doorZoomDuration, () => {
-      this.input.enabled = false;
-      this.swingDoor(false, R.door.openDuration, () => {
+    this.kitchenView(1);
+    hud(this).forEach((o) => {
+      const a = o.alpha; // бледные вкладки остаются бледными
+      o.setAlpha(0);
+      this.tweens.add({ targets: o, alpha: a, duration: R.doorZoomDuration * 0.5, delay: R.doorZoomDuration * 0.5 });
+    });
+    this.tweens.addCounter({
+      from: 1, to: 0, duration: R.doorZoomDuration, ease: 'Cubic.easeOut',
+      onUpdate: (tw) => this.kitchenView(tw.getValue()),
+      onComplete: () => this.swingDoor(false, R.door.openDuration, () => {
+        this.scene.stop('Game');
         const ms = panDuration(RING / 2);
         panFx(this, -1, ms);
-        this.goTo(HOME, { dir: -1, ms, onDone: () => (this.input.enabled = true) });
-      });
+        this.goTo(HOME, { ring: true, dir: -1, ms, onDone: () => (this.input.enabled = true) });
+      }),
     });
   }
 
@@ -406,6 +458,7 @@ export class RoomScene extends Phaser.Scene {
     this.input.on('pointerdown', (p, over) => {
       if (over.length || this.mapBusy) { this.gesture = null; return; } // кнопка, кот, вкладка; камера летит
       this.tweens.killTweensOf(this.pan);
+      this.pan.p = ((this.pan.p % RING) + RING) % RING;
       this.gesture = {
         x0: p.x, y0: p.y, pan0: this.pan.p, axis: null, lastX: p.x, lastY: p.y, lastT: p.event.timeStamp, vx: 0,
         onPoster: !this.mapOpen && this.map.bounds().contains(this.worldAt(p).x, this.worldAt(p).y),
@@ -425,7 +478,13 @@ export class RoomScene extends Phaser.Scene {
       const dt = Math.max(1, p.event.timeStamp - g.lastT);
       if (g.axis === 'x' && !this.mapOpen) {
         g.vx = ((g.lastX - p.x) / dt) * 16.7;
-        this.pan.p = g.pan0 - dx; // круг замкнут — краёв нет
+        // листаем от магазина до профиля; за краем — тянется с сопротивлением
+        const lo = 1 * STEP;
+        const hi = (SLOTS.length - 1) * STEP;
+        let pan = g.pan0 - dx;
+        if (pan < lo) pan = lo - (lo - pan) * 0.35;
+        if (pan > hi) pan = hi + (pan - hi) * 0.35;
+        this.pan.p = pan;
       } else if (g.axis === 'y' && this.mapOpen && !this.mapBusy) {
         const k = this.cameras.main.zoom * this.map.root.scale; // экранные px → px карты
         this.map.velocity = ((g.lastY - p.y) / dt / k) * 16.7;
@@ -454,7 +513,7 @@ export class RoomScene extends Phaser.Scene {
         const dx = g.x0 - p.x;
         let i = Math.round(g.pan0 / STEP);
         if (Math.abs(dx) > W * R.swipeShare || Math.abs(g.vx) > R.flick) i += Math.sign(dx);
-        this.goTo(((i % SLOTS.length) + SLOTS.length) % SLOTS.length, { dir: Math.sign(dx) || 1 });
+        this.goTo(Phaser.Math.Clamp(i, 1, SLOTS.length - 1));
       }
     });
     this.input.on('wheel', (p, objs, dx, dy) => {

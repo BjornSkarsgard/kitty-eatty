@@ -5,8 +5,7 @@ import { sfx } from '../audio.js';
 // Эффекты переходов между холлом (RoomScene) и кухней (уровнем).
 // - Быстрый проезд по кругу холла к двери кухни и обратно: размытие в движении, мультяшные струйки ветра,
 //   звук sfx_whoosh серединой на середину проезда (panFx).
-// - Сквозь открытую дверь — зум камеры: холл приближается, пока проём не заполнит экран, и на этом кадре
-//   включается уровень, который сам доезжает зумом до 1 (zoomIn / enterZoom). Назад — наоборот.
+// Зум сквозь дверь кухни с живым уровнем за ней — в RoomScene (kitchenView).
 // Размытие — только WebGL и включённые эффекты; в Canvas — просто быстрый проезд.
 const T = () => CONFIG.transition;
 
@@ -40,29 +39,6 @@ export function panFx(scene, dir, ms) {
 // Закреплённые на экране элементы (монеты, настройки, вкладки) — при зуме в дверь гаснут, на выходе проявляются.
 // Зоны нажатия (вкладки) прозрачности не имеют — их пропускаем.
 export const hud = (scene) => scene.children.list.filter((o) => o.scrollFactorX === 0 && o.visible && typeof o.alpha === 'number');
-
-// Камера приближается в zoom (центр — середина экрана), потом onDone.
-export function zoomIn(scene, zoom, ms, onDone) {
-  scene.input.enabled = false;
-  scene.tweens.add({ targets: hud(scene), alpha: 0, duration: ms * 0.5 });
-  scene.tweens.add({ targets: scene.cameras.main, zoom, duration: ms, ease: 'Cubic.easeIn', onComplete: onDone });
-}
-
-// Сцена начинается приближенной в zoom и отъезжает до 1; закреплённые элементы проявляются к концу.
-export function enterZoom(scene, zoom, ms, onDone) {
-  const cam = scene.cameras.main;
-  cam.setZoom(zoom);
-  scene.input.enabled = false;
-  hud(scene).forEach((o) => {
-    const a = o.alpha; // бледные вкладки остаются бледными
-    o.setAlpha(0);
-    scene.tweens.add({ targets: o, alpha: a, duration: ms * 0.5, delay: ms * 0.5 });
-  });
-  scene.tweens.add({
-    targets: cam, zoom: 1, duration: ms, ease: 'Cubic.easeOut',
-    onComplete: () => { scene.input.enabled = true; onDone?.(); },
-  });
-}
 
 // Мультяшные струйки ветра: белые изогнутые штрихи с острыми концами проносятся поперёк экрана навстречу
 // движению. Несколько вариантов рисуются один раз в текстуры (wind_0..), дальше это обычные картинки —

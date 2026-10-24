@@ -10,7 +10,6 @@ import { currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyU
 import { showPopup } from '../view/Popup.js';
 import { iconButton, counterPill, plate, tray, makeIcon } from '../view/ui.js';
 import { addSettingsMenu } from '../view/settings.js';
-import { zoomIn, enterZoom } from '../view/transition.js';
 import LEVELS from '../levels/levels.json';
 
 const L = CONFIG.layout;
@@ -33,7 +32,7 @@ export class GameScene extends Phaser.Scene {
     // по кнопке — переданный уровень, при запуске — из ?level= (разработка) или из сохранения
     this.levelIndex = data.levelIndex ?? levelFromUrl() ?? currentLevel(LEVELS.length);
     setCurrentLevel(this.levelIndex);
-    this.fromHall = data.fromHall; // вошли из холла через дверь кухни — отъезжаем зумом
+    this.behindDoor = data.behindDoor; // запущен из холла за дверью кухни — холл сам доведёт камеру и включит ввод
   }
 
   create() {
@@ -68,12 +67,18 @@ export class GameScene extends Phaser.Scene {
     this.createPortions();
     this.createCats();
     this.createButtons();
-    if (this.fromHall) enterZoom(this, CONFIG.room.doorZoom, CONFIG.room.doorZoomDuration);
+    if (this.behindDoor) {
+      this.scene.moveBelow('Room'); // виден только в проёме двери, холл — сверху
+      this.input.enabled = false;
+    }
   }
 
-  // Домой: камера приближается, как будто отступаем назад сквозь дверь, и холл начинается с открытой двери кухни.
+  // Домой: холл запускается поверх уровня у открытой двери кухни, сам уводит камеру назад, закрывает дверь
+  // и выключает уровень (RoomScene.backFromKitchen).
   leave() {
-    zoomIn(this, CONFIG.room.doorZoom, CONFIG.room.doorZoomDuration, () => this.scene.start('Room', { fromKitchen: true }));
+    this.input.enabled = false;
+    this.scene.moveBelow('Room');
+    this.scene.launch('Room', { fromKitchen: true });
   }
 
   // Лапки на обоях: штамп paw.png ровной сеткой по стене (ряды через dy, соседние сдвинуты на полшага dx).

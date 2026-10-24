@@ -20,21 +20,23 @@ export function showPopup(scene, { title, text = '', buttons = [], depth = 50 })
   parts.push(shade);
 
   const pw = 560;
-  const textH = text ? 110 : 0;
+  const font = `"${CONFIG.font}", sans-serif`;
+  // текст меряем заранее: окно растёт под него, чтобы длинный текст не наезжал на кнопки
+  const body = scene.add.text(W / 2, 0, text, {
+    fontFamily: font, fontStyle: 'bold', fontSize: '32px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 6, align: 'center', wordWrap: { width: pw - 80 },
+  }).setOrigin(0.5).setDepth(depth).setScrollFactor(0);
+  const textH = text ? Math.max(110, body.height + 30) : 0;
   const ph = 135 + textH + buttons.length * 110;
   const top = H / 2 - ph / 2;
+  body.y = top + 115 + textH / 2;
   parts.push(panel(scene, pw, ph, { corner: 44 }).setPosition(W / 2, top + ph / 2).setDepth(depth).setScrollFactor(0));
   // панель ловит тапы, чтобы они не закрывали окно
   parts.push(scene.add.zone(W / 2, top + ph / 2, pw, ph).setDepth(depth).setScrollFactor(0).setInteractive());
-
-  const font = `"${CONFIG.font}", sans-serif`;
   parts.push(scene.add.text(W / 2, top + 70, title, {
     fontFamily: font, fontStyle: 'bold', fontSize: '50px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 10,
   }).setOrigin(0.5).setDepth(depth).setScrollFactor(0));
-  const body = scene.add.text(W / 2, top + 160, text, {
-    fontFamily: font, fontStyle: 'bold', fontSize: '32px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 6, align: 'center', wordWrap: { width: pw - 80 },
-  }).setOrigin(0.5).setDepth(depth).setScrollFactor(0);
   parts.push(body);
+  scene.children.bringToTop(body); // создан раньше панели — поднимаем над ней
   close.setText = (s) => body.setText(s);
   close.isOpen = () => body.active;
 

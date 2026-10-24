@@ -287,10 +287,19 @@ export class RoomScene extends Phaser.Scene {
   // ---------- комнаты (координаты — как на картинке комнаты во весь экран) ----------
 
   createHome(room) {
-    const title = this.add.text(W / 2, HC.titleY, 'Накорми котиков', {
-      fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '54px', color: '#ffffff',
-      stroke: '#6b3d1f', strokeThickness: 12,
-    }).setOrigin(0.5);
+    // логотип Kitty Eatty (logo.png) слегка покачивается; без картинки — название текстом
+    let title;
+    if (this.textures.exists('logo')) {
+      title = this.add.image(W / 2, HC.logoY, 'logo');
+      const k = HC.logoWidth / title.width;
+      title.setScale(k);
+      this.tweens.add({ targets: title, scale: k * HC.logoPulse, duration: HC.logoPulseMs, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    } else {
+      title = this.add.text(W / 2, HC.titleY, 'Накорми котиков', {
+        fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '54px', color: '#ffffff',
+        stroke: '#6b3d1f', strokeThickness: 12,
+      }).setOrigin(0.5);
+    }
     const shadow = this.add.graphics().fillStyle(0x000000, 0.18).fillEllipse(W / 2, HC.floorY + HC.shadowY, 260, 40);
     // кот сидит на полу, дышит в такт музыке, на тап — случайная реакция, как в игре
     const s = HC.catScale;

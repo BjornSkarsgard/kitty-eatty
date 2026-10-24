@@ -3,12 +3,66 @@ import { CONFIG } from '../config.js';
 import { sfx } from '../audio.js';
 
 // Общие элементы интерфейса (как в референсах Ивана): кнопки-иконки с бейджами, пилюля-счётчик,
-// табличка, лоток. Пока заглушки кодом: «объём» — светлый верх, тёмный низ, блик.
-// Есть картинка icon_<name>.png — она вместо иконки кодом; ui_*.png для заготовок — позже.
+// табличка, лоток, панель окна. Заготовки — картинки ui_*.png (кнопки разных цветов — tools/recolor-ui.mjs),
+// растягиваются «по девяти кусочкам» (sliceImage); нет картинки — рисуется кодом.
+// Есть картинка icon_<name>.png — она вместо иконки кодом.
 const U = CONFIG.ui;
 const font = () => `"${CONFIG.font}", sans-serif`;
 
-// Глянцевая плашка: тень, тёмный «бок» снизу, лицо, мягкий блик сверху слева. shape: 'square' | 'round'.
+// Картинка-заготовка, растянутая на w×h «по девяти кусочкам»: углы не тянутся, края тянутся вдоль, середина —
+// во все стороны (работает и без WebGL). inset — [слева, сверху, справа, снизу] в px картинки: сколько занимают углы;
+// k — во сколько раз их уменьшить на экране. Кусочки — кадры той же текстуры (<key>#ij).
+// Возвращает контейнер с серединой в (0, 0).
+export function sliceImage(scene, key, w, h, inset, k) {
+  const tex = scene.textures.get(key);
+  const src = tex.get('__BASE');
+  const [l, t, r, b] = inset;
+  const xs = [0, l, src.width - r, src.width];
+  const ys = [0, t, src.height - b, src.height];
+  const dx = [0, l * k, w - r * k, w];
+  const dy = [0, t * k, h - b * k, h];
+  const box = scene.add.container(0, 0);
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+    const sw = xs[i + 1] - xs[i];
+    const sh = ys[j + 1] - ys[j];
+    if (sw <= 0 || sh <= 0) continue;
+    const name = `${key}#${i}${j}`;
+    if (!tex.has(name)) tex.add(name, 0, xs[i], ys[j], sw, sh);
+    const img = scene.add.image(-w / 2 + dx[i], -h / 2 + dy[j], key, name).setOrigin(0, 0);
+    // на полпикселя шире — без щелей между кусочками
+    img.setScale((dx[i + 1] - dx[i] + 0.5) / sw, (dy[j + 1] - dy[j] + 0.5) / sh);
+    box.add(img);
+  }
+  return box;
+}
+
+// Заготовки: углы в px картинки (inset) — у пилюли и лотка это круглые концы на всю высоту.
+const SLICES = {
+  ui_panel: [70, 70, 70, 70],
+  ui_plate: [75, 75, 75, 75],
+  ui_pill: [105, 0, 105, 0],
+  ui_tray: [76, 0, 76, 0],
+};
+const hasArt = (scene, key) => scene.textures.exists(key);
+
+// Панель окна w×h (фиолетовая с золотой рамкой): картинка ui_panel или кодом. corner — размер угла на экране.
+export function panel(scene, w, h, { corner = 56 } = {}) {
+  if (hasArt(scene, 'ui_panel')) return sliceImage(scene, 'ui_panel', w, h, SLICES.ui_panel, corner / SLICES.ui_panel[0]);
+  const g = scene.add.graphics();
+  g.fillStyle(0x000000, 0.35).fillRoundedRect(-w / 2 + 6, -h / 2 + 14, w, h, 48);
+  g.fillStyle(0xd48a00, 1).fillRoundedRect(-w / 2 - 10, -h / 2 - 10, w + 20, h + 20, 56);
+  g.fillStyle(0xf5b301, 1).fillRoundedRect(-w / 2 - 10, -h / 2 - 10, w + 20, h + 12, 56);
+  g.fillStyle(0x5b3fd6, 1).fillRoundedRect(-w / 2, -h / 2, w, h, 46);
+  return g;
+}
+
+// Цвет кнопки → вариант картинки (ui_btn_<форма><суффикс>); цвета вне списка — кодом.
+const blankKey = (shape, color) => {
+  const suffix = { [U.buttonColor]: '', [U.exitColor]: '_red', [U.onColor]: '_green', [U.offColor]: '_gray' }[color];
+  return suffix === undefined ? null : `ui_btn_${shape}${suffix}`;
+};
+
+// Глянцевая плашка кодом: тень, тёмный «бок» снизу, лицо, мягкий блик сверху слева. shape: 'square' | 'round'.
 function drawBlank(g, w, h, color, shape) {
   const r = shape === 'round' ? Math.min(w, h) / 2 : Math.min(w, h) * 0.26;
   const dark = Phaser.Display.Color.ValueToColor(color).darken(28).color;
@@ -126,10 +180,23 @@ export function iconButton(scene, x, y, icon, onTap, {
   size = U.iconButton, shape = 'square', color = U.buttonColor, label = null, badge = null, depth = 15, sound = 'sfx_button',
 } = {}) {
   const btn = scene.add.container(x, y).setDepth(depth);
+  // заготовка-картинка нужного цвета, если есть; иначе — кодом
+  const art = scene.add.image(0, 0, 'ui_btn_square', '__BASE').setVisible(false);
   const g = scene.add.graphics();
-  drawBlank(g, size, size, color, shape);
-  btn.setColor = (c) => { g.clear(); drawBlank(g, size, size, c, shape); return btn; };
-  btn.add([g, makeIcon(scene, icon, size * 0.62).setPosition(0, -3)]);
+  btn.setColor = (c) => {
+    const key = blankKey(shape, c);
+    g.clear();
+    if (key && hasArt(scene, key)) {
+      art.setTexture(key, '__BASE').setVisible(true);
+      art.setScale(size / Math.max(art.width, art.height));
+    } else {
+      art.setVisible(false);
+      drawBlank(g, size, size, c, shape);
+    }
+    return btn;
+  };
+  btn.setColor(color);
+  btn.add([art, g, makeIcon(scene, icon, size * 0.62).setPosition(0, -3)]);
   if (label) {
     btn.add(scene.add.text(0, size / 2 + 22, label, {
       fontFamily: font(), fontStyle: 'bold', fontSize: '28px', color: '#ffffff', stroke: '#3b2a55', strokeThickness: 7,
@@ -165,10 +232,16 @@ export function iconButton(scene, x, y, icon, onTap, {
 export function counterPill(scene, x, y, icon, value, { w = U.pillWidth, depth = 15 } = {}) {
   const h = 56;
   const box = scene.add.container(x, y).setDepth(depth);
-  const g = scene.add.graphics();
-  g.fillStyle(0x000000, 0.25).fillRoundedRect(-w / 2 + 3, -h / 2 + 6, w, h, h / 2);
-  g.fillStyle(0xfff3e0, 1).fillRoundedRect(-w / 2, -h / 2, w, h, h / 2);
-  g.lineStyle(4, 0x9c6a3c, 1).strokeRoundedRect(-w / 2, -h / 2, w, h, h / 2);
+  let g;
+  if (hasArt(scene, 'ui_pill')) {
+    const src = scene.textures.get('ui_pill').get('__BASE');
+    g = sliceImage(scene, 'ui_pill', w, h + 8, SLICES.ui_pill, (h + 8) / src.height);
+  } else {
+    g = scene.add.graphics();
+    g.fillStyle(0x000000, 0.25).fillRoundedRect(-w / 2 + 3, -h / 2 + 6, w, h, h / 2);
+    g.fillStyle(0xfff3e0, 1).fillRoundedRect(-w / 2, -h / 2, w, h, h / 2);
+    g.lineStyle(4, 0x9c6a3c, 1).strokeRoundedRect(-w / 2, -h / 2, w, h, h / 2);
+  }
   const text = scene.add.text(14, 1, '', { fontFamily: font(), fontStyle: 'bold', fontSize: '34px', color: '#6b3d1f' }).setOrigin(0.5);
   box.add([g, makeIcon(scene, icon, 72).setPosition(-w / 2 + 6, 0), text]);
   box.setValue = (n) => { text.setText(String(n)); return box; };
@@ -180,17 +253,30 @@ export function plate(scene, x, y, label, { depth = 15, color = 0x2b2160 } = {})
   const text = scene.add.text(0, 0, label, {
     fontFamily: font(), fontStyle: 'bold', fontSize: '38px', color: '#ffffff', stroke: '#1b1426', strokeThickness: 6,
   }).setOrigin(0.5);
-  const w = text.width + 56;
-  const h = 64;
-  const g = scene.add.graphics();
-  g.fillStyle(0x000000, 0.3).fillRoundedRect(-w / 2 + 3, -h / 2 + 6, w, h, 22);
-  g.fillStyle(color, 1).fillRoundedRect(-w / 2, -h / 2, w, h, 22);
-  g.lineStyle(5, 0x8f6be8, 1).strokeRoundedRect(-w / 2, -h / 2, w, h, 22);
+  const w = text.width + 64;
+  const h = 72;
+  let g;
+  if (hasArt(scene, 'ui_plate')) {
+    g = sliceImage(scene, 'ui_plate', w, h, SLICES.ui_plate, 26 / SLICES.ui_plate[0]);
+    // своя окраска (табличка головоломки) — подкрашиваем заготовку
+    if (color !== 0x2b2160) g.list.forEach((img) => img.setTint(color));
+  } else {
+    g = scene.add.graphics();
+    g.fillStyle(0x000000, 0.3).fillRoundedRect(-w / 2 + 3, -h / 2 + 6, w, h, 22);
+    g.fillStyle(color, 1).fillRoundedRect(-w / 2, -h / 2, w, h, 22);
+    g.lineStyle(5, 0x8f6be8, 1).strokeRoundedRect(-w / 2, -h / 2, w, h, 22);
+  }
   return scene.add.container(x, y, [g, text]).setDepth(depth);
 }
 
 // Лоток под кнопками внизу экрана.
 export function tray(scene, x, y, w, h, { depth = 14 } = {}) {
+  if (hasArt(scene, 'ui_tray')) {
+    const src = scene.textures.get('ui_tray').get('__BASE');
+    // концы лотка — полукруги на всю высоту, поэтому масштаб углов — по высоте, но не больше, чем влезает по ширине
+    const k = Math.min(h / src.height, w / 2 / SLICES.ui_tray[0]);
+    return sliceImage(scene, 'ui_tray', w, h, SLICES.ui_tray, k).setPosition(x, y).setDepth(depth);
+  }
   const g = scene.add.graphics().setDepth(depth);
   g.fillStyle(0x000000, 0.3).fillRoundedRect(x - w / 2 + 4, y - h / 2 + 8, w, h, 40);
   g.fillStyle(0x3a2a78, 1).fillRoundedRect(x - w / 2, y - h / 2, w, h, 40);

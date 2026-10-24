@@ -9,7 +9,7 @@ import { sfx, sfxRandom, music } from '../audio.js';
 import { currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo, catNeed, lives, loseLife } from '../save.js';
 import { confirmLife, showNoLives } from '../view/lives.js';
 import { showPopup } from '../view/Popup.js';
-import { iconButton, counterPill, plate, tray, makeIcon } from '../view/ui.js';
+import { iconButton, counterPill, plate, tray, makeIcon, panel } from '../view/ui.js';
 import { addSettingsMenu } from '../view/settings.js';
 import LEVELS from '../levels/levels.json';
 
@@ -617,12 +617,9 @@ export class GameScene extends Phaser.Scene {
     const box = this.add.container(W / 2, cy).setDepth(21);
     const pw = WC.width;
     const ph = WC.height;
+    box.add(panel(this, pw + 20, ph + 20));
     const g = this.add.graphics();
-    g.fillStyle(0x000000, 0.35).fillRoundedRect(-pw / 2 + 6, -ph / 2 + 14, pw, ph, 48);
-    g.fillStyle(0xd48a00, 1).fillRoundedRect(-pw / 2 - 10, -ph / 2 - 10, pw + 20, ph + 20, 56);
-    g.fillStyle(0xf5b301, 1).fillRoundedRect(-pw / 2 - 10, -ph / 2 - 10, pw + 20, ph + 12, 56);
-    g.fillStyle(0x5b3fd6, 1).fillRoundedRect(-pw / 2, -ph / 2, pw, ph, 46);
-    g.fillStyle(0x6d52e8, 1).fillRoundedRect(-pw / 2 + 12, -ph / 2 + 12, pw - 24, ph * 0.45, 38);
+    g.fillStyle(0xffffff, 0.08).fillRoundedRect(-pw / 2 + 24, -ph / 2 + 24, pw - 48, ph * 0.43, 34); // светлее под звёздами
     // подставка под награды
     g.fillStyle(0x3b27a0, 1).fillEllipse(0, WC.rewardsY + 58, 380, 70);
     g.fillStyle(0x4a33c0, 1).fillEllipse(0, WC.rewardsY + 46, 380, 64);
@@ -808,12 +805,8 @@ export class GameScene extends Phaser.Scene {
     const box = this.add.container(W / 2, H / 2).setDepth(31);
     const pw = 520;
     const ph = 560;
+    box.add(panel(this, pw + 20, ph + 20));
     const g = this.add.graphics();
-    g.fillStyle(0x000000, 0.35).fillRoundedRect(-pw / 2 + 6, -ph / 2 + 14, pw, ph, 44);
-    g.fillStyle(0xd48a00, 1).fillRoundedRect(-pw / 2 - 10, -ph / 2 - 10, pw + 20, ph + 20, 52);
-    g.fillStyle(0xf5b301, 1).fillRoundedRect(-pw / 2 - 10, -ph / 2 - 10, pw + 20, ph + 12, 52);
-    g.fillStyle(0x5b3fd6, 1).fillRoundedRect(-pw / 2, -ph / 2, pw, ph, 42);
-    g.fillStyle(0x6d52e8, 1).fillRoundedRect(-pw / 2 + 12, -ph / 2 + 12, pw - 24, ph * 0.5, 34);
     // большой кружок уровня
     g.fillStyle(0xd48a00, 1).fillCircle(0, -70, 86);
     g.fillStyle(0xf5b301, 1).fillCircle(0, -76, 86);

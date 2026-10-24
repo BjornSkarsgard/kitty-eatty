@@ -1,13 +1,13 @@
-import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { makeButton } from './Button.js';
+import { panel } from './ui.js';
 import { sfx } from '../audio.js';
 
 // Окно поверх экрана: затемнение (тап по нему закрывает), панель, заголовок, текст и кнопки столбиком.
 // buttons: [{ label, onTap, color, disabled, keep }] — после onTap окно закрывается, если не keep
 // (keep — переключатели: onTap(btn) сам меняет надпись кнопки через btn.setLabel).
 // Возвращает close(); у него close.setText(s) — поменять текст (таймеры) и close.isOpen().
-// Картинка panel.png (этап 5) — позже, пока панель кодом.
+// Панель — заготовка ui_panel (src/view/ui.js).
 export function showPopup(scene, { title, text = '', buttons = [], depth = 50 }) {
   const W = CONFIG.width;
   const H = CONFIG.height;
@@ -23,20 +23,16 @@ export function showPopup(scene, { title, text = '', buttons = [], depth = 50 })
   const textH = text ? 110 : 0;
   const ph = 135 + textH + buttons.length * 110;
   const top = H / 2 - ph / 2;
-  const g = scene.add.graphics().setDepth(depth).setScrollFactor(0);
-  g.fillStyle(0x000000, 0.25).fillRoundedRect(W / 2 - pw / 2 + 6, top + 10, pw, ph, 36);
-  g.fillStyle(0xfff3e0, 1).fillRoundedRect(W / 2 - pw / 2, top, pw, ph, 36);
-  g.lineStyle(8, 0x9c3f1c, 1).strokeRoundedRect(W / 2 - pw / 2, top, pw, ph, 36);
+  parts.push(panel(scene, pw, ph, { corner: 44 }).setPosition(W / 2, top + ph / 2).setDepth(depth).setScrollFactor(0));
   // панель ловит тапы, чтобы они не закрывали окно
-  g.setInteractive(new Phaser.Geom.Rectangle(W / 2 - pw / 2, top, pw, ph), Phaser.Geom.Rectangle.Contains);
-  parts.push(g);
+  parts.push(scene.add.zone(W / 2, top + ph / 2, pw, ph).setDepth(depth).setScrollFactor(0).setInteractive());
 
   const font = `"${CONFIG.font}", sans-serif`;
   parts.push(scene.add.text(W / 2, top + 70, title, {
-    fontFamily: font, fontStyle: 'bold', fontSize: '50px', color: '#ffffff', stroke: '#9c3f1c', strokeThickness: 10,
+    fontFamily: font, fontStyle: 'bold', fontSize: '50px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 10,
   }).setOrigin(0.5).setDepth(depth).setScrollFactor(0));
   const body = scene.add.text(W / 2, top + 160, text, {
-    fontFamily: font, fontStyle: 'bold', fontSize: '32px', color: '#6b3d1f', align: 'center', wordWrap: { width: pw - 80 },
+    fontFamily: font, fontStyle: 'bold', fontSize: '32px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 6, align: 'center', wordWrap: { width: pw - 80 },
   }).setOrigin(0.5).setDepth(depth).setScrollFactor(0);
   parts.push(body);
   close.setText = (s) => body.setText(s);

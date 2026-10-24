@@ -1,7 +1,6 @@
-import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { showPopup } from './Popup.js';
-import { iconButton, plate, makeIcon } from './ui.js';
+import { iconButton, plate, makeIcon, panel } from './ui.js';
 import { sfx } from '../audio.js';
 import { skinsOwned, selectedSkin, selectSkin, buySkin, coins } from '../save.js';
 
@@ -25,16 +24,11 @@ export function openCollection(scene, { onChange } = {}) {
   parts.push(box);
   const pw = V.width;
   const ph = V.height;
-  const g = scene.add.graphics();
-  g.fillStyle(0x000000, 0.35).fillRoundedRect(-pw / 2 + 6, -ph / 2 + 14, pw, ph, 44);
-  g.fillStyle(0xd48a00, 1).fillRoundedRect(-pw / 2 - 10, -ph / 2 - 10, pw + 20, ph + 20, 52);
-  g.fillStyle(0xf5b301, 1).fillRoundedRect(-pw / 2 - 10, -ph / 2 - 10, pw + 20, ph + 12, 52);
-  g.fillStyle(0x5b3fd6, 1).fillRoundedRect(-pw / 2, -ph / 2, pw, ph, 42);
+  box.add(panel(scene, pw + 20, ph + 20));
   // панель ловит тапы, чтобы они не закрывали окно
-  g.setInteractive(new Phaser.Geom.Rectangle(-pw / 2, -ph / 2, pw, ph), Phaser.Geom.Rectangle.Contains);
-  box.add(g);
+  box.add(scene.add.zone(0, 0, pw, ph).setInteractive());
   box.add(plate(scene, 0, -ph / 2 + 4, 'Коллекция', { depth: 0, color: 0x4b33a8 }).setScale(1.2));
-  box.add(iconButton(scene, pw / 2 - 6, -ph / 2 + 4, 'close', close, { size: 84, shape: 'round', color: CONFIG.ui.exitColor, depth: 0 }));
+  box.add(iconButton(scene, pw / 2 - 26, -ph / 2 + 4, 'close', close, { size: 84, shape: 'round', color: CONFIG.ui.exitColor, depth: 0 }));
 
   let grid = null;
   const draw = () => {

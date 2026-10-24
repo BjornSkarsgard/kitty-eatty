@@ -129,7 +129,7 @@ export class RoomScene extends Phaser.Scene {
       fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '64px', color: '#ffffff',
       stroke: '#6b3d1f', strokeThickness: 12,
     }).setOrigin(0.5);
-    this.add.graphics().fillStyle(0x000000, 0.18).fillEllipse(x0 + W / 2, HC.floorY + 6, 260, 40);
+    this.add.graphics().fillStyle(0x000000, 0.18).fillEllipse(x0 + W / 2, HC.floorY + HC.shadowY, 260, 40); // тень под котом
     // кот сидит на полу, дышит в такт музыке, на тап — случайная реакция, как в игре
     const s = HC.catScale;
     this.cat = new CatView(this, x0 + W / 2, HC.floorY - CONFIG.cat.origin[2] * s, HC.catColor);

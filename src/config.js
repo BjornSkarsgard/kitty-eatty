@@ -297,6 +297,7 @@ export const CONFIG = {
   home: {
     titleY: 190,
     floorY: 750,         // где стоят лапы кота (на ковре в bg_room_home); ниже — пол
+    shadowY: -8,         // тень под котом: смещение от floorY (минус — выше)
     catScale: 2.6,
     catColor: 2,
     playY: 1020,

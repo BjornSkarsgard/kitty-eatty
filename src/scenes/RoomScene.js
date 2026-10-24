@@ -31,7 +31,8 @@ const TABS = SLOTS.slice(1);
 const KITCHEN = 0;
 const MAP = SLOTS.findIndex((s) => s.key === 'map');
 const HOME = SLOTS.findIndex((s) => s.key === 'home');
-const RING = SLOTS.length * W; // длина круга в пикселях поворота
+const STEP = R.archWidth + R.wallGap; // от арки до соседней на экране
+const RING = SLOTS.length * STEP; // длина круга в пикселях поворота
 const slotOf = (key) => Math.max(1, SLOTS.findIndex((s) => s.key === key));
 // Сдвиг по кругу в пределах [-RING/2, RING/2).
 const wrap = (x) => ((((x + RING / 2) % RING) + RING) % RING) - RING / 2;
@@ -50,7 +51,7 @@ export class RoomScene extends Phaser.Scene {
 
   init(data) {
     this.fromKitchen = data.fromKitchen; // вернулись из уровня — начинаем у открытой двери кухни
-    this.pan = { p: (this.fromKitchen ? KITCHEN : slotOf(data.zone ?? 'home')) * W };
+    this.pan = { p: (this.fromKitchen ? KITCHEN : slotOf(data.zone ?? 'home')) * STEP };
   }
 
   create() {
@@ -104,8 +105,8 @@ export class RoomScene extends Phaser.Scene {
   layout() {
     const p = this.pan.p;
     for (const s of this.slots) {
-      const d = wrap(s.i * W - p); // где арка относительно экрана
-      const on = Math.abs(d) < W;
+      const d = wrap(s.i * STEP - p); // где арка относительно экрана
+      const on = Math.abs(d) < (W + R.archWidth) / 2; // хоть краем на экране
       const k = s.room.scale;
       s.room.setVisible(on).setPosition(W / 2 - (W / 2) * k + R.depth * d, O.top * (1 - k));
       s.mask.x = d;
@@ -118,14 +119,14 @@ export class RoomScene extends Phaser.Scene {
       this.map.root.setPosition(P.x, P.y).setScale(P.scale);
     }
     // вкладки: доля пути между арками; у кухни стекло упирается в крайнюю вкладку
-    this.tabs.setPosition((((p % RING) + RING) % RING) / W - 1);
+    this.tabs.setPosition((((p % RING) + RING) % RING) / STEP - 1);
   }
 
   // Поворот к арке slot по кратчайшему пути (dir — куда ехать, если пути равны). ms и onDone — для проезда к кухне.
   goTo(slot, { dir = 1, ms = R.panDuration, ease = 'Cubic.easeInOut', onDone } = {}) {
     if (this.mapOpen && slot !== MAP) this.collapseMap();
     this.pan.p = ((this.pan.p % RING) + RING) % RING;
-    let delta = wrap(slot * W - this.pan.p);
+    let delta = wrap(slot * STEP - this.pan.p);
     if (Math.abs(Math.abs(delta) - RING / 2) < 1) delta = (dir * RING) / 2;
     if (Math.abs(delta) > 1 && !onDone) sfx(this, 'sfx_swipe', CONFIG.audio.swipe);
     this.tweens.killTweensOf(this.pan);
@@ -153,7 +154,7 @@ export class RoomScene extends Phaser.Scene {
   placeDoor(d) {
     const cx = O.x + d;
     this.leaves?.forEach((leaf, side) => leaf.setPosition(cx + (side ? 1 : -1) * (leaf.width / 2) * R.door.scale, R.door.bottom));
-    this.playButton.setX(cx).setVisible(!this.doorOpen && Math.abs(d) < W);
+    this.playButton.setX(cx).setVisible(!this.doorOpen && Math.abs(d) < STEP);
   }
 
   // Створки: open — распахнуты (сжаты к петлям и затенены) или закрыты; ms = 0 — сразу.
@@ -183,7 +184,7 @@ export class RoomScene extends Phaser.Scene {
     this.input.enabled = false;
     const go = () => this.swingDoor(true, R.door.openDuration, () =>
       zoomIn(this, R.doorZoom, R.doorZoomDuration, () => this.scene.start('Game', { levelIndex: index, fromHall: true })));
-    const span = wrap(KITCHEN * W - this.pan.p);
+    const span = wrap(KITCHEN * STEP - this.pan.p);
     if (Math.abs(span) < 2) return go();
     const ms = panDuration(span);
     const delta = this.goTo(KITCHEN, { dir: 1, ms, onDone: go });
@@ -371,7 +372,7 @@ export class RoomScene extends Phaser.Scene {
       if (g.axis === 'x' && !this.mapOpen) {
         // протащили дальше swipeShare экрана или быстро взмахнули — к соседней арке, иначе — обратно
         const dx = g.x0 - p.x;
-        let i = Math.round(g.pan0 / W);
+        let i = Math.round(g.pan0 / STEP);
         if (Math.abs(dx) > W * R.swipeShare || Math.abs(g.vx) > R.flick) i += Math.sign(dx);
         this.goTo(((i % SLOTS.length) + SLOTS.length) % SLOTS.length, { dir: Math.sign(dx) || 1 });
       }

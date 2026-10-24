@@ -15,18 +15,19 @@ const W = CONFIG.width;
 const H = CONFIG.height;
 const R = CONFIG.room;
 const HC = CONFIG.home;
-// Стена холла (арка, дверь, кусок стены) крупнее экрана в archScale раз от середины экрана — края обрезаны,
-// проём больше, откосы уже. Все размеры стены в конфиге — до этого увеличения.
+// Стена холла (арка, кусок стены) крупнее экрана в archScale раз от середины экрана — края обрезаны,
+// проём больше, откосы уже. Арка кухни — прежнего размера (sx = 1): дверь видна в стене целиком.
+// Все размеры стены в конфиге — до увеличения.
 const SX = R.archScale;
-const zoomY = (y) => H / 2 + (y - H / 2) * SX;
-const O = {
-  x: W / 2 + (R.opening.x - W / 2) * SX, w: R.opening.w * SX,
-  top: zoomY(R.opening.top), bottom: zoomY(R.opening.bottom), vault: R.opening.vault * SX,
-};
+const opening = (sx) => ({
+  x: W / 2 + (R.opening.x - W / 2) * sx, w: R.opening.w * sx,
+  top: H / 2 + (R.opening.top - H / 2) * sx, bottom: H / 2 + (R.opening.bottom - H / 2) * sx, vault: R.opening.vault * sx,
+});
+const OK = opening(1); // проём кухни
 const ARCH_W = R.archWidth * SX;
 const WALL_W = R.wallGap * SX;
-// зум сквозь открытую дверь: проём заполняет экран целиком
-const DOOR_ZOOM = Math.max(W / O.w, H / (O.bottom - O.top));
+// зум сквозь открытую дверь: проём кухни заполняет экран целиком
+const DOOR_ZOOM = Math.max(W / OK.w, H / (OK.bottom - OK.top));
 
 // Арки по кругу холла слева направо; круг замкнут (за профилем — снова кухня). Кухня — не вкладка,
 // остальные пять — вкладки нижней панели в том же порядке.
@@ -111,6 +112,8 @@ export class RoomScene extends Phaser.Scene {
 
   // Арка: комната (контейнер под маской проёма) и стена с аркой над ней.
   createSlot(s, i) {
+    const sx = s.key === 'kitchen' ? 1 : SX;
+    const O = opening(sx);
     const room = this.add.container(0, 0).setDepth(0);
     const key = s.key === 'kitchen' ? 'bg_game' : `bg_room_${s.key}`;
     let bg = null;
@@ -128,12 +131,12 @@ export class RoomScene extends Phaser.Scene {
     let arch = null;
     if (this.textures.exists('hall_arch')) {
       arch = this.add.image(0, H / 2, 'hall_arch').setDepth(5);
-      arch.setScale((H / arch.height) * SX);
+      arch.setScale((H / arch.height) * sx);
     }
     // кусок стены справа от арки — до следующей (hall_wall.jpg, tools/fit-hall-wall.mjs)
     const wall = this.textures.exists('hall_wall') && R.wallGap ? this.add.image(0, H / 2, 'hall_wall').setDepth(5) : null;
     wall?.setDisplaySize(WALL_W, H * SX);
-    return { i, room, mask, arch, wall, bg };
+    return { i, room, mask, arch, wall, bg, O, archW: R.archWidth * sx };
   }
 
   // Каждый кадр: всё на своих местах для текущего поворота pan.p.
@@ -141,13 +144,19 @@ export class RoomScene extends Phaser.Scene {
     const p = this.pan.p;
     for (const s of this.slots) {
       const d = wrap(s.i * STEP - p); // где арка относительно экрана
-      const on = Math.abs(d) < (W + ARCH_W) / 2; // хоть краем на экране
+      const on = Math.abs(d) < (W + s.archW) / 2; // хоть краем на экране
       const k = s.room.scale;
-      s.room.setVisible(on).setPosition(W / 2 - (W / 2) * k + R.depth * d, O.top * (1 - k));
+      s.room.setVisible(on).setPosition(W / 2 - (W / 2) * k + R.depth * d, s.O.top * (1 - k));
       s.mask.x = d;
       s.arch?.setVisible(on).setX(W / 2 + d);
-      const dw = d + STEP / 2; // середина стены после арки
-      s.wall?.setVisible(Math.abs(dw) < (W + WALL_W) / 2).setX(W / 2 + dw);
+      // стена — от края этой арки до края следующей (у кухни арка уже — стена рядом с ней шире)
+      const next = this.slots[(s.i + 1) % SLOTS.length];
+      const l = d + s.archW / 2;
+      const r = d + STEP - next.archW / 2;
+      if (s.wall) {
+        s.wall.displayWidth = r - l;
+        s.wall.setVisible(l < W / 2 && r > -W / 2).setX(W / 2 + (l + r) / 2);
+      }
       s.d = d;
     }
     this.placeDoor(this.slots[KITCHEN].d);
@@ -183,15 +192,15 @@ export class RoomScene extends Phaser.Scene {
   createDoor() {
     if (!this.textures.exists('kitchen_door')) return;
     this.leaves = [0, 1].map((side) => {
-      const leaf = this.add.image(0, 0, 'kitchen_door').setDepth(3).setOrigin(side, 1).setScale(R.door.scale * SX);
+      const leaf = this.add.image(0, 0, 'kitchen_door').setDepth(3).setOrigin(side, 1).setScale(R.door.scale);
       leaf.setCrop(side * leaf.width / 2, 0, leaf.width / 2, leaf.height);
       return leaf;
     });
   }
 
   placeDoor(d) {
-    const cx = O.x + d;
-    this.leaves?.forEach((leaf, side) => leaf.setPosition(cx + (side ? 1 : -1) * (leaf.width / 2) * R.door.scale * SX, zoomY(R.door.bottom)));
+    const cx = OK.x + d;
+    this.leaves?.forEach((leaf, side) => leaf.setPosition(cx + (side ? 1 : -1) * (leaf.width / 2) * R.door.scale, R.door.bottom));
   }
 
   // Створки: open — распахнуты (сжаты к петлям и затенены) или закрыты; ms = 0 — сразу.
@@ -203,7 +212,7 @@ export class RoomScene extends Phaser.Scene {
       // створки при закрытии пружинят (t чуть меньше 0) — тень не дальше «нет тени», иначе цвет переполняется и мигает
       const c = Phaser.Display.Color.Interpolate.ColorWithColor(white, shade, 1, Phaser.Math.Clamp(t, 0, 1));
       this.leaves.forEach((leaf) => {
-        leaf.scaleX = R.door.scale * SX * (1 - (1 - R.door.open) * t);
+        leaf.scaleX = R.door.scale * (1 - (1 - R.door.open) * t);
         leaf.setTint(Phaser.Display.Color.GetColor(c.r, c.g, c.b));
       });
     };
@@ -246,12 +255,12 @@ export class RoomScene extends Phaser.Scene {
   kitchenView(t) {
     const cam = this.cameras.main;
     const gcam = this.scene.get('Game').cameras.main;
-    const dy = (O.top + O.bottom) / 2 - H / 2; // середина проёма ниже/выше середины экрана
+    const dy = (OK.top + OK.bottom) / 2 - H / 2; // середина проёма ниже/выше середины экрана
     const zr = 1 + (DOOR_ZOOM - 1) * t;
     cam.setZoom(zr);
     cam.scrollY = dy * t;
     const cy = H / 2 + (1 - t) * dy * zr; // где сейчас на экране середина проёма
-    const zg = Math.min(1, (zr * O.w) / W);
+    const zg = Math.min(1, (zr * OK.w) / W);
     gcam.setZoom(zg);
     gcam.scrollY = (H / 2 - cy) / zg;
   }

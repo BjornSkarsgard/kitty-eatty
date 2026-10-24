@@ -37,8 +37,8 @@ const META = {
   ultraBoosterSave: 0.2,                       // с ультракотом нужно на столько меньше бустеров (умения сильнее)
   start: { coins: 0, undo: 3, hint: 1, jar: 1 },
   // Жизни: тратится одна, когда игрок жмёт «Заново» или выходит из начатого уровня; победа жизнь не тратит.
-  // Восполняются сами (по одной за regenMin минут, за ночь — полностью), за ролик (+adGives) или за монеты.
-  lives: { max: 6, regenMin: 20, adGives: 3, price: 40 },
+  // Восполняются сами (по одной за regenMin минут — и в игре, и пока игра закрыта), за ролик (+adGives) или за монеты.
+  lives: { max: 6, regenMin: 360, adGives: 3, price: 100 },
 };
 
 const PLAYER = {
@@ -121,9 +121,9 @@ for (let i = 0; i < LEVELS.length; i++) {
     }
     s.lives -= 1;
   }
-  // подарок дня — в начале каждого игрового дня; за ночь жизни восполнились
+  // подарок дня — в начале каждого игрового дня; за сутки вне игры жизни восполнились на сколько успели
   const day = Math.floor(s.sec / 60 / PLAYER.minutesPerDay);
-  if (s.day <= day && s.day > 0) s.lives = META.lives.max;
+  if (s.day <= day && s.day > 0) s.lives = Math.min(META.lives.max, s.lives + (24 * 60 - PLAYER.minutesPerDay) / META.lives.regenMin);
   while (s.day <= day) {
     const g = META.daily[s.day % META.daily.length];
     if (g === 'chest') openChest(); else coins(g);

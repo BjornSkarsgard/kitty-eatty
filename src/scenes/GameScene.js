@@ -6,7 +6,7 @@ import { beatPulse, beatPhase } from '../beat.js';
 import { CatView } from '../view/CatView.js';
 import { makeButton } from '../view/Button.js';
 import { sfx, sfxRandom, music } from '../audio.js';
-import { currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo } from '../save.js';
+import { currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo, catNeed } from '../save.js';
 import { showPopup } from '../view/Popup.js';
 import { iconButton, counterPill, plate, tray, makeIcon } from '../view/ui.js';
 import { addSettingsMenu } from '../view/settings.js';
@@ -650,6 +650,10 @@ export class GameScene extends Phaser.Scene {
         fontFamily: font, fontStyle: 'bold', fontSize: '32px', color: '#d9cfff',
       }).setOrigin(0.5));
     }
+    const xpBar = this.xpBar(box, WC.xpY, reward);
+
+    // полоска опыта кота доезжает, когда звёзды отпрыгали; новые уровни кота — окном поверх
+    this.time.delayedCall(400 + reward.stars * CONFIG.stars.popDelay + 300, () => this.fillXpBar(xpBar, reward));
 
     const next = () => this.scene.restart({ levelIndex: isLast ? 0 : this.levelIndex + 1 });
     box.add(makeButton(this, 0, WC.buttonY, isLast ? 'С начала' : 'Продолжить', next, { w: 380, h: 150, size: 50, skin: 'green' }));
@@ -689,5 +693,139 @@ export class GameScene extends Phaser.Scene {
         onComplete: () => this.fxStars.setDepth(23).explode(10, box.x + sx, box.y + sy),
       });
     }
+  }
+
+  // ---------- опыт кота ----------
+
+  // Полоска опыта в окне победы: слева кружок с уровнем кота, в полоске «опыт / нужно», справа сверху «+N опыта».
+  // Сначала показывает, каким кот был до победы; fillXpBar доводит.
+  xpBar(box, y, reward) {
+    const C = CONFIG.catXp;
+    const font = `"${CONFIG.font}", sans-serif`;
+    const w = C.barWidth;
+    const h = C.barHeight;
+    const x0 = -w / 2 + 30; // полоска чуть правее — слева кружок уровня
+    const track = this.add.graphics();
+    track.fillStyle(0x2b1a66, 1).fillRoundedRect(x0, y - h / 2, w, h, h / 2);
+    track.lineStyle(3, 0x8f6be8, 1).strokeRoundedRect(x0, y - h / 2, w, h, h / 2);
+    const fill = this.add.graphics();
+    const text = this.add.text(x0 + w / 2, y, '', {
+      fontFamily: font, fontStyle: 'bold', fontSize: '26px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 5,
+    }).setOrigin(0.5);
+    const badge = this.add.container(x0 - 6, y);
+    const bg = this.add.graphics();
+    bg.fillStyle(0xd48a00, 1).fillCircle(0, 4, 40);
+    bg.fillStyle(0xf5b301, 1).fillCircle(0, 0, 40);
+    bg.fillStyle(0xffffff, 0.3).fillEllipse(-10, -16, 34, 16);
+    const num = this.add.text(0, 2, '', {
+      fontFamily: font, fontStyle: 'bold', fontSize: '40px', color: '#ffffff', stroke: '#7a3a00', strokeThickness: 7,
+    }).setOrigin(0.5);
+    badge.add([bg, num]);
+    const gain = this.add.text(x0 + w, y - h / 2 - 22, reward.xp ? `+${reward.xp} опыта` : '', {
+      fontFamily: font, fontStyle: 'bold', fontSize: '28px', color: '#ffe066', stroke: '#2b1a66', strokeThickness: 6,
+    }).setOrigin(1, 0.5);
+    box.add([track, fill, text, badge, gain]);
+    const bar = {
+      level: reward.cat.level,
+      set: (level, xp) => {
+        const need = catNeed(level);
+        const k = Phaser.Math.Clamp(xp / need, 0, 1);
+        fill.clear();
+        if (k > 0) fill.fillStyle(0xffc83d, 1).fillRoundedRect(x0 + 4, y - h / 2 + 4, Math.max(h - 8, (w - 8) * k), h - 8, (h - 8) / 2);
+        if (k > 0) fill.fillStyle(0xffffff, 0.35).fillRoundedRect(x0 + 10, y - h / 2 + 7, Math.max(0, (w - 8) * k - 12), 6, 3);
+        text.setText(`${Math.floor(xp)} / ${need}`);
+        num.setText(String(level));
+      },
+      badge,
+    };
+    bar.set(reward.cat.level, reward.cat.xp);
+    return bar;
+  }
+
+  // Полоска доезжает до нового опыта; на каждом новом уровне кота — до конца, кружок подпрыгивает с новым числом,
+  // и с нуля дальше. Потом — окна «Новый уровень кота!» по очереди.
+  fillXpBar(bar, reward) {
+    const C = CONFIG.catXp;
+    if (!reward.xp) return;
+    const steps = []; // [уровень, от, до]
+    let level = reward.cat.level;
+    let from = reward.cat.xp;
+    let left = reward.xp;
+    while (left > 0) {
+      const room = catNeed(level) - from;
+      const take = Math.min(left, room);
+      steps.push([level, from, from + take]);
+      left -= take;
+      if (take === room) { level++; from = 0; } else from += take;
+    }
+    const run = (i) => {
+      if (i >= steps.length) return this.showCatLevelUps(reward.levelUps);
+      const [lv, a, b] = steps[i];
+      this.tweens.addCounter({
+        from: a, to: b, duration: C.barFillMs * Math.max(0.3, (b - a) / catNeed(lv)), ease: 'Cubic.easeOut',
+        onUpdate: (tw) => bar.set(lv, tw.getValue()),
+        onComplete: () => {
+          if (b < catNeed(lv)) return run(i + 1);
+          // новый уровень кота
+          sfx(this, 'sfx_star', CONFIG.audio.star, CONFIG.audio.starPitch[2]);
+          bar.set(lv + 1, 0);
+          this.tweens.add({ targets: bar.badge, scale: 1.35, duration: 140, yoyo: true, ease: 'Quad.easeOut' });
+          this.time.delayedCall(260, () => run(i + 1));
+        },
+      });
+    };
+    run(0);
+  }
+
+  // Окно «Новый уровень кота!»: кружок с номером, награды, «Забрать». Награды уже начислены при победе —
+  // здесь их только показываем и обновляем счётчик монет. Несколько уровней подряд — несколько окон по очереди.
+  showCatLevelUps(ups) {
+    const up = ups[0];
+    if (!up) return;
+    const W = CONFIG.width;
+    const H = CONFIG.height;
+    const font = `"${CONFIG.font}", sans-serif`;
+    const shade = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.45).setDepth(30).setInteractive();
+    const box = this.add.container(W / 2, H / 2).setDepth(31);
+    const pw = 520;
+    const ph = 560;
+    const g = this.add.graphics();
+    g.fillStyle(0x000000, 0.35).fillRoundedRect(-pw / 2 + 6, -ph / 2 + 14, pw, ph, 44);
+    g.fillStyle(0xd48a00, 1).fillRoundedRect(-pw / 2 - 10, -ph / 2 - 10, pw + 20, ph + 20, 52);
+    g.fillStyle(0xf5b301, 1).fillRoundedRect(-pw / 2 - 10, -ph / 2 - 10, pw + 20, ph + 12, 52);
+    g.fillStyle(0x5b3fd6, 1).fillRoundedRect(-pw / 2, -ph / 2, pw, ph, 42);
+    g.fillStyle(0x6d52e8, 1).fillRoundedRect(-pw / 2 + 12, -ph / 2 + 12, pw - 24, ph * 0.5, 34);
+    // большой кружок уровня
+    g.fillStyle(0xd48a00, 1).fillCircle(0, -70, 86);
+    g.fillStyle(0xf5b301, 1).fillCircle(0, -76, 86);
+    g.fillStyle(0xffffff, 0.3).fillEllipse(-24, -116, 70, 30);
+    box.add(g);
+    box.add(plate(this, 0, -ph / 2 + 4, 'Новый уровень кота!', { depth: 0, color: 0x4b33a8 }).setScale(1.1));
+    box.add(this.add.text(0, -72, String(up.level), {
+      fontFamily: font, fontStyle: 'bold', fontSize: '96px', color: '#ffffff', stroke: '#7a3a00', strokeThickness: 12,
+    }).setOrigin(0.5));
+    const items = [['coin', up.coins], ['undo', up.undos]].filter(([, n]) => n > 0);
+    items.forEach(([icon, n], i) => {
+      const x = (i - (items.length - 1) / 2) * 170;
+      const ic = makeIcon(this, icon, 92).setPosition(x, 80);
+      if (icon !== 'coin') ic.setScale(ic.scale * 0.8);
+      box.add(icon === 'coin' ? ic : [this.add.circle(x, 80, 44, 0x7b5cf0), ic]);
+      box.add(this.add.text(x + 38, 114, String(n), {
+        fontFamily: font, fontStyle: 'bold', fontSize: '44px', color: '#ffffff', stroke: '#2b1a66', strokeThickness: 8,
+      }).setOrigin(0.5));
+    });
+    const take = () => {
+      sfx(this, 'sfx_coins', CONFIG.audio.coins);
+      this.coinPill.setValue(coins());
+      this.refreshUndo();
+      shade.destroy();
+      box.destroy();
+      this.showCatLevelUps(ups.slice(1));
+    };
+    box.add(makeButton(this, 0, 205, 'Забрать', take, { w: 340, h: 130, size: 46, skin: 'green' }));
+    box.setScale(0.5).setAlpha(0);
+    sfx(this, 'sfx_popup', CONFIG.audio.popup);
+    this.tweens.add({ targets: box, scale: 1, alpha: 1, duration: 320, ease: 'Back.easeOut' });
+    this.fxStars.setDepth(32).explode(16, W / 2, H / 2 - 76);
   }
 }

@@ -8,19 +8,23 @@
 //   coins    — монеты (за победы; тратятся на отмены, позже — в магазине);
 //   undos    — запас отмен хода, общий на всю игру;
 //   undoProgress — сколько новых уровней пройдено к следующей бесплатной отмене;
+//   catLevel, xp — уровень кота (общий на игрока) и опыт, набранный к следующему;
 //   settings — { sound, music, fx, vibro }: переключатели под шестерёнкой.
 import { CONFIG } from './config.js';
 
 const KEY = 'kittyeatty.save';
-const VERSION = 2;
+const VERSION = 3;
 const E = CONFIG.economy;
+const C = CONFIG.catXp;
 
 const SETTINGS = { sound: true, music: true, fx: true, vibro: true };
-const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, undoProgress: 0, settings: { ...SETTINGS } });
+const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, undoProgress: 0, catLevel: 1, xp: 0, settings: { ...SETTINGS } });
 
 // Старые версии сохранения дополняем до текущей, прогресс не теряется.
 function migrate(d) {
   if (d.v === 1) d = { ...d, v: 2, coins: E.startCoins, undos: E.startUndos, undoProgress: 0 };
+  if (d.v === 2) d = { ...d, v: 3, catLevel: 1, xp: 0 };
+  if (d && !Number.isFinite(d.xp)) d.xp = 0; // битый опыт — с нуля, уровень кота не трогаем
   if (d && !d.settings) d.settings = {};
   if (d) d.settings = { ...SETTINGS, ...d.settings }; // новые переключатели — со значением по умолчанию
   return d;
@@ -34,7 +38,7 @@ function read() {
   try {
     const raw = window.localStorage.getItem(KEY);
     const d = raw && migrate(JSON.parse(raw));
-    if (d && d.v === VERSION && Number.isInteger(d.coins) && Number.isInteger(d.undos) && Number.isInteger(d.current) && Number.isInteger(d.unlocked) && d.best) return d;
+    if (d && d.v === VERSION && Number.isInteger(d.coins) && Number.isInteger(d.undos) && Number.isInteger(d.current) && Number.isInteger(d.unlocked) && Number.isInteger(d.catLevel) && d.best) return d;
   } catch (e) { /* нет доступа или битые данные — начинаем заново */ }
   return empty();
 }
@@ -71,16 +75,18 @@ export function setCurrentLevel(index) {
 // Победа: запоминаем лучший результат, открываем следующий уровень и запускаться будем с него
 // (даже если игру закрыли, не нажав «Дальше»). Награда — CONFIG.economy:
 // за первое прохождение монеты за победу и звёзды и шаг к бесплатной отмене;
-// за переигровку — монеты только за новые звёзды (фармить старые уровни невыгодно).
-// Возвращает { stars, coins, undos } — что показать в окне победы.
+// за переигровку — монеты только за новые звёзды (фармить старые уровни невыгодно). Так же опыт кота.
+// Возвращает, что показать в окне победы: { stars, coins, undos, xp, cat: { level, xp } — каким кот был до победы,
+// levelUps: [{ level, coins, undos }] — новые уровни кота и их награды (уже начислены) }.
 export function recordWin(level, index, moves, count) {
   const d = get();
   const prevStars = levelStars(level);
   const stars = starsFor(moves, level.minMoves);
   if (!(d.best[level.id] <= moves)) d.best[level.id] = moves;
-  const reward = { stars, coins: 0, undos: 0 };
+  const reward = { stars, coins: 0, undos: 0, xp: 0, cat: { level: d.catLevel, xp: d.xp }, levelUps: [] };
   if (prevStars === 0) {
-    reward.coins = E.winCoins + E.starCoins * stars;
+    reward.coins = E.winCoins + E.coinsPer25Levels * Math.floor(index / 25) + E.starCoins * stars;
+    reward.xp = C.winXp + C.starXp * stars + C.xpPer10Levels * Math.floor(index / 10);
     d.undoProgress += 1;
     if (d.undoProgress >= E.undoEveryLevels) {
       d.undoProgress = 0;
@@ -88,9 +94,19 @@ export function recordWin(level, index, moves, count) {
     }
   } else {
     reward.coins = E.starCoins * Math.max(0, stars - prevStars);
+    reward.xp = C.starXp * Math.max(0, stars - prevStars);
   }
   d.coins += reward.coins;
   d.undos += reward.undos;
+  d.xp += reward.xp;
+  while (d.xp >= catNeed(d.catLevel)) {
+    d.xp -= catNeed(d.catLevel);
+    d.catLevel += 1;
+    const up = catReward(d.catLevel);
+    d.coins += up.coins;
+    d.undos += up.undos;
+    reward.levelUps.push(up);
+  }
   const next = Math.min(index + 1, count - 1);
   d.unlocked = Math.max(d.unlocked, next);
   d.current = next;
@@ -115,6 +131,22 @@ export function levelStars(level) {
   const best = bestMoves(level.id);
   return best === undefined ? 0 : starsFor(best, level.minMoves);
 }
+
+// ---------- уровень кота ----------
+
+// Опыта от уровня кота level до следующего.
+export const catNeed = (level) => C.needBase + C.needStep * (level - 1);
+
+// Награда за достижение уровня кота level.
+export function catReward(level) {
+  return {
+    level,
+    coins: C.rewardCoins + C.rewardCoinsPerLevel * level,
+    undos: C.rewardUndos + (level % C.bonusUndoEvery === 0 ? 1 : 0),
+  };
+}
+
+export const catLevel = () => get().catLevel;
 
 // ---------- монеты и отмены ----------
 

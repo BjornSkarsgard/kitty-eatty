@@ -8,7 +8,7 @@ import { addSettingsMenu } from '../view/settings.js';
 import { panDuration, panFx, hud } from '../view/transition.js';
 import { music, sfx } from '../audio.js';
 import { beatPhase } from '../beat.js';
-import { currentLevel, unlockedLevel, levelStars, coins } from '../save.js';
+import { currentLevel, unlockedLevel, levelStars, coins, catLevel } from '../save.js';
 import LEVELS from '../levels/levels.json';
 
 const W = CONFIG.width;
@@ -436,7 +436,7 @@ export class RoomScene extends Phaser.Scene {
     const P = R.profile;
     const passed = unlockedLevel(LEVELS.length);
     const stars = LEVELS.reduce((sum, l) => sum + levelStars(l), 0);
-    const rows = [['Пройдено уровней', passed], ['Звёзд собрано', stars], ['Монет', coins()]];
+    const rows = [['Уровень кота', catLevel()], ['Пройдено уровней', passed], ['Звёзд собрано', stars]];
     const x0 = W / 2 - P.w / 2;
     rows.forEach(([name, value], k) => {
       const y = P.y + k * P.step;

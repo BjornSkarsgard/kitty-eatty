@@ -50,6 +50,11 @@ export class GameScene extends Phaser.Scene {
     if (this.textures.exists('bg_game')) {
       const bg = this.add.image(CONFIG.width / 2, CONFIG.height / 2, 'bg_game');
       bg.setScale(Math.max(CONFIG.width / bg.width, CONFIG.height / bg.height));
+      // за краями экрана — зеркальные продолжения кухни: видны, только пока уровень маленький в проёме двери холла
+      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        this.add.image(bg.x + dx * bg.displayWidth, bg.y + dy * bg.displayHeight, 'bg_game')
+          .setScale(bg.scaleX, bg.scaleY).setFlip(dx !== 0, dy !== 0);
+      }
       this.createWallPaws(bg);
     }
     makeFxTextures(this);

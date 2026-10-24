@@ -188,7 +188,8 @@ export class RoomScene extends Phaser.Scene {
     const white = Phaser.Display.Color.ValueToColor(0xffffff);
     const shade = Phaser.Display.Color.ValueToColor(R.door.shade);
     const set = (t) => {
-      const c = Phaser.Display.Color.Interpolate.ColorWithColor(white, shade, 1, t);
+      // створки при закрытии пружинят (t чуть меньше 0) — тень не дальше «нет тени», иначе цвет переполняется и мигает
+      const c = Phaser.Display.Color.Interpolate.ColorWithColor(white, shade, 1, Phaser.Math.Clamp(t, 0, 1));
       this.leaves.forEach((leaf) => {
         leaf.scaleX = R.door.scale * (1 - (1 - R.door.open) * t);
         leaf.setTint(Phaser.Display.Color.GetColor(c.r, c.g, c.b));

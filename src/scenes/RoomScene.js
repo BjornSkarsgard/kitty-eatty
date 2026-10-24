@@ -50,6 +50,7 @@ export class RoomScene extends Phaser.Scene {
     this.createHome(2 * W);
     this.createCollection(3 * W);
     this.createProfile(4 * W);
+    this.createDividers();
 
     const U = CONFIG.ui;
     counterPill(this, 30 + U.pillWidth / 2, U.topY, 'coin', coins(), { depth: 25 }).setScrollFactor(0);
@@ -82,7 +83,7 @@ export class RoomScene extends Phaser.Scene {
 
   // ---------- комната ----------
 
-  // Стена и пол на всю ширину; на стыках участков — вертикальные «косяки» (в арте там будут шкаф, штора, растение).
+  // Стена и пол на всю ширину (под картинками участков, пока их нет).
   drawRoom() {
     const total = W * ZONES.length;
     const g = this.add.graphics();
@@ -94,11 +95,33 @@ export class RoomScene extends Phaser.Scene {
         const bg = this.add.image(i * W + W / 2, H / 2, `bg_room_${z.key}`);
         bg.setScale(Math.max(W / bg.width, H / bg.height));
       }
-      if (i) {
-        g.fillStyle(0x9c6a3c, 1).fillRect(i * W - 18, 0, 36, HC.floorY);
-        g.fillStyle(0xffffff, 0.15).fillRect(i * W - 14, 0, 6, HC.floorY);
-      }
     });
+  }
+
+  // Общий дверной косяк на каждом стыке участков — один на две соседние комнаты (свои косяки картинок срезаны).
+  // Он ближе к камере, чем комнаты, поэтому при листании чуть обгоняет фон (параллакс) — так чувствуется глубина.
+  // Положение подобрано так, что посередине между участками косяк ровно на стыке.
+  // Картинка room_divider.png (высокая, на всю высоту экрана) — позже; пока косяк кодом.
+  createDividers() {
+    const D = R.divider;
+    for (let i = 1; i < ZONES.length; i++) {
+      const x = W / 2 + D.parallax * (i * W - W / 2);
+      let obj;
+      if (this.textures.exists('room_divider')) {
+        obj = this.add.image(x, H / 2, 'room_divider');
+        obj.setScale(H / obj.height);
+      } else {
+        const g = this.add.graphics().setPosition(x, 0);
+        const w = D.width;
+        g.fillStyle(0x000000, 0.25).fillRect(-w / 2 + 10, 0, w, H);               // тень на стене справа
+        g.fillStyle(0x7a4b2a, 1).fillRect(-w / 2, 0, w, H);                       // косяк
+        g.fillStyle(0xa8703f, 1).fillRect(-w / 2 + 8, 0, w - 22, H);              // лицевая доска
+        g.fillStyle(0xffffff, 0.18).fillRect(-w / 2 + 12, 0, 8, H);               // блик слева сверху
+        g.fillStyle(0x5c361d, 1).fillRect(w / 2 - 14, 0, 14, H);                  // торец в тени
+        obj = g;
+      }
+      obj.setScrollFactor(D.parallax, 1).setDepth(5);
+    }
   }
 
   createHome(x0) {

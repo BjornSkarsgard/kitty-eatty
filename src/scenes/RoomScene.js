@@ -129,7 +129,7 @@ export class RoomScene extends Phaser.Scene {
     const U = CONFIG.ui;
     const w = 130;
     const x = 30 + U.pillWidth + 20 + w / 2;
-    this.livesPill = counterPill(this, x, U.topY, 'heart', lives(), { w, depth: 25 }).setScrollFactor(0);
+    this.livesPill = counterPill(this, x, U.topY, 'heart', '', { w, depth: 25 }).setScrollFactor(0);
     this.livesTimer = this.add.text(x, U.topY + 46, '', {
       fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '24px', color: '#ffffff', stroke: '#3b2a55', strokeThickness: 6,
     }).setOrigin(0.5).setDepth(25).setScrollFactor(0);
@@ -139,7 +139,7 @@ export class RoomScene extends Phaser.Scene {
 
   refreshTop() {
     this.coinPill.setValue(coins());
-    this.livesPill.setValue(lives());
+    this.livesPill.setValue(lives() + '/' + CONFIG.lives.max); // 4/6 — сколько из скольких
     const left = livesRefillLeft();
     this.livesTimer.setText(left ? formatLeft(left) : '');
   }

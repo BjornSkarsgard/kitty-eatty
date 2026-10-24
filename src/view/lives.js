@@ -18,7 +18,7 @@ export function formatLeft(ms) {
 export function confirmLife(scene, title, onYes) {
   showPopup(scene, {
     title,
-    text: `Сгорит 1 жизнь. Сейчас жизней: ${lives()}`,
+    text: `Сгорит 1 жизнь. Сейчас жизней: ${lives()}/${CONFIG.lives.max}`,
     buttons: [
       { label: 'Да', color: CONFIG.ui.exitColor, onTap: onYes },
       { label: 'Нет' },
@@ -35,9 +35,15 @@ export function showNoLives(scene, onGot) {
   }];
   if (CONFIG.ads.enabled) buttons.push({ label: `Ролик: +${L.adGives} жизни`, color: 0xf0a020, onTap: () => {} }); // этап 6
   buttons.push({ label: 'Подождать' });
-  showPopup(scene, {
-    title: 'Жизни кончились',
-    text: `Все жизни вернутся через ${formatLeft(livesRefillLeft())}\nМонет: ${coins()}`,
-    buttons,
+  const text = () => `Все жизни вернутся через ${formatLeft(livesRefillLeft())}\nМонет: ${coins()}`;
+  const popup = showPopup(scene, { title: 'Жизни кончились', text: text(), buttons });
+  // таймер тикает; дотикал — жизни вернулись: окно закрывается, и дальше как после покупки
+  const tick = scene.time.addEvent({
+    delay: 1000, loop: true,
+    callback: () => {
+      if (!popup.isOpen()) return tick.remove();
+      if (lives() > 0) { tick.remove(); popup(); return onGot?.(); }
+      popup.setText(text());
+    },
   });
 }

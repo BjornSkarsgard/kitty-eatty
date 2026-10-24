@@ -6,6 +6,7 @@ import { sfx } from '../audio.js';
 // Окно поверх экрана: затемнение (тап по нему закрывает), панель, заголовок, текст и кнопки столбиком.
 // buttons: [{ label, onTap, color, disabled, keep }] — после onTap окно закрывается, если не keep
 // (keep — переключатели: onTap(btn) сам меняет надпись кнопки через btn.setLabel).
+// Возвращает close(); у него close.setText(s) — поменять текст (таймеры) и close.isOpen().
 // Картинка panel.png (этап 5) — позже, пока панель кодом.
 export function showPopup(scene, { title, text = '', buttons = [], depth = 50 }) {
   const W = CONFIG.width;
@@ -34,9 +35,12 @@ export function showPopup(scene, { title, text = '', buttons = [], depth = 50 })
   parts.push(scene.add.text(W / 2, top + 70, title, {
     fontFamily: font, fontStyle: 'bold', fontSize: '50px', color: '#ffffff', stroke: '#9c3f1c', strokeThickness: 10,
   }).setOrigin(0.5).setDepth(depth).setScrollFactor(0));
-  parts.push(scene.add.text(W / 2, top + 160, text, {
+  const body = scene.add.text(W / 2, top + 160, text, {
     fontFamily: font, fontStyle: 'bold', fontSize: '32px', color: '#6b3d1f', align: 'center', wordWrap: { width: pw - 80 },
-  }).setOrigin(0.5).setDepth(depth).setScrollFactor(0));
+  }).setOrigin(0.5).setDepth(depth).setScrollFactor(0);
+  parts.push(body);
+  close.setText = (s) => body.setText(s);
+  close.isOpen = () => body.active;
 
   buttons.forEach((b, i) => {
     const btn = makeButton(scene, W / 2, top + 160 + textH + i * 110, b.label, () => {

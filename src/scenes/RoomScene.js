@@ -51,6 +51,7 @@ export class RoomScene extends Phaser.Scene {
 
   init(data) {
     this.fromKitchen = data.fromKitchen; // вернулись из уровня — начинаем у открытой двери кухни
+    this.tabLock = null; // сцена переиспользуется — блокировка стекла вкладок с прошлого раза не нужна
     this.pan = { p: (this.fromKitchen ? KITCHEN : slotOf(data.zone ?? 'home')) * STEP };
   }
 
@@ -141,8 +142,15 @@ export class RoomScene extends Phaser.Scene {
     this.placeDoor(this.slots[KITCHEN].d);
     const P = this.mapPlace();
     this.map.root.setPosition(P.x, P.y).setScale(P.scale);
-    // вкладки: доля пути между арками; у кухни стекло упирается в крайнюю вкладку
-    this.tabs.setPosition((((p % RING) + RING) % RING) / STEP - 1);
+    // вкладки: доля пути между арками; на пути к кухне и обратно стекло стоит на «Главной» (tabLock)
+    this.tabs.setPosition(this.tabLock ? this.tabLock.f : (((p % RING) + RING) % RING) / STEP - 1);
+  }
+
+  // Стекло вкладок перестаёт следить за поворотом и переезжает на «Главную» (или сразу стоит там).
+  lockTabsHome(slide = true) {
+    const home = HOME - 1;
+    this.tabLock = { f: slide ? Phaser.Math.Clamp((((this.pan.p % RING) + RING) % RING) / STEP - 1, 0, TABS.length - 1) : home };
+    if (slide) this.tweens.add({ targets: this.tabLock, f: home, duration: R.tabSlide, ease: 'Cubic.easeOut' });
   }
 
   // Поворот к арке slot. Между вкладками — напрямую (магазин … профиль, мимо кухни не ездим);
@@ -201,6 +209,7 @@ export class RoomScene extends Phaser.Scene {
   startLevel(index) {
     if (this.mapOpen) return this.collapseMap(() => this.startLevel(index));
     this.input.enabled = false;
+    this.lockTabsHome();
     const game = this.scene.get('Game');
     this.scene.launch('Game', { levelIndex: index, behindDoor: true });
     let arrived = false;
@@ -254,6 +263,7 @@ export class RoomScene extends Phaser.Scene {
   // и только тогда уровень выключается; потом быстро едем на главную тем же путём — через профиль и коллекцию.
   backFromKitchen() {
     this.input.enabled = false;
+    this.lockTabsHome(false);
     this.slots[KITCHEN].bg?.setVisible(false);
     this.swingDoor(true, 0);
     this.kitchenView(1);
@@ -269,7 +279,7 @@ export class RoomScene extends Phaser.Scene {
         this.scene.stop('Game');
         const ms = panDuration(RING / 2);
         panFx(this, -1, ms);
-        this.goTo(HOME, { ring: true, dir: -1, ms, onDone: () => (this.input.enabled = true) });
+        this.goTo(HOME, { ring: true, dir: -1, ms, onDone: () => { this.tabLock = null; this.input.enabled = true; } });
       }),
     });
   }

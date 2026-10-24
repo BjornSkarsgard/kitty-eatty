@@ -76,6 +76,10 @@ export function setupAudioFocus(game) {
     const snd = game.sound;
     if (!snd.context) return; // HTML5 Audio (без WebAudio) — оставляем как есть
     snd.pauseOnBlur = false;
+    // Phaser при возврате сам дёргает suspend() + resume() без обработки ошибки: если устройство звука ещё занято,
+    // вылетает InvalidStateError «Failed to start the audio device», а заодно обрывается наше плавное включение.
+    // Возврат ведём только мы (ниже), с повтором по касанию.
+    game.events.off('visible', snd.onGameVisible, snd);
     const ctx = snd.context;
     const gain = snd.masterVolumeNode.gain;
     const GESTURES = ['touchend', 'click', 'pointerup', 'keydown'];

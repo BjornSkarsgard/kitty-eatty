@@ -25,19 +25,24 @@ export class CatsLevel {
   }
 
   // Фон — кухня (bg_game); за краями экрана — зеркальные продолжения кухни: видны, только пока уровень маленький
-  // в проёме двери холла. Лапки на обоях. Текстуры эффектов (искорки, сердечки, конфетти).
+  // в проёме двери холла (влёт и выход), остальное время спрятаны — setMirrors. Лапки на обоях.
+  // Текстуры эффектов (искорки, сердечки, конфетти).
   createBackground() {
     const scene = this.scene;
     if (scene.textures.exists('bg_game')) {
       const bg = scene.add.image(CONFIG.width / 2, CONFIG.height / 2, 'bg_game');
       bg.setScale(Math.max(CONFIG.width / bg.width, CONFIG.height / bg.height));
-      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      this.mirrors = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]].map(([dx, dy]) =>
         scene.add.image(bg.x + dx * bg.displayWidth, bg.y + dy * bg.displayHeight, 'bg_game')
-          .setScale(bg.scaleX, bg.scaleY).setFlip(dx !== 0, dy !== 0);
-      }
+          .setScale(bg.scaleX, bg.scaleY).setFlip(dx !== 0, dy !== 0));
       this.createWallPaws(bg);
     }
     makeFxTextures(scene);
+  }
+
+  // Зеркальные продолжения кухни: нужны только на время перехода через дверь холла.
+  setMirrors(on) {
+    this.mirrors?.forEach((m) => m.setVisible(on));
   }
 
   // Лапки на обоях: штамп paw.png ровной сеткой по стене (ряды через dy, соседние сдвинуты на полшага dx).
@@ -238,7 +243,7 @@ export class CatsLevel {
     const r = game.bowlRects[bowl];
     const top = r.top;
     const bottom = r.bottom - game.dim.base;
-    const wrap = makeJuteWrap(game, color, game.dim.bw, top, bottom, `jute_anim_${bowl}`).setPosition(r.x, 0).setDepth(2);
+    const wrap = makeJuteWrap(game, color, game.dim.bw, top, bottom).setPosition(r.x, 0).setDepth(2);
     this.wraps[bowl] = wrap;
     wrap.reveal(0);
     wrap.t = 0;

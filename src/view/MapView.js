@@ -57,7 +57,7 @@ export class MapView {
     return new Phaser.Geom.Rectangle(r.x - (W / 2) * r.scale, r.y - (this.viewH / 2) * r.scale, W * r.scale, this.viewH * r.scale);
   }
 
-  // Каждый кадр: инерция прокрутки и маска по текущему положению и масштабу.
+  // Каждый кадр: инерция прокрутки; маска перерисовывается, только когда окно карты сдвинулось или изменилось.
   update(dragging) {
     if (!dragging && Math.abs(this.velocity) > 0.2) {
       this.setScroll(this.scroll + this.velocity);
@@ -69,6 +69,8 @@ export class MapView {
       this.setScroll(this.scroll);
     }
     const b = this.bounds();
+    if (this.maskRect && Phaser.Geom.Rectangle.Equals(b, this.maskRect)) return;
+    this.maskRect = b;
     this.maskShape.clear().fillStyle(PAL.white).fillRect(b.x, b.y, b.width, b.height);
   }
 

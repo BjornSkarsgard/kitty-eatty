@@ -65,7 +65,14 @@ export class GameScene extends Phaser.Scene {
     if (this.behindDoor) {
       this.scene.moveBelow('Room'); // виден только в проёме двери, холл — сверху
       this.input.enabled = false;
-    }
+    } else this.theme.setMirrors(false); // не из холла — продолжения кухни за краями не видны
+  }
+
+  // Холл довёл влёт через дверь: уровень во весь экран, можно играть; продолжения кухни за краями больше не нужны.
+  enteredFromHall() {
+    this.cameras.main.setZoom(1).setScroll(0, 0);
+    this.input.enabled = true;
+    this.theme.setMirrors(false);
   }
 
   // Выход из уровня: если уровень начат и не пройден — сначала предупреждение, что сгорит жизнь.
@@ -86,6 +93,7 @@ export class GameScene extends Phaser.Scene {
   // и выключает уровень (RoomScene.backFromKitchen).
   goHome() {
     this.input.enabled = false;
+    this.theme.setMirrors(true); // уровень сейчас уменьшится в проём двери — за краями видна кухня
     this.scene.moveBelow('Room');
     this.scene.launch('Room', { fromKitchen: true });
   }

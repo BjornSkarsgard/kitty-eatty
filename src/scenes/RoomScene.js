@@ -86,6 +86,7 @@ export class RoomScene extends Phaser.Scene {
 
   init(data) {
     this.fromKitchen = data.fromKitchen; // вернулись из уровня — начинаем у открытой двери кухни
+    this.laidOut = null;
     this.tabLock = null; // сцена переиспользуется — блокировка стекла вкладок с прошлого раза не нужна
     this.pan = { p: (this.fromKitchen ? KITCHEN : slotOf(data.zone ?? 'home')) * STEP };
   }
@@ -186,6 +187,7 @@ export class RoomScene extends Phaser.Scene {
   // Каждый кадр: всё на своих местах для текущего поворота pan.p.
   layout() {
     const p = this.pan.p;
+    this.laidOut = { p, tab: this.tabLock ? this.tabLock.f : null };
     for (const s of this.slots) {
       const d = wrap(s.i * STEP - p); // где арка относительно экрана
       const on = Math.abs(d) < (W + s.archW) / 2; // хоть краем на экране
@@ -339,8 +341,7 @@ export class RoomScene extends Phaser.Scene {
       from: 0, to: 1, duration: R.doorZoomDuration, ease: 'Cubic.easeIn',
       onUpdate: (tw) => this.kitchenView(tw.getValue()),
       onComplete: () => {
-        game.cameras.main.setZoom(1).setScroll(0, 0);
-        game.input.enabled = true;
+        game.enteredFromHall();
         this.scene.stop();
       },
     });
@@ -722,7 +723,9 @@ export class RoomScene extends Phaser.Scene {
 
   update() {
     this.cat.breathe(beatPhase(this, CONFIG.anim.idleBreathBeats));
-    this.layout();
+    // раскладка зависит только от поворота и стекла вкладок — пересчитываем, когда они сдвинулись
+    const tab = this.tabLock ? this.tabLock.f : null;
+    if (this.pan.p !== this.laidOut?.p || tab !== this.laidOut.tab) this.layout();
     this.map.update(this.gesture?.axis === 'y');
   }
 }

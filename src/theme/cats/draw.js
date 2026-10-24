@@ -150,9 +150,11 @@ function makeLayer(scene, w, h, fill, g) {
 
 // Когтеточка: джутовая верёвка jute_wrap вокруг банки от bottom до top (центр по x = 0), покрашенная tint'ом
 // в цвет корма, и картинка корма поверх. Берётся целое число витков (по стыкам картинки, CONFIG.jute.coilFirst/
-// coilPitch), чуть растянутых по высоте, чтобы ровно закрыть стенку. Верёвка рисуется в свою текстуру key:
-// container.reveal(t), t = 0…1 — витки по очереди снизу вверх, каждый идёт слева направо со скруглённым концом.
-export function makeJuteWrap(scene, colorIndex, w, top, bottom, key) {
+// coilPitch), чуть растянутых по высоте, чтобы ровно закрыть стенку. Полная обмотка из n витков рисуется в текстуру
+// один раз (jute_coils_<n>, общая для всех банок). container.reveal(t), t = 0…1 — витки по очереди снизу вверх,
+// каждый идёт слева направо со скруглённым концом: открывается маской (фигуры, без перерисовки текстуры);
+// при t = 1 маска снимается.
+export function makeJuteWrap(scene, colorIndex, w, top, bottom) {
   const J = CONFIG.jute;
   const color = lighten(CONFIG.colors[colorIndex].fill, J.tintLighten);
   const src = scene.textures.get('jute_wrap').getSourceImage();
@@ -163,31 +165,47 @@ export function makeJuteWrap(scene, colorIndex, w, top, bottom, key) {
   const maxCoils = Math.floor((lastSeam - J.coilFirst) / p) + 1;
   const n = Math.max(1, Math.min(maxCoils, Math.round((bottom - top) / (p * k))));
   const H = Math.ceil(n * p);
-  if (scene.textures.exists(key)) scene.textures.remove(key);
-  const canvas = scene.textures.createCanvas(key, W, H);
-  const ctx = canvas.getContext();
+  const key = `jute_coils_${n}`;
+  if (!scene.textures.exists(key)) {
+    const canvas = scene.textures.createCanvas(key, W, H);
+    const ctx = canvas.getContext();
+    for (let i = 0; i < n; i++) ctx.drawImage(src, 0, lastSeam - i * p, W, p, 0, H - (i + 1) * p, W, p); // виток i снизу
+    canvas.refresh();
+  }
+  const sy = (bottom - top) / H;
   const r = p / 2;
+  // маска в координатах текстуры: та же фигура, что раньше вырезалась на холсте
+  const mask = scene.make.graphics({ add: false }).setScale(k, sy);
   const reveal = (t) => {
-    ctx.clearRect(0, 0, W, H);
+    if (t >= 1) {
+      if (rope.mask) rope.clearMask();
+      return;
+    }
+    if (!rope.mask) rope.setMask(mask.createGeometryMask());
+    mask.setPosition(c.x - (W * k) / 2, c.y + bottom - H * sy);
+    mask.clear().fillStyle(0xffffff, 1);
     const done = t * n;
     for (let i = 0; i < n && i < done; i++) {
-      const sy = lastSeam - i * p; // виток i снизу в картинке
-      const dy = H - (i + 1) * p;  // и на холсте
+      const dy = H - (i + 1) * p;
       const end = W * Math.min(1, done - i);
-      ctx.save();
-      if (end < W) {
-        ctx.beginPath();
-        ctx.rect(0, dy, Math.max(0, end - r), p);
-        ctx.ellipse(Math.max(0, end - r), dy + r, Math.min(r, end), r, 0, -Math.PI / 2, Math.PI / 2);
-        ctx.clip();
+      if (end >= W) {
+        mask.fillRect(0, dy, W, p);
+        continue;
       }
-      ctx.drawImage(src, 0, sy, W, p, 0, dy, W, p);
-      ctx.restore();
+      const cx = Math.max(0, end - r);
+      const rx = Math.min(r, end);
+      mask.fillRect(0, dy, cx, p);
+      mask.beginPath();
+      mask.moveTo(cx, dy);
+      for (let a = 0; a <= 16; a++) {
+        const ang = -Math.PI / 2 + (Math.PI * a) / 16;
+        mask.lineTo(cx + Math.cos(ang) * rx, dy + r + Math.sin(ang) * r);
+      }
+      mask.closePath();
+      mask.fillPath();
     }
-    canvas.refresh();
   };
-  reveal(1);
-  const rope = scene.add.image(0, bottom, key).setOrigin(0.5, 1).setScale(k, (bottom - top) / H).setTint(color);
+  const rope = scene.add.image(0, bottom, key).setOrigin(0.5, 1).setScale(k, sy).setTint(color);
   // картинка корма поверх джута
   const cy = (top + bottom) / 2;
   const size = Math.min(w * J.iconSize, (bottom - top) * 0.6);
@@ -208,6 +226,7 @@ export function makeJuteWrap(scene, colorIndex, w, top, bottom, key) {
   c.rope = rope;
   c.coils = n;
   c.reveal = reveal;
+  c.once('destroy', () => mask.destroy());
   c.icon = icon;
   c.iconScale = iconScale;
   return c;

@@ -51,12 +51,18 @@ export function music(scene, key) {
     snd.setVolume(0); // Phaser до старта отдаёт volume = 1 — без этого музыка начиналась на полной громкости
     state.sound = snd;
     fade(snd, musicVolume(), xf, null, 0);
-    const untilNext = Math.max(1000, snd.duration * 1000 - xf);
-    state.timer = setTimeout(() => {
-      if (state.stopped) return;
-      fade(snd, 0, xf, () => snd.destroy());
-      startCopy();
-    }, untilNext);
+    // следующая копия — за xf до конца трека; время берётся по позиции трека, поэтому после паузы
+    // (игру свернули) петля перепланируется с того же места, а не по таймеру, который шёл всё это время
+    state.schedule = () => {
+      clearTimeout(state.timer);
+      const untilNext = Math.max(1000, (snd.duration - snd.seek) * 1000 - xf);
+      state.timer = setTimeout(() => {
+        if (state.stopped) return;
+        fade(snd, 0, xf, () => snd.destroy());
+        startCopy();
+      }, untilNext);
+    };
+    state.schedule();
   };
   startCopy();
 }
@@ -76,6 +82,7 @@ export function setupAudioFocus(game) {
     let timer = null;
 
     const fadeIn = () => {
+      current?.schedule?.(); // звук снова идёт — петля музыки от текущей позиции трека
       const now = ctx.currentTime;
       gain.cancelScheduledValues(now);
       gain.setValueAtTime(0, now);
@@ -100,6 +107,7 @@ export function setupAudioFocus(game) {
       gain.setValueAtTime(gain.value, t);
       if (document.hidden) {
         listen(false);
+        clearTimeout(current?.timer); // пока свёрнуто, петля стоит (иначе таймер запустит копию в паузе — двойной старт)
         gain.linearRampToValueAtTime(0, t + A.focusFadeOut / 1000);
         timer = setTimeout(() => ctx.suspend().catch(() => {}), A.focusFadeOut + A.focusSuspendDelay);
       } else {

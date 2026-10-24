@@ -79,13 +79,20 @@ export class CatView extends Phaser.GameObjects.Container {
     });
   }
 
-  // Слой с вариантами (глаза, рот): картинка, если есть, иначе фигура.
-  swapLayer(box, layoutKey, key, pivot, fallback) {
-    box.removeAll(true);
-    if (this.useArt && this.image(box, layoutKey, key, pivot)) return;
-    const g = this.scene.add.graphics();
-    fallback(g);
-    box.add(g);
+  // Слой с вариантами (глаза, рот): каждый вариант создаётся один раз, при первом показе (картинка, если есть,
+  // иначе фигура), дальше только переключается видимость — моргание ничего не пересоздаёт.
+  swapLayer(box, variant, layoutKey, key, pivot, fallback) {
+    box.variants ??= {};
+    if (!box.variants[variant]) {
+      let v = this.useArt && this.image(box, layoutKey, key, pivot);
+      if (!v) {
+        v = this.scene.add.graphics();
+        fallback(v);
+        box.add(v);
+      }
+      box.variants[variant] = v;
+    }
+    for (const [name, v] of Object.entries(box.variants)) v.setVisible(name === variant);
   }
 
   // mood: 'open' — ждёт, 'happy' — ест/сыт, 'grumpy' — ворчит, 'closed' — моргает/спит.
@@ -98,11 +105,11 @@ export class CatView extends Phaser.GameObjects.Container {
   // Открытые и довольные глаза общие; у ворчливых и закрытых веко в цвет шерсти — свои у каждого кота.
   showEyes(kind) {
     const key = kind === 'open' || kind === 'happy' ? `eyes_${kind}` : `cat_${this.name}_eyes_${kind}`;
-    this.swapLayer(this.eyes, 'eyes', key, 'eyes', (g) => drawEyes(g, kind));
+    this.swapLayer(this.eyes, kind, 'eyes', key, 'eyes', (g) => drawEyes(g, kind));
   }
 
   setMouth(open) {
-    this.swapLayer(this.mouth, open ? 'mouth_open' : 'mouth', open ? 'mouth_open' : 'mouth_closed', 'mouth', (g) => drawMouth(g, open));
+    this.swapLayer(this.mouth, open ? 'open' : 'closed', open ? 'mouth_open' : 'mouth', open ? 'mouth_open' : 'mouth_closed', 'mouth', (g) => drawMouth(g, open));
     return this;
   }
 

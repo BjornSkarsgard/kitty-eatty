@@ -43,7 +43,7 @@ export const STR = {
   watchAd: 'Смотреть рекламу',
 
   // победа и уровень кота
-  praise: { normal: 'Идеально!', hard: 'Справились!', nightmare: 'Невероятно!' }, // по level.kind
+  praise: { normal: 'Идеально!', hard: 'Великолепно!', nightmare: 'Невероятно!' }, // по level.kind
   rewards: 'Награды:',
   alreadyPassed: 'Уровень уже пройден',
   again: 'С начала',

@@ -31,6 +31,15 @@ export function addDevButton(scene, x, y, onClose, onChange) {
     wrench.setVisible(!on);
     cross.setVisible(on);
   };
+  // окна игры (коллекция 40, окна 50, коробки 60) рисуются под верхней полосой, а ключ — в ней:
+  // пока открыто какое-то окно (и не наша панель), ключ спрятан. btn.hidden — прячет ещё и меню шестерёнки.
+  btn.hidden = false;
+  const check = () => {
+    const popup = !close && scene.children.list.some((o) => o.depth >= 40 && o.depth < 70 && o.visible);
+    btn.setVisible(!btn.hidden && !popup);
+  };
+  scene.events.on('update', check);
+  scene.events.once('shutdown', () => scene.events.off('update', check));
   return btn;
 }
 

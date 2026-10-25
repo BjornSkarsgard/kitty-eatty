@@ -51,13 +51,14 @@ export class Board {
     return this.bowls.length - 1;
   }
 
-  // Сколько одинаковых порций лежит сверху подряд.
+  // Сколько одинаковых порций лежит сверху подряд. Скрытая «?» серию обрывает: даже того же цвета она не переезжает,
+  // а откроется, когда уйдёт порция над ней.
   topRun(i) {
     const b = this.bowls[i];
     if (!b.length) return 0;
     const color = b[b.length - 1];
     let run = 1;
-    while (run < b.length && b[b.length - 1 - run] === color) run++;
+    while (run < b.length && b[b.length - 1 - run] === color && !this.hid[i][b.length - 1 - run]) run++;
     return run;
   }
 

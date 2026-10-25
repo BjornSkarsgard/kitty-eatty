@@ -3,6 +3,12 @@
 // ice — лёд (необязательно): ice[i] = k — банка i заморожена, пока не собрано k банок (0 / нет — не заморожена).
 // Собранную банку разобрать нельзя, поэтому число собранных только растёт, и растаявшая банка больше не замерзает:
 // заморожена ли банка — видно по самому состоянию, хранить отдельно не нужно.
+// Скрытый корм «?»: порция цвета c записана как c + HID. Верхняя всегда открыта; скрытая обрывает серию сверху
+// (topRun сравнивает значения — скрытая с открытой не совпадает) и открывается, когда уйдёт порция над ней (applyMove).
+export const HID = 1000;
+export const colorOf = (x) => x % HID;
+// Состояние с маской скрытых (mask[i][s] = 1 — скрыта).
+export const withHidden = (st, mask) => st.map((b, i) => b.map((c, s) => (mask?.[i]?.[s] ? c + HID : c)));
 
 export function topRun(b) {
   if (!b.length) return 0;
@@ -12,7 +18,7 @@ export function topRun(b) {
   return run;
 }
 
-export const isComplete = (b, cap) => b.length === cap && b.every((c) => c === b[0]);
+export const isComplete = (b, cap) => b.length === cap && b.every((c) => colorOf(c) === colorOf(b[0]));
 export const isSolved = (st, cap) => st.every((b) => !b.length || isComplete(b, cap));
 
 // «Почти собранная» миска — на старте уровня выглядит как недосмотр:
@@ -57,6 +63,8 @@ export function legalMoves(st, cap, ice) {
 export function applyMove(st, [f, t, n]) {
   const ns = st.slice();
   ns[f] = st[f].slice(0, st[f].length - n);
+  const top = ns[f].length - 1;
+  if (top >= 0 && ns[f][top] >= HID) { ns[f] = ns[f].slice(); ns[f][top] -= HID; } // открылась порция под ушедшими
   ns[t] = st[t].concat(st[f].slice(st[f].length - n));
   return ns;
 }
@@ -68,8 +76,8 @@ function heuristic(st) {
   const bottoms = new Map();
   for (const b of st) {
     if (!b.length) continue;
-    for (let i = 1; i < b.length; i++) if (b[i] !== b[i - 1]) h++;
-    bottoms.set(b[0], (bottoms.get(b[0]) || 0) + 1);
+    for (let i = 1; i < b.length; i++) if (colorOf(b[i]) !== colorOf(b[i - 1])) h++;
+    bottoms.set(colorOf(b[0]), (bottoms.get(colorOf(b[0])) || 0) + 1);
   }
   for (const n of bottoms.values()) h += n - 1;
   return h;

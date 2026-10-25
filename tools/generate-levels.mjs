@@ -5,7 +5,7 @@
 import { writeFileSync } from 'node:fs';
 import { CONFIG } from '../src/config.js';
 import { Board } from '../src/core/Board.js';
-import { scramble, solve, deadEndRate, keyOf, isComplete, isNearComplete, rng } from './lib.mjs';
+import { scramble, solve, deadEndRate, keyOf, isComplete, isNearComplete, rng, withHidden as hiddenState } from './lib.mjs';
 
 const G = CONFIG.levelGen;
 const MX = G.mechanics;
@@ -148,10 +148,12 @@ for (let n = 1; n <= G.count; n++) {
   let sol = best.sol;
   let dead = best.dead;
   let ice = null;
+  let iceArr = null;
   if (mech.ice) {
     const placed = placeIce(best.bowls, p.capacity, n);
     if (placed) {
       ice = placed.ice;
+      iceArr = placed.iceArr;
       sol = placed.sol;
       dead = deadEndRate(best.bowls, p.capacity, mrand, 80, 400, placed.iceArr);
     } else if (mech.intro === 'ice') throw new Error(`Не удалось заморозить банку на уровне-знакомстве ${n}`);
@@ -167,7 +169,14 @@ for (let n = 1; n <= G.count; n++) {
   if (p.puzzle) level.puzzle = true;
   if (p.kind) level.kind = p.kind;
   if (ice) level.ice = ice;
-  if (mech.hiddenFull || mech.hiddenPart) level.hidden = hideMask(best.bowls, mech.hiddenFull);
+  if (mech.hiddenFull || mech.hiddenPart) {
+    level.hidden = hideMask(best.bowls, mech.hiddenFull);
+    // скрытая порция не переезжает вместе с верхней — решение и минимум ходов считаем заново с маской
+    const hs = solve(hiddenState(best.bowls, level.hidden), p.capacity, 2_000_000, iceArr);
+    if (!hs) throw new Error(`Уровень ${n} со скрытым кормом не решается`);
+    level.solution = hs.moves;
+    level.minMoves = hs.moves.length;
+  }
   if (mech.intro) level.intro = mech.intro;
   if (!verify(level)) throw new Error(`Решение уровня ${n} не прошло проверку игровой логикой`);
   used.add(best.key);

@@ -6,7 +6,7 @@ import { beatPulse } from '../beat.js';
 import { sfx, music } from '../audio.js';
 import {
   currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo, lives, loseLife, infiniteLeft,
-  boosters, boosterUnlocked, spendBooster, buyBooster, selectedUltra,
+  boosters, boosterUnlocked, spendBooster, buyBooster, selectedUltra, ultLeft, spendUlt,
 } from '../core/save.js';
 import { ULTS_READY } from '../theme/cats/ultras.js';
 import { hintFor } from '../core/hint.js';
@@ -51,9 +51,8 @@ export class GameScene extends Phaser.Scene {
     this.moved = false; // был ли ход — тогда «Заново» и выход сжигают жизнь
     this.extraJars = 0; // сколько банок добавлено умением «+1 банка»
     this.scaleCap = undefined; // масштаб банок с запасом под «+1 банка» — считается заново на каждом уровне
-    // ультракот: ульта раз за уровень (ultUsed), ultPick — ждём тап по банке, к которой её применить
+    // ультракот: ульта восстанавливается за CONFIG.ultRecharge уровней (save.ultLeft), ultPick — ждём тап по банке
     this.ultra = selectedUltra();
-    this.ultUsed = false;
     this.ultPick = false;
     // насколько выше обычной может стать банка (место в рядах — с начала уровня): «Большая миска» +2,
     // запасная банка ультракота +boost.jarCap
@@ -412,8 +411,9 @@ export class GameScene extends Phaser.Scene {
   refreshUndo() {
     const n = undos();
     this.undoBtn.setBadge(n > 0 ? n : null).setPrice(n > 0 ? null : CONFIG.economy.undoPrice);
-    // ульта: бейдж «1», пока не потрачена на этом уровне; потрачена — бледная
-    this.trayBtns.ult?.setBadge(this.ultUsed ? null : 1).setAlpha(this.ultUsed ? 0.5 : 1);
+    // ульта: готова — бейдж «!»; заряжается — бледная, на бейдже сколько уровней пройдено из нужных (2/5)
+    const left = ultLeft();
+    this.trayBtns.ult?.setBadge(left ? `${CONFIG.ultRecharge - left}/${CONFIG.ultRecharge}` : '!').setAlpha(left ? 0.5 : 1);
     for (const [kind, icon] of [['hint', 'hint'], ['jar', 'addjar']]) {
       const btn = this.trayBtns[icon];
       if (!btn) continue;
@@ -500,7 +500,10 @@ export class GameScene extends Phaser.Scene {
   // тап по банке — она вырастает на CONFIG.ultBigJar.extra порций до конца уровня. Повторный тап по кнопке — отмена.
   ult() {
     if (this.won) return;
-    if (this.ultUsed) return this.shakeButton(this.trayBtns.ult);
+    if (ultLeft()) {
+      this.shakeButton(this.trayBtns.ult);
+      return showPopup(this, { title: this.ultra.ultName, text: STR.ultCharging(ultLeft()), buttons: [{ label: STR.ok }] });
+    }
     this.deselect();
     this.ultPick = !this.ultPick;
     this.ultPrompt?.destroy();
@@ -516,7 +519,7 @@ export class GameScene extends Phaser.Scene {
     this.ultPick = false;
     this.ultPrompt?.destroy();
     this.ultPrompt = null;
-    this.ultUsed = true;
+    spendUlt();
     this.board.caps[i] += CONFIG.ultBigJar.extra;
     this.rebuildJars();
     // банка вытягивается вверх

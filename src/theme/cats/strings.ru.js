@@ -82,13 +82,14 @@ export const STR = {
   ultraGiftAt: (n) => `Подарок на ${n} уровне`,
   ultraInfo: (ultName, ultText, boostText) => `Ульта «${ultName}»: ${ultText[0].toLowerCase()}${ultText.slice(1)}.${boostText ? `
 ${boostText}.` : ''}
-Ульта — раз за уровень, бесплатно.`,
+Ульта бесплатная, восстанавливается за 5 пройденных уровней.`,
   ultraSoon: 'Эта порода появится в одном из обновлений.',
   ultraIntroTitle: 'Ультракот',
   ultraIntroWhen: (n) => `Будет твоим в подарок на ${n} уровне!`,
   ultraIntroOk: 'Жду!',
   ultraGiftTitle: 'Подарок: ультракот!',
   ultPick: (ultName) => `«${ultName}»: выбери банку`,
+  ultCharging: (n) => `Ульта восстановится через ${n} ${plural(n, 'уровень', 'уровня', 'уровней')}. Старые уровни тоже считаются.`,
   buyUltraQ: (price) => `Купить породу за ${price} монет?`,
   catLevelShort: (n) => `Ур. кота ${n}`,
   unlocksAtCatLevel: (n) => `Откроется на ${n} уровне кота`,

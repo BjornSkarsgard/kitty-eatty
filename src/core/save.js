@@ -18,13 +18,14 @@
 //   names, name — открытые клички (id из src/theme/cats/names.js) и выбранная ('#custom' — своя); custom — своя кличка (или null);
 //   nameTokens — неиспользованные «именные таблички» (можно придумать кличку самому);
 //   ultras, ultra — купленные / подаренные ультракоты (id из theme/cats/ultras.js) и выбранный (null — играем обычным котом);
-//   ultraIntro — окно знакомства с ультракотом уже показано;
+//   ultraIntro — окно знакомства с ультракотом уже показано; ultCharge — сколько уровней пройдено с последней ульты
+//     (CONFIG.ultRecharge и больше — ульта готова);
 //   settings — { sound, music, fx, vibro }: переключатели под шестерёнкой.
 import { CONFIG } from '../config.js';
 import { MILESTONES } from './milestones.js';
 
 const KEY = 'kittyeatty.save';
-const VERSION = 12;
+const VERSION = 13;
 const E = CONFIG.economy;
 const C = CONFIG.catXp;
 const LV = CONFIG.lives;
@@ -36,7 +37,7 @@ const START_NAMES = NAMES.filter((n) => n.start).map((n) => n.id);
 export const CUSTOM = '#custom';
 
 const SETTINGS = { sound: true, music: true, fx: true, vibro: true };
-const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, hints: B.hint.start, jars: B.jar.start, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, daily: { last: null, day: 0 }, infiniteUntil: null, msDone: 0, ultras: [], ultra: null, ultraIntro: false,
+const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, hints: B.hint.start, jars: B.jar.start, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, daily: { last: null, day: 0 }, infiniteUntil: null, msDone: 0, ultras: [], ultra: null, ultraIntro: false, ultCharge: CONFIG.ultRecharge,
   names: [...START_NAMES], name: START_NAMES[0], custom: null, nameTokens: 0, settings: { ...SETTINGS } });
 
 // Старые версии сохранения дополняем до текущей, прогресс не теряется.
@@ -68,6 +69,7 @@ function migrate(d) {
   if (d.v === 9) d = { ...d, v: 10, infiniteUntil: null, msDone: 0 };
   if (d.v === 10) d = { ...d, v: 11, hints: B.hint.start, jars: B.jar.start };
   if (d.v === 11) d = { ...d, v: 12, ultras: [], ultra: null, ultraIntro: false };
+  if (d.v === 12) d = { ...d, v: 13, ultCharge: CONFIG.ultRecharge };
   if (d && !Number.isFinite(d.xp)) d.xp = 0; // битый опыт — с нуля, уровень кота не трогаем
   if (d && !d.settings) d.settings = {};
   if (d) d.settings = { ...SETTINGS, ...d.settings }; // новые переключатели — со значением по умолчанию
@@ -127,6 +129,7 @@ export function recordWin(level, index, moves, count) {
   const first = !levelPassed(level);
   if (!(d.best[level.id] <= moves)) d.best[level.id] = moves;
   const reward = { coins: 0, undos: 0, xp: 0, cat: { level: d.catLevel, xp: d.xp }, levelUps: [], chests: 0 };
+  d.ultCharge = Math.min(CONFIG.ultRecharge, d.ultCharge + 1); // ульта заряжается за любую победу, и за переигровку
   if (first) {
     reward.coins = (E.winCoins + E.coinsPer25Levels * Math.floor(index / 25)) * (E.kindCoins[level.kind] ?? 1);
     reward.xp = C.winXp + C.xpPer10Levels * Math.floor(index / 10);
@@ -253,6 +256,16 @@ export function claimUltraGift() {
   d.ultra = u.id;
   write();
   return u;
+}
+
+// Ульта: сколько уровней ещё до готовности (0 — готова) и потратить её (false — не готова).
+export const ultLeft = () => Math.max(0, CONFIG.ultRecharge - get().ultCharge);
+export function spendUlt() {
+  const d = get();
+  if (d.ultCharge < CONFIG.ultRecharge) return false;
+  d.ultCharge = 0;
+  write();
+  return true;
 }
 
 // Пора показать знакомство с первым ультракотом (один раз, после CONFIG.ultraIntroLevel); true — отмечено, показывай.

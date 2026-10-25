@@ -5,6 +5,7 @@ import { CatsLevel } from '../theme/cats/kitchen.js';
 import { CatView } from '../theme/cats/CatView.js';
 import { beatPulse } from '../beat.js';
 import { sfx, music } from '../audio.js';
+import { haptic } from '../haptics.js';
 import {
   currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo, lives, loseLife, infiniteLeft,
   boosters, boosterUnlocked, spendBooster, buyBooster, selectedUltra, ultLeft, spendUlt, catLook,
@@ -379,6 +380,7 @@ export class GameScene extends Phaser.Scene {
   // Выбранная банка приподнимается целиком (с кормом), а серия, которая полетит, пульсирует и светится.
   select(i) {
     sfx(this, 'sfx_pick');
+    haptic('pick');
     this.selected = i;
     this.liftJar(i, -A.liftY * this.dim.scale, 'Back.easeOut');
     this.portions[i].slice(-this.board.topRun(i)).forEach((p) => this.pulse(p));
@@ -462,6 +464,7 @@ export class GameScene extends Phaser.Scene {
 
   shake(i) {
     sfx(this, 'sfx_invalid');
+    haptic('invalid');
     const layers = [this.jarBack[i], this.jarFront[i], ...this.theme.jarExtras(i)];
     const x = this.bowlRects[i].x;
     this.tweens.killTweensOf(layers);
@@ -814,14 +817,18 @@ export class GameScene extends Phaser.Scene {
         const t = p.flyT;
         p.setPosition(x0 + (dst.x - x0) * t, y0 + (dst.y - y0) * t - arc * 4 * t * (1 - t));
       },
-      onComplete: () => { p.setDepth(0); sfx(this, 'sfx_drop'); },
+      onComplete: () => { p.setDepth(0); sfx(this, 'sfx_drop'); haptic('drop'); },
     });
   }
 
   // После хода или обмена: собранные банки — коту, всё собрано — победа.
   afterChange(bowls) {
     this.syncBlockers();
-    for (const b of new Set(bowls)) if (this.board.isComplete(b)) this.theme.jarComplete(b, this.board.bowls[b][0]);
+    for (const b of new Set(bowls)) {
+      if (!this.board.isComplete(b)) continue;
+      this.theme.jarComplete(b, this.board.bowls[b][0]);
+      haptic('jar');
+    }
     if (this.board.isSolved()) {
       this.won = true;
       this.time.delayedCall(A.winDelay, () => this.showWin());
@@ -929,7 +936,7 @@ export class GameScene extends Phaser.Scene {
         },
         onComplete: () => {
           p.setDepth(0);
-          if (k === sprites.length - 1) sfx(this, 'sfx_drop');
+          if (k === sprites.length - 1) { sfx(this, 'sfx_drop'); haptic('drop'); }
         },
       });
     });
@@ -958,6 +965,7 @@ export class GameScene extends Phaser.Scene {
     const W = CONFIG.width;
     const H = CONFIG.height;
     sfx(this, 'music_win');
+    haptic('win');
     const level = LEVELS[this.levelIndex];
     const reward = recordWin(level, this.levelIndex, this.board.history.length, LEVELS.length);
     this.refreshUndo();

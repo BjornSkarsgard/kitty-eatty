@@ -7,11 +7,11 @@ import { MILESTONES } from '../core/milestones.js';
 import { TEST_TOOLS } from '../dev.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
 
-// Панель разработчика для тестов: кнопка с ключом на главном экране (только с тестовыми инструментами, src/dev.js),
+// Панель разработчика для тестов: кнопка «DEV» на главном экране (только с тестовыми инструментами, src/dev.js),
 // окно с кнопками — монеты, уровень кота, жизни, умения, сундуки и подарки, ульта, уровень игры, открыть всё.
 // Меняет сохранение сразу; onClose — после закрытия (холл перерисовывается целиком). Тексты здесь — только для тестов,
 // поэтому не в strings.ru.js.
-// onChange — после каждой кнопки (обновить верхнюю полосу). Пока панель открыта, на месте ключа — красный крестик:
+// onChange — после каждой кнопки (обновить верхнюю полосу). Пока панель открыта, на месте «DEV» — красный крестик:
 // тап по нему закрывает панель.
 export function addDevButton(scene, x, y, onClose, onChange) {
   if (!TEST_TOOLS) return null;
@@ -23,7 +23,10 @@ export function addDevButton(scene, x, y, onClose, onChange) {
   }, {
     size: 84, shape: 'round', color: PAL.adOrange, depth: 26,
   }).setScrollFactor(0);
-  const wrench = scene.add.text(0, -2, '🔧', { fontSize: '44px' }).setOrigin(0.5);
+  // надпись «DEV» шрифтом игры (кнопка только для тестов — своего арта не нужно)
+  const wrench = scene.add.text(0, -3, 'DEV', {
+    fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '28px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 6,
+  }).setOrigin(0.5);
   const cross = makeIcon(scene, 'close', 84 * 0.62).setPosition(0, -3).setVisible(false);
   btn.add([wrench, cross]);
   const setOpen = (on) => {

@@ -180,6 +180,7 @@ function catReward(level) {
 }
 
 export const catLevel = () => get().catLevel;
+export const catXp = () => get().xp; // опыт, набранный к следующему уровню кота
 
 // ---------- рескины обычного кота ----------
 

@@ -1,10 +1,10 @@
-import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { makeButton } from './Button.js';
 import { iconButton, plate, makeIcon, panel, kindBadge } from './ui.js';
 import { sfx } from '../audio.js';
 import { catNeed } from '../core/save.js';
 import { showCatLevelUps } from './CatLevelUpPopup.js';
+import { catXpBar } from './CatXpBar.js';
 import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
 
@@ -91,46 +91,13 @@ export function showWinPopup(scene, { level, reward, isLast, fxStars, onNext, on
 // Полоска опыта в окне победы: слева кружок с уровнем кота, в полоске «опыт / нужно», справа сверху «+N опыта».
 // Сначала показывает, каким кот был до победы; fillXpBar доводит.
 function xpBar(scene, box, y, reward) {
-  const C = CONFIG.catXp;
   const font = `"${CONFIG.font}", sans-serif`;
-  const w = C.barWidth;
-  const h = C.barHeight;
-  const x0 = -w / 2 + 30; // полоска чуть правее — слева кружок уровня
-  const track = scene.add.graphics();
-  track.fillStyle(PAL.night, 1).fillRoundedRect(x0, y - h / 2, w, h, h / 2);
-  track.lineStyle(3, PAL.rim, 1).strokeRoundedRect(x0, y - h / 2, w, h, h / 2);
-  const fill = scene.add.graphics();
-  const text = scene.add.text(x0 + w / 2, y, '', {
-    fontFamily: font, fontStyle: 'bold', fontSize: '26px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 5,
-  }).setOrigin(0.5);
-  const badge = scene.add.container(x0 - 6, y);
-  const bg = scene.add.graphics();
-  bg.fillStyle(PAL.goldDark, 1).fillCircle(0, 4, 40);
-  bg.fillStyle(PAL.gold, 1).fillCircle(0, 0, 40);
-  bg.fillStyle(PAL.white, 0.3).fillEllipse(-10, -16, 34, 16);
-  const num = scene.add.text(0, 2, '', {
-    fontFamily: font, fontStyle: 'bold', fontSize: '40px', color: PAL.text, stroke: PAL.textGoldStroke, strokeThickness: 7,
-  }).setOrigin(0.5);
-  badge.add([bg, num]);
-  const gain = scene.add.text(x0 + w, y - h / 2 - 22, reward.xp ? STR.xpGain(reward.xp) : '', {
+  const bar = catXpBar(scene, 0, y);
+  const gain = scene.add.text(bar.barRight, y + bar.barTop - 22, reward.xp ? STR.xpGain(reward.xp) : '', {
     fontFamily: font, fontStyle: 'bold', fontSize: '28px', color: PAL.textGold, stroke: PAL.textStroke, strokeThickness: 6,
   }).setOrigin(1, 0.5);
-  box.add([track, fill, text, badge, gain]);
-  const bar = {
-    level: reward.cat.level,
-    set: (level, xp) => {
-      const need = catNeed(level);
-      const k = Phaser.Math.Clamp(xp / need, 0, 1);
-      fill.clear();
-      if (k > 0) fill.fillStyle(PAL.goldLight, 1).fillRoundedRect(x0 + 4, y - h / 2 + 4, Math.max(h - 8, (w - 8) * k), h - 8, (h - 8) / 2);
-      if (k > 0) fill.fillStyle(PAL.white, 0.35).fillRoundedRect(x0 + 10, y - h / 2 + 7, Math.max(0, (w - 8) * k - 12), 6, 3);
-      text.setText(`${Math.floor(xp)} / ${need}`);
-      num.setText(String(level));
-    },
-    badge,
-  };
-  bar.set(reward.cat.level, reward.cat.xp);
-  return bar;
+  box.add([bar, gain]);
+  return bar.set(reward.cat.level, reward.cat.xp);
 }
 
 // Полоска доезжает до нового опыта; на каждом новом уровне кота — до конца, кружок подпрыгивает с новым числом,

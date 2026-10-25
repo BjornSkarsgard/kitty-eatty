@@ -10,10 +10,11 @@ import { music, sfx } from '../audio.js';
 import { beatPhase } from '../beat.js';
 import {
   currentLevel, unlockedLevel, levelPassed, coins, catLevel, lives, livesRefillLeft, selectedSkin, skinsOwned,
-  chestsPending, openChest, infiniteLeft, claimMilestones, dailyAvailable, claimDaily, catName,
+  chestsPending, openChest, infiniteLeft, claimMilestones, catXp, dailyAvailable, claimDaily, catName,
 } from '../core/save.js';
 import { openCollection } from '../view/CollectionView.js';
 import { openBox, closedBox } from '../view/ChestView.js';
+import { catXpBar } from '../view/CatXpBar.js';
 import { showPopup } from '../view/Popup.js';
 import { showNoLives, formatLeft } from '../view/lives.js';
 import { LEVELS } from '../core/levels.js';
@@ -415,7 +416,9 @@ export class RoomScene extends Phaser.Scene {
     const level = currentLevel(LEVELS.length);
     const play = makeButton(this, W / 2, HC.playY, STR.play(LEVELS[level].id), () => this.startLevel(level),
       { ...CONFIG.ui.bigButton, skin: 'yellow' });
-    room.add([title, shadow, this.cat, play]);
+    // полоска уровня кота под кличкой (опыт меняется только на уровне — холл при возврате создаётся заново)
+    const xp = catXpBar(this, W / 2, HC.xpY, { w: HC.xpWidth, h: HC.xpHeight }).set(catLevel(), catXp());
+    room.add([title, shadow, this.cat, play, xp]);
     this.refreshName();
     this.createBoxes(room);
   }

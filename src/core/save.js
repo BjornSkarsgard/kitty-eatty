@@ -470,6 +470,26 @@ export function setSetting(key, value) {
 // ---------- для разработки ----------
 
 // Начислить монеты, сундуки, подарки дня (только в режиме разработки, ссылкой ?give=coins2000,chests3,gifts3).
+// Выставить сохранение точно (только в режиме разработки, ссылкой ?set=milestone,chests2,gifts3):
+//   milestone — следующий уровень с рубежом от текущего прогресса становится текущим: всё до него пройдено,
+//     прошлые рубежи забраны — пройдёшь его, и откроется ровно один рубеж; levelN — то же, но уровень N;
+//   chestsN — ровно N неоткрытых сундуков; giftsN — ровно N подарков дня можно забрать.
+export function devSet({ milestone = false, level = 0, chests = null, gifts = null }) {
+  const d = get();
+  let id = level;
+  if (milestone) id = MILESTONES.find((m) => m.id > d.unlocked)?.id ?? 0; // d.unlocked — индекс, то есть id последнего пройденного
+  if (id >= 1 && id <= CONFIG.levelGen.count) {
+    for (let k = 1; k < id; k++) if (d.best[k] === undefined) d.best[k] = 0;
+    for (let k = id; k <= CONFIG.levelGen.count; k++) delete d.best[k];
+    d.unlocked = id - 1;
+    d.current = id - 1;
+    d.msDone = MILESTONES.filter((m) => m.id < id).at(-1)?.id ?? 0;
+  }
+  if (chests !== null) d.chests = chests;
+  if (gifts !== null) d.daily = { ...d.daily, last: today(), extra: gifts };
+  write();
+}
+
 export function devGive({ coins = 0, chests = 0, gifts = 0, tokens = 0 }) {
   const d = get();
   d.nameTokens += tokens;

@@ -6,7 +6,7 @@ import { RoomScene } from './scenes/RoomScene.js';
 import { setupAudioFocus } from './audio.js';
 import { loadFonts } from './fonts.js';
 import { applySettings } from './view/settings.js';
-import { devGive } from './core/save.js';
+import { devGive, devSet } from './core/save.js';
 
 // Разработка: ?give=coins2000,chests3,gifts3,tokens1 — начислить в сохранение (один раз: параметр сразу убирается из адреса).
 if (import.meta.env.DEV) {
@@ -16,6 +16,14 @@ if (import.meta.env.DEV) {
     const n = (key) => Number((give.match(new RegExp(`${key}(\\d+)`)) || [])[1] || 0);
     devGive({ coins: n('coins'), chests: n('chests'), gifts: n('gifts'), tokens: n('tokens') });
     url.searchParams.delete('give');
+    history.replaceState(null, '', url);
+  }
+  // ?set=milestone,chests2,gifts3 (или level25) — выставить точно, см. devSet в src/core/save.js
+  const set = url.searchParams.get('set');
+  if (set) {
+    const n = (key) => { const m = set.match(new RegExp(`${key}(\\d+)`)); return m ? Number(m[1]) : null; };
+    devSet({ milestone: /milestone/.test(set), level: n('level') ?? 0, chests: n('chests'), gifts: n('gifts') });
+    url.searchParams.delete('set');
     history.replaceState(null, '', url);
   }
 }

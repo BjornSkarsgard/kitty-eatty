@@ -10,13 +10,14 @@ import { music, sfx } from '../audio.js';
 import { beatPhase } from '../beat.js';
 import {
   currentLevel, unlockedLevel, levelPassed, coins, catLevel, lives, livesRefillLeft, skinsOwned,
-  chestsPending, openChest, infiniteLeft, claimMilestones, catXp, catLook, claimUltraGift, takeUltraIntro, dailyAvailable, claimDaily, catName,
+  chestsPending, openChest, infiniteLeft, claimMilestones, catXp, catLook, claimUltraGift, takeUltraIntro, dailyAvailable, catName,
 } from '../core/save.js';
 import { openCollection } from '../view/CollectionView.js';
 import { openBox, closedBox } from '../view/ChestView.js';
 import { catXpBar } from '../view/CatXpBar.js';
 import { showUltraIntro } from '../view/UltraView.js';
 import { addDevButton } from '../view/DevPanel.js';
+import { openDaily } from '../view/DailyView.js';
 import { showPopup } from '../view/Popup.js';
 import { showNoLives, formatLeft } from '../view/lives.js';
 import { LEVELS } from '../core/levels.js';
@@ -137,7 +138,9 @@ export class RoomScene extends Phaser.Scene {
       return openBox(this, 'gift', [{ ultra: ultra.id }], () => { this.makeHomeCat(); this.afterBox(); this.map.redraw(); this.showMilestones(); },
         { title: STR.ultraGiftTitle });
     }
-    if (takeUltraIntro()) showUltraIntro(this, CONFIG.ultras.find((u) => u.gift));
+    if (takeUltraIntro()) return showUltraIntro(this, CONFIG.ultras.find((u) => u.gift), () => this.showMilestones());
+    // награда за вход ещё не забрана сегодня — окно само (первый заход за день; закрыл не забрав — покажется снова)
+    if (dailyAvailable()) openDaily(this, () => this.afterBox());
   }
 
   // Монеты, настройки и вкладки — на своей камере: основная камера приближается (к карте, в дверь кухни),
@@ -502,13 +505,10 @@ export class RoomScene extends Phaser.Scene {
     openBox(this, 'chest', items, () => this.afterBox());
   }
 
+  // Подарок дня — окно «Награды за вход» (неделя серии), в любой момент.
   tapGift() {
-    const got = claimDaily();
-    if (!got) {
-      return this.denyBox(this.giftBtn, () => showPopup(this, { title: STR.dailyTitle, text: STR.dailyTomorrow, buttons: [{ label: STR.ok }] }));
-    }
     sfx(this, 'sfx_button');
-    openBox(this, 'gift', got.items, () => this.afterBox());
+    openDaily(this, () => this.afterBox());
   }
 
   // Открыть нечего: звук отмены, коробка дрожит, потом — окно с подсказкой (then). Повторный тап во время дрожи — мимо.

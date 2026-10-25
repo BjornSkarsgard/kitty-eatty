@@ -226,6 +226,27 @@ export function iconButton(scene, x, y, icon, onTap, {
     return btn;
   };
   btn.setBadge(badge);
+
+  // Цена при нулевом запасе: плашка с монеткой и числом внизу кнопки (покупка в один тап); null — убрать.
+  const priceBox = scene.add.container(0, size / 2 - 2);
+  const pg = scene.add.graphics();
+  const priceText = scene.add.text(14, 0, '', { fontFamily: font(), fontStyle: 'bold', fontSize: '26px', color: PAL.textBrown }).setOrigin(0.5);
+  priceBox.add([pg, makeIcon(scene, 'coin', 34).setPosition(-24, 0), priceText]);
+  btn.add(priceBox);
+  btn.setPrice = (n) => {
+    priceBox.setVisible(n !== null && n !== undefined);
+    if (!priceBox.visible) return btn;
+    priceText.setText(String(n));
+    const w = priceText.width + 62;
+    pg.clear();
+    pg.fillStyle(PAL.black, 0.25).fillRoundedRect(-w / 2 + 2, -17 + 4, w, 34, 17);
+    pg.fillStyle(PAL.cream, 1).fillRoundedRect(-w / 2, -17, w, 34, 17);
+    pg.lineStyle(3, PAL.brownRim, 1).strokeRoundedRect(-w / 2, -17, w, 34, 17);
+    priceBox.list[1].setX(-w / 2 + 18);
+    priceText.setX(9);
+    return btn;
+  };
+  btn.setPrice(null);
   btn.enabled = true;
   btn.setEnabled = (on) => { btn.enabled = on; btn.setAlpha(on ? 1 : 0.5); return btn; };
 

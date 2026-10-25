@@ -384,17 +384,17 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  // Бейджи на отмене и умениях — сколько осталось (0 — значок «+»: купить); не открытое умение — бледное;
+  // Бейджи на отмене и умениях — сколько осталось; 0 — вместо бейджа цена (тап — покупка); не открытое умение — бледное;
   // монеты в пилюле.
   refreshUndo() {
     const n = undos();
-    this.undoBtn.setBadge(n > 0 ? n : '+');
+    this.undoBtn.setBadge(n > 0 ? n : null).setPrice(n > 0 ? null : CONFIG.economy.undoPrice);
     for (const [kind, icon] of [['hint', 'hint'], ['jar', 'addjar']]) {
       const btn = this.trayBtns[icon];
       if (!btn) continue;
       const open = boosterUnlocked(kind);
       const left = boosters(kind);
-      btn.setAlpha(open ? 1 : 0.5).setBadge(open ? (left > 0 ? left : '+') : null);
+      btn.setAlpha(open ? 1 : 0.5).setBadge(open && left > 0 ? left : null).setPrice(open && left <= 0 ? CONFIG.boosters[kind].price : null);
     }
     this.coinPill.setValue(coins());
   }
@@ -406,20 +406,24 @@ export class GameScene extends Phaser.Scene {
     return false;
   }
 
-  // Потратить заряд умения и сделать use(); запаса нет — окно «купить за монеты» (позже — и ролик).
+  // Потратить заряд умения и сделать use(). Запаса нет — как в Magic Sort: покупка за монеты в один тап, без окна
+  // (цена видна на кнопке); окно — только если монет не хватает.
   useBooster(kind, use) {
-    if (spendBooster(kind)) {
-      this.refreshUndo();
-      return use();
+    if (!spendBooster(kind)) {
+      if (!buyBooster(kind)) return this.notEnoughCoins();
+      sfx(this, 'sfx_coins', CONFIG.audio.coins);
+      spendBooster(kind);
     }
-    const price = CONFIG.boosters[kind].price;
-    const buttons = [{
-      label: STR.buyFor(price), color: PAL.buyGreen, disabled: coins() < price,
-      onTap: () => { if (buyBooster(kind)) { sfx(this, 'sfx_coins', CONFIG.audio.coins); this.useBooster(kind, use); } },
-    }];
+    this.refreshUndo();
+    use();
+  }
+
+  // Монет не хватает на заряд: окно (на этапе 6 — ещё «посмотреть ролик»).
+  notEnoughCoins() {
+    const buttons = [];
     if (CONFIG.ads.enabled) buttons.push({ label: STR.watchAd, color: PAL.adOrange, onTap: () => {} }); // этап 6
-    buttons.push({ label: STR.noThanks });
-    showPopup(this, { title: STR.noBoosterTitle[kind], text: STR.coinsLeft(coins()), buttons });
+    buttons.push({ label: STR.ok });
+    showPopup(this, { title: STR.noCoinsTitle, text: STR.coinsLeft(coins()), buttons });
   }
 
   // «+1 банка»: пустая банка до конца уровня; банки расступаются (масштаб не меняется — см. layoutBowls).
@@ -510,7 +514,12 @@ export class GameScene extends Phaser.Scene {
     this.deselect();
     const last = this.board.history[this.board.history.length - 1];
     if (!last) return;
-    if (!spendUndo()) return this.offerUndo();
+    // запаса нет — покупка в один тап (цена на кнопке), монет не хватает — окно
+    if (!spendUndo()) {
+      if (!buyUndo()) return this.notEnoughCoins();
+      sfx(this, 'sfx_coins', CONFIG.audio.coins);
+      spendUndo();
+    }
     this.refreshUndo();
     this.undoMove();
   }
@@ -572,17 +581,6 @@ export class GameScene extends Phaser.Scene {
       lifespan: 2200, rotate: { start: 0, end: 720 }, scale: { min: 0.8, max: 1.4 },
       tint: CONFIG.colors.map((c) => c.fill),
     }).setDepth(22);
-  }
-
-  offerUndo() {
-    const price = CONFIG.economy.undoPrice;
-    const buttons = [{
-      label: STR.buyFor(price), color: PAL.buyGreen, disabled: coins() < price,
-      onTap: () => { if (buyUndo()) { sfx(this, 'sfx_coins', CONFIG.audio.coins); this.refreshUndo(); this.undo(); } },
-    }];
-    if (CONFIG.ads.enabled) buttons.push({ label: STR.watchAd, color: PAL.adOrange, onTap: () => {} }); // этап 6
-    buttons.push({ label: STR.noThanks });
-    showPopup(this, { title: STR.noUndosTitle, text: STR.coinsLeft(coins()), buttons });
   }
 
   // ---------- победа ----------

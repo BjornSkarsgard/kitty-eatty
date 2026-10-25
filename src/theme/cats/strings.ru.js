@@ -49,12 +49,10 @@ export const STR = {
   letsGo: 'Вперёд!',
   leaveTitle: 'Выйти из уровня?',
   restartTitle: 'Начать заново?',
-  noUndosTitle: 'Отмены кончились',
+  noCoinsTitle: 'Не хватает монет',
   booster: { hint: 'Нюх', jar: '+1 банка' },
-  noBoosterTitle: { hint: 'Подсказки кончились', jar: 'Банки кончились' },
   offTrackTitle: 'Сбились с пути',
   offTrackText: (n) => `Вернуться на ${n} ${plural(n, 'ход', 'хода', 'ходов')} назад, где всё было верно? Отмены не тратятся.`,
-  buyFor: (price) => `Купить за ${price} монет`,
   watchAd: 'Смотреть рекламу',
 
   // победа и уровень кота

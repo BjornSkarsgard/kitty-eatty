@@ -261,10 +261,11 @@ export function claimUltraGift() {
 
 // Ульта: сколько уровней ещё до готовности (0 — готова) и потратить её (false — не готова).
 // CONFIG.ultInfiniteDev — в режиме разработки и тестовой сборке (src/dev.js) ульта бесконечная.
-const ULT_INF = CONFIG.ultInfiniteDev && TEST_TOOLS;
-export const ultLeft = () => (ULT_INF ? 0 : Math.max(0, CONFIG.ultRecharge - get().ultCharge));
+// Переключатель в панели разработчика (d.dev.ultInf) важнее конфига.
+const ultInf = () => TEST_TOOLS && (get().dev?.ultInf ?? CONFIG.ultInfiniteDev);
+export const ultLeft = () => (ultInf() ? 0 : Math.max(0, CONFIG.ultRecharge - get().ultCharge));
 export function spendUlt() {
-  if (ULT_INF) return true;
+  if (ultInf()) return true;
   const d = get();
   if (d.ultCharge < CONFIG.ultRecharge) return false;
   d.ultCharge = 0;
@@ -585,6 +586,18 @@ export function setSetting(key, value) {
 //     прошлые рубежи забраны — пройдёшь его, и откроется ровно один рубеж; levelN — то же, но уровень N;
 //   chestsN — ровно N неоткрытых сундуков; giftsN — ровно N подарков дня можно забрать; coinsN — ровно N монет;
 //   catN — уровень кота N (опыт с нуля); jarsN, hintsN — ровно столько банок и подсказок.
+// Панель разработчика (src/view/DevPanel.js, только с тестовыми инструментами): правка сохранения как есть.
+// fn(d) меняет данные напрямую; d.dev — флаги панели ({ ultInf }). Возвращает то, что вернула fn.
+export function devEdit(fn) {
+  if (!TEST_TOOLS) return undefined;
+  const d = get();
+  if (!d.dev) d.dev = {};
+  const res = fn(d);
+  write();
+  return res;
+}
+export const devState = () => get();
+
 export function devSet({ milestone = false, level = 0, chests = null, gifts = null, coins = null, cat = null, jars = null, hints = null }) {
   const d = get();
   let id = level;

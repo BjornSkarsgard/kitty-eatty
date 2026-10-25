@@ -436,7 +436,7 @@ export class RoomScene extends Phaser.Scene {
       const label = this.add.text(0, B.size * 0.5 + 20, '', this.noteStyle()).setOrigin(0.5).setFontSize(26);
       c.add([box, badge, label]);
       c.setSize(B.size, B.size).setInteractive();
-      c.on('pointerdown', () => { sfx(this, 'sfx_button'); onTap(); });
+      c.on('pointerdown', () => onTap()); // звук — в onTap: открыть или «пусто»
       c.badge = (t) => { badge.setVisible(!!t); num.setText(String(t || '')); };
       c.label = label;
       c.box = box;
@@ -474,21 +474,35 @@ export class RoomScene extends Phaser.Scene {
   tapChest() {
     const items = openChest();
     if (!items) {
-      return showPopup(this, {
+      return this.denyBox(this.chestBtn, () => showPopup(this, {
         title: STR.chest,
         text: STR.chestInfo(CONFIG.chest.everyCatLevels),
         buttons: [{ label: STR.ok }],
-      });
+      }));
     }
+    sfx(this, 'sfx_button');
     openBox(this, 'chest', items, () => this.afterBox());
   }
 
   tapGift() {
     const got = claimDaily();
     if (!got) {
-      return showPopup(this, { title: STR.dailyTitle, text: STR.dailyTomorrow, buttons: [{ label: STR.ok }] });
+      return this.denyBox(this.giftBtn, () => showPopup(this, { title: STR.dailyTitle, text: STR.dailyTomorrow, buttons: [{ label: STR.ok }] }));
     }
+    sfx(this, 'sfx_button');
     openBox(this, 'gift', got.items, () => this.afterBox());
+  }
+
+  // Открыть нечего: звук отмены, коробка дрожит, потом — окно с подсказкой (then). Повторный тап во время дрожи — мимо.
+  denyBox(btn, then) {
+    if (btn.denying) return;
+    btn.denying = true;
+    sfx(this, 'sfx_invalid');
+    const D = HC.boxes;
+    this.tweens.add({
+      targets: btn.box, x: D.shake, duration: D.shakeMs, yoyo: true, repeat: 3, ease: 'Sine.easeInOut',
+      onComplete: () => { btn.box.x = 0; btn.denying = false; then(); },
+    });
   }
 
   // Кличка — табличкой над котом.

@@ -23,6 +23,7 @@
 //   settings — { sound, music, fx, vibro }: переключатели под шестерёнкой.
 import { CONFIG } from '../config.js';
 import { MILESTONES } from './milestones.js';
+import { TEST_TOOLS } from '../dev.js';
 
 const KEY = 'kittyeatty.save';
 const VERSION = 13;
@@ -259,8 +260,8 @@ export function claimUltraGift() {
 }
 
 // Ульта: сколько уровней ещё до готовности (0 — готова) и потратить её (false — не готова).
-// CONFIG.ultInfiniteDev — в режиме разработки ульта бесконечная (для тестов).
-const ULT_INF = CONFIG.ultInfiniteDev && !!import.meta.env?.DEV;
+// CONFIG.ultInfiniteDev — в режиме разработки и тестовой сборке (src/dev.js) ульта бесконечная.
+const ULT_INF = CONFIG.ultInfiniteDev && TEST_TOOLS;
 export const ultLeft = () => (ULT_INF ? 0 : Math.max(0, CONFIG.ultRecharge - get().ultCharge));
 export function spendUlt() {
   if (ULT_INF) return true;

@@ -16,6 +16,7 @@ import { showPopup } from '../view/Popup.js';
 import { iconButton, counterPill, plate, tray, kindBadge } from '../view/ui.js';
 import { addSettingsMenu } from '../view/settings.js';
 import { LEVELS } from '../core/levels.js';
+import { TEST_TOOLS } from '../dev.js';
 import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
 
@@ -23,7 +24,7 @@ const L = CONFIG.layout;
 
 // В режиме разработки можно открыть любой уровень: http://<адрес>:5173/?level=150
 function levelFromUrl() {
-  if (!import.meta.env.DEV) return null;
+  if (!TEST_TOOLS) return null;
   const n = Number(new URLSearchParams(location.search).get('level'));
   return n >= 1 && n <= LEVELS.length ? n - 1 : null;
 }

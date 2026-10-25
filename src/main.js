@@ -7,9 +7,10 @@ import { setupAudioFocus } from './audio.js';
 import { loadFonts } from './fonts.js';
 import { applySettings } from './view/settings.js';
 import { devGive, devSet } from './core/save.js';
+import { TEST_TOOLS } from './dev.js';
 
 // Разработка: ?give=coins2000,chests3,gifts3,tokens1 — начислить в сохранение (один раз: параметр сразу убирается из адреса).
-if (import.meta.env.DEV) {
+if (TEST_TOOLS) {
   const url = new URL(location.href);
   const give = url.searchParams.get('give');
   if (give) {
@@ -46,8 +47,8 @@ loadFonts(CONFIG.font).then(() => {
   setupAudioFocus(game);
 
   // Для отладки из консоли браузера в режиме разработки.
-  if (import.meta.env.DEV) window.__game = game;
-  if (import.meta.env.DEV && new URLSearchParams(location.search).has('fps')) fpsMeter();
+  if (TEST_TOOLS) window.__game = game;
+  if (TEST_TOOLS && new URLSearchParams(location.search).has('fps')) fpsMeter();
 });
 
 // Разработка: ?fps — в углу экрана кадры в секунду сейчас и худшее за последние 5 секунд (по requestAnimationFrame).

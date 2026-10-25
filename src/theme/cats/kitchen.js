@@ -260,7 +260,7 @@ export class CatsLevel {
     cat.stopActions().setMood('grumpy');
     game.portions[bowl].forEach((p) => {
       game.tweens.killTweensOf(p);
-      p.setScale(1).setAlpha(1);
+      p.setScale(p.baseScale ?? 1).setAlpha(1);
     });
     this.unwrapJar(bowl);
     cat.walkTo(cat.home.x, cat.home.y, () => cat.setMood('open').setInteractive());

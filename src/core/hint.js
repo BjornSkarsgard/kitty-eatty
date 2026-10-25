@@ -31,7 +31,7 @@ export function hintFor(level, board) {
   if (k !== undefined) return k < level.solution.length ? { move: level.solution[k] } : null;
   // откатываем копию поля с конца (ходы, обмены, ульты), пока не попадём на позицию решения
   const copy = Object.assign(Object.create(Board.prototype), structuredClone({ ...board, changes: undefined }));
-  copy.changes = { revealed: [], thawed: [] };
+  copy.changes = { revealed: [], thawed: [], caps: false };
   let back = 0;
   while (copy.history.length) {
     copy.undo();

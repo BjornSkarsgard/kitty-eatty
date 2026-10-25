@@ -1,6 +1,7 @@
 // Чистая логика поля, без Phaser. Миска — массив порций снизу вверх, порция — индекс цвета.
 // capacity — сколько порций одного цвета (столько же вмещает обычная банка); caps — вместимость каждой банки
-// (больше capacity — запасная банка ультракота, 1 — «Карман» манчкина).
+// (больше capacity — запасная банка ультракота, 1 — «Карман» манчкина); baseCaps — обычная вместимость банки:
+// «Тесно, но влезет» кладёт серию сверх места, банка вырастает (caps > baseCaps) и сжимается обратно, когда лишнее уходит.
 // hid — скрытый корм «?»: флаги рядом с цветами (hid[i][s] — порция скрыта), переезжают вместе с порцией;
 // верхняя порция банки всегда открыта (reveal после каждого изменения), открытая больше не скрывается.
 // ice — лёд: ice[i] = k — банка заморожена, пока не собрано k банок; из неё нельзя брать и в неё нельзя класть.
@@ -11,25 +12,31 @@ export class Board {
     this.capacity = level.capacity;
     this.bowls = level.bowls.map((b) => [...b]);
     this.caps = this.bowls.map(() => level.capacity);
+    this.baseCaps = [...this.caps];
     this.hid = this.bowls.map((b, i) => b.map((_, s) => !!level.hidden?.[i]?.[s]));
     this.ice = this.bowls.map(() => 0);
     for (const [i, k] of level.ice ?? []) this.ice[i] = k;
     this.thawed = this.bowls.map(() => false);
     this.history = [];
-    this.changes = { revealed: [], thawed: [] };
+    this.changes = { revealed: [], thawed: [], caps: false };
     this.after();
-    this.changes = { revealed: [], thawed: [] }; // открытое на старте — не событие
+    this.changes = { revealed: [], thawed: [], caps: false }; // открытое на старте — не событие
   }
 
   // После любого изменения: открыть верхний корм, растопить лёд. События копятся до takeChanges (для анимаций).
+  // caps — у какой-то банки поменялась высота (выросла / сжалась) — сцене пора переразложить банки.
   after() {
     this.changes.revealed.push(...this.reveal());
     this.changes.thawed.push(...this.thaw());
+    this.caps.forEach((c, i) => {
+      const need = Math.max(this.baseCaps[i], this.bowls[i].length);
+      if (c !== need) { this.caps[i] = need; this.changes.caps = true; }
+    });
   }
 
   takeChanges() {
     const c = this.changes;
-    this.changes = { revealed: [], thawed: [] };
+    this.changes = { revealed: [], thawed: [], caps: false };
     return c;
   }
 
@@ -38,6 +45,7 @@ export class Board {
     this.bowls.push([]);
     this.hid.push([]);
     this.caps.push(cap);
+    this.baseCaps.push(cap);
     this.ice.push(0);
     this.thawed.push(false);
     return this.bowls.length - 1;
@@ -117,7 +125,7 @@ export class Board {
   }
 
   // Перекладывает верхнюю серию (сколько влезет). Возвращает число порций или 0.
-  // anyColor — ульта «Прыжок» (цвет не важен), anyRoom — «Тесно, но влезет» (вся серия, сверх вместимости).
+  // anyColor — ульта «Прыжок» (цвет не важен), anyRoom — «Тесно, но влезет» (вся серия; банка вырастает под неё, after).
   move(from, to, opts = {}) {
     if (!this.canMove(from, to, opts)) return 0;
     const run = this.topRun(from);

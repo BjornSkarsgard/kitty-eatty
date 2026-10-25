@@ -259,8 +259,11 @@ export function claimUltraGift() {
 }
 
 // Ульта: сколько уровней ещё до готовности (0 — готова) и потратить её (false — не готова).
-export const ultLeft = () => Math.max(0, CONFIG.ultRecharge - get().ultCharge);
+// CONFIG.ultInfiniteDev — в режиме разработки ульта бесконечная (для тестов).
+const ULT_INF = CONFIG.ultInfiniteDev && !!import.meta.env?.DEV;
+export const ultLeft = () => (ULT_INF ? 0 : Math.max(0, CONFIG.ultRecharge - get().ultCharge));
 export function spendUlt() {
+  if (ULT_INF) return true;
   const d = get();
   if (d.ultCharge < CONFIG.ultRecharge) return false;
   d.ultCharge = 0;

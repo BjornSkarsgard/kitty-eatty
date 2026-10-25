@@ -151,7 +151,10 @@ export class GameScene extends Phaser.Scene {
     const neck = (bw) => (art.top * bw) / tex.width;
     const base = (bw) => ((tex.height - art.bottom) * bw) / tex.width;
     const floor = (bw) => ((tex.height - art.floor) * bw) / tex.width;
-    const bh0 = (this.board.capacity + this.reserveSlots) * L.portionHeight + L.bowlPadding + floor(L.bowlWidth);
+    // высота ряда (в порциях) — по самой высокой банке ряда, но не ниже обычной с запасом
+    const slotsMin = this.board.capacity + this.reserveSlots;
+    const caps = this.board.caps;
+    const rowSlots = (count, perRow, r) => Math.max(slotsMin, ...caps.slice(r * perRow, Math.min(count, (r + 1) * perRow)).slice(0, perRow));
     const availW = CONFIG.width - L.sideMargin * 2;
     const availH = L.bowlsBottom - L.bowlsTop - neck(L.bowlWidth);
     const fit = (count) => {
@@ -159,7 +162,8 @@ export class GameScene extends Phaser.Scene {
       for (let rows = 1; rows <= 4; rows++) {
         const perRow = Math.ceil(count / rows);
         const w = perRow * L.bowlWidth + (perRow - 1) * L.bowlGapX;
-        const h = rows * bh0 + (rows - 1) * L.bowlGapY;
+        let h = (rows - 1) * L.bowlGapY;
+        for (let r = 0; r < rows; r++) h += (count > n ? slotsMin : rowSlots(count, perRow, r)) * L.portionHeight + L.bowlPadding + floor(L.bowlWidth);
         const scale = Math.min(1, availW / w, availH / h);
         if (perRow <= L.maxPerRow && (!best || scale > best.scale + 0.001)) best = { rows, perRow, scale };
       }
@@ -170,7 +174,7 @@ export class GameScene extends Phaser.Scene {
       this.scaleCap = fit(n + extra).scale;
     }
     const { rows, perRow } = fit(n);
-    const scale = Math.min(fit(n).scale, this.scaleCap);
+    const scale = Math.min(fit(n).scale, this.scaleCap); // выросшая банка («Тесно, но влезет») — всё мельче
     const bw = L.bowlWidth * scale;
     const d = (this.dim = {
       bw,
@@ -184,16 +188,19 @@ export class GameScene extends Phaser.Scene {
       k: bw / tex.width, // пикселей экрана на пиксель картинки банки
       scale,
     });
-    const bh = (this.board.capacity + this.reserveSlots) * d.ph + d.pad + d.floor; // высота ряда
-    const totalH = rows * bh + (rows - 1) * d.gy;
+    const rowH = [];
+    for (let r = 0; r < rows; r++) rowH.push(rowSlots(n, perRow, r) * d.ph + d.pad + d.floor);
+    const totalH = rowH.reduce((a, b) => a + b, 0) + (rows - 1) * d.gy;
     const top0 = L.bowlsBottom - totalH; // нижний ряд стоит на столе
 
     this.bowlRects = [];
+    let top = top0;
     for (let r = 0; r < rows; r++) {
       const count = Math.min(perRow, n - r * perRow);
       const rowW = count * d.bw + (count - 1) * d.gx;
       const x0 = (CONFIG.width - rowW) / 2 + d.bw / 2;
-      const top = top0 + r * (bh + d.gy);
+      const bh = rowH[r];
+      if (r > 0) top += rowH[r - 1] + d.gy;
       for (let c = 0; c < count; c++) {
         const i = this.bowlRects.length;
         const own = this.board.caps[i] * d.ph + d.pad + d.floor; // высота самой банки
@@ -245,12 +252,25 @@ export class GameScene extends Phaser.Scene {
   // После любого изменения поля: «?» — как в Board (открылась — на глазах), растаявший лёд — тает, на остальном — новое число.
   syncBlockers() {
     this.portions.forEach((list, i) => list.forEach((p, s) => this.theme.setHidden(p, this.board.isHidden(i, s), true)));
-    const { thawed } = this.board.takeChanges();
+    const { thawed, caps } = this.board.takeChanges();
+    if (caps) this.relayout();
     for (const i of thawed) {
       this.iceViews[i]?.melt();
       this.iceViews[i] = null;
     }
     this.iceViews.forEach((v, i) => v?.setCount(this.board.iceLeft(i)));
+  }
+
+  // Банка выросла или сжалась («Тесно, но влезет»): банки заново, при нужде всё мельче — корм масштабируется следом.
+  relayout() {
+    const old = this.dim.scale;
+    this.rebuildJars();
+    const k = this.dim.scale / old;
+    if (Math.abs(k - 1) < 0.001) return;
+    this.portions.flat().forEach((p) => {
+      p.baseScale = (p.baseScale ?? 1) * k;
+      if (p.scale > 0) this.tweens.add({ targets: p, scale: p.baseScale, duration: A.liftDuration * 2, ease: 'Cubic.easeOut' });
+    });
   }
 
   // Порции разлетаются по местам из Board после ульты или её отмены: банки, где ничего не поменялось, не трогаем;
@@ -367,7 +387,7 @@ export class GameScene extends Phaser.Scene {
 
   stopPulse(p) {
     this.pulsing.delete(p);
-    p.setScale(1);
+    p.setScale(p.baseScale ?? 1);
     if (p.halo) {
       p.halo.destroy();
       p.halo = null;
@@ -399,7 +419,7 @@ export class GameScene extends Phaser.Scene {
     if (this.pulsing.size || this.glass) {
       const env = beatPulse(this);
       for (const p of this.pulsing) {
-        p.setScale(1 + (A.selectPulse - 1) * env);
+        p.setScale((p.baseScale ?? 1) * (1 + (A.selectPulse - 1) * env));
         if (p.halo) p.halo.setAlpha(env * CONFIG.fx.haloAlpha);
       }
       if (this.glass) this.glass.setAlpha(env * CONFIG.fx.glassAlpha);

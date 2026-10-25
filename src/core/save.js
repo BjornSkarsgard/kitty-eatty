@@ -473,8 +473,8 @@ export function setSetting(key, value) {
 // Выставить сохранение точно (только в режиме разработки, ссылкой ?set=milestone,chests2,gifts3):
 //   milestone — следующий уровень с рубежом от текущего прогресса становится текущим: всё до него пройдено,
 //     прошлые рубежи забраны — пройдёшь его, и откроется ровно один рубеж; levelN — то же, но уровень N;
-//   chestsN — ровно N неоткрытых сундуков; giftsN — ровно N подарков дня можно забрать.
-export function devSet({ milestone = false, level = 0, chests = null, gifts = null }) {
+//   chestsN — ровно N неоткрытых сундуков; giftsN — ровно N подарков дня можно забрать; coinsN — ровно N монет.
+export function devSet({ milestone = false, level = 0, chests = null, gifts = null, coins = null }) {
   const d = get();
   let id = level;
   if (milestone) id = MILESTONES.find((m) => m.id > d.unlocked)?.id ?? 0; // d.unlocked — индекс, то есть id последнего пройденного
@@ -486,6 +486,7 @@ export function devSet({ milestone = false, level = 0, chests = null, gifts = nu
     d.msDone = MILESTONES.filter((m) => m.id < id).at(-1)?.id ?? 0;
   }
   if (chests !== null) d.chests = chests;
+  if (coins !== null) d.coins = coins;
   if (gifts !== null) d.daily = { ...d.daily, last: today(), extra: gifts };
   write();
 }

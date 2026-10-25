@@ -162,7 +162,8 @@ const ICONS = {
 };
 
 // Иконки, у которых пока нет своей картинки icon_<имя>, но есть подходящий арт.
-const ICON_ART = { heart: 'fx_heart' };
+// hint — временно лапка с карты: кнопка подсказки без своей иконки видна только в тестовой сборке.
+const ICON_ART = { heart: 'fx_heart', hint: 'paw' };
 
 export function makeIcon(scene, name, size) {
   // сундук — закрытый: коробка и крышка вместе

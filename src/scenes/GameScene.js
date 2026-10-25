@@ -321,19 +321,21 @@ export class GameScene extends Phaser.Scene {
     const U = CONFIG.ui;
     const W = CONFIG.width;
     const step = U.iconButton + 48;
-    // подсказка — только когда есть её иконка icon_hint (арт ещё не готов)
+    // подсказка — когда есть её иконка icon_hint; пока арта нет — только в тестовой сборке, с лапкой paw вместо иконки
     const ultOn = this.ultra && ULTS_READY.has(this.ultra.ult);
     const items = [
       ultOn && ['ult', () => this.ult()],
       ['undo', () => this.undo()],
-      this.textures.exists('icon_hint') && ['hint', () => this.hint()],
+      (this.textures.exists('icon_hint') || TEST_TOOLS) && ['hint', () => this.hint()], // нет иконки — только в тестах, лапкой
       ['addjar', () => this.addJar()],
       ['restart', () => this.restartLevel()],
     ].filter(Boolean);
-    tray(this, W / 2, U.trayY, step * items.length + 30, U.iconButton + 44);
+    // много кнопок (ульта, отмена, подсказка, банка, заново) — теснее, чтобы лоток влез в ширину экрана
+    const pitch = Math.min(step, (W - 70) / items.length);
+    tray(this, W / 2, U.trayY, pitch * items.length + 30, U.iconButton + 44);
     this.trayBtns = {};
     items.forEach(([icon, onTap], k) => {
-      this.trayBtns[icon] = iconButton(this, W / 2 + (k - (items.length - 1) / 2) * step, U.trayY, icon, onTap);
+      this.trayBtns[icon] = iconButton(this, W / 2 + (k - (items.length - 1) / 2) * pitch, U.trayY, icon, onTap);
     });
     this.undoBtn = this.trayBtns.undo;
     if (ultOn) {

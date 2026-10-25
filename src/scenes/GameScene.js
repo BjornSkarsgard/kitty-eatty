@@ -581,7 +581,7 @@ export class GameScene extends Phaser.Scene {
     if (instant[u]) return this.ultNow(u);
     this.ultPick = true;
     sfx(this, 'sfx_pick');
-    this.setUltPrompt(u === 'swap' ? STR.ultPick(this.ultra.ultName) : `«${this.ultra.ultName}»: ${STR.ultPrompt[u]}`);
+    this.setUltPrompt(u === 'swap' ? STR.ultPick : STR.ultPrompt[u]);
   }
 
   // Ульта сработала: заряд, звёздочки, звук, кнопки.
@@ -651,10 +651,13 @@ export class GameScene extends Phaser.Scene {
     this.time.delayedCall(A.moveDuration, () => { if (!this.won && this.selected === null) this.showHint(h.move); });
   }
 
+  // Подсказка ульты сверху: что тапнуть. Длинная — ужимается под ширину экрана (с запасом на «дыхание»).
   setUltPrompt(text) {
     this.ultPrompt?.destroy();
     this.ultPrompt = plate(this, CONFIG.width / 2, CONFIG.layout.bowlsTop - 40, text, { color: PAL.plate }).setDepth(16);
-    this.tweens.add({ targets: this.ultPrompt, scale: 1.06, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    const k = Math.min(1, (CONFIG.width - 60) / (this.ultPrompt.getBounds().width * 1.06));
+    this.ultPrompt.setScale(k);
+    this.tweens.add({ targets: this.ultPrompt, scale: k * 1.06, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
   }
 
   endUltPick() {

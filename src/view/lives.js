@@ -7,13 +7,14 @@ import { PALETTE as PAL } from '../theme/cats/palette.js';
 
 // Окна про жизни: предупреждение «сгорит 1 жизнь» и «жизни кончились».
 
-// 5:42:07 — сколько осталось до полных жизней.
+// 29:07 (или 1:05:07, если больше часа) — сколько осталось до следующей жизни.
 export function formatLeft(ms) {
   const t = Math.ceil(ms / 1000);
   const h = Math.floor(t / 3600);
   const m = Math.floor((t % 3600) / 60);
   const s = t % 60;
-  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  const ms2 = `${String(m).padStart(h ? 2 : 1, '0')}:${String(s).padStart(2, '0')}`;
+  return h ? `${h}:${ms2}` : ms2;
 }
 
 // Предупреждение перед тратой жизни: «Да» — onYes (жизнь сжигает вызывающий), «Нет» — ничего.
@@ -28,14 +29,18 @@ export function confirmLife(scene, title, onYes) {
   });
 }
 
-// Жизней нет: купить за монеты (onGot — жизнь появилась), ролик (этап 6), подождать.
+// Жизней нет: ролик (этап 6), подождать (onGot — жизнь появилась). За монеты — только запасной путь,
+// когда ролик показать нельзя: пока реклама выключена, кнопка есть всегда; на этапе 6 — при ошибке ролика.
 export function showNoLives(scene, onGot) {
   const L = CONFIG.lives;
-  const buttons = [{
-    label: STR.buyLife(L.price), color: PAL.buyGreen, disabled: coins() < L.price,
-    onTap: () => { if (buyLife()) { sfx(scene, 'sfx_coins', CONFIG.audio.coins); onGot?.(); } },
-  }];
+  const buttons = [];
   if (CONFIG.ads.enabled) buttons.push({ label: STR.adLives(L.adGives), color: PAL.adOrange, onTap: () => {} }); // этап 6
+  else {
+    buttons.push({
+      label: STR.buyLife(L.price), color: PAL.buyGreen, disabled: coins() < L.price,
+      onTap: () => { if (buyLife()) { sfx(scene, 'sfx_coins', CONFIG.audio.coins); onGot?.(); } },
+    });
+  }
   buttons.push({ label: STR.wait });
   const text = () => STR.livesBackIn(formatLeft(livesRefillLeft()), coins());
   const popup = showPopup(scene, { title: STR.noLivesTitle, text: text(), buttons });

@@ -54,7 +54,7 @@ export const STR = {
   // жизни
   lifeWillBurn: (n, max) => `Сгорит 1 жизнь. Сейчас жизней: ${n}/${max}`,
   noLivesTitle: 'Жизни кончились',
-  livesBackIn: (time, coins) => `Все жизни вернутся через ${time}\nМонет: ${coins}`,
+  livesBackIn: (time, coins) => `Следующая жизнь через ${time}\nМонет: ${coins}`,
   buyLife: (price) => `Купить жизнь за ${price}`,
   adLives: (n) => `Ролик: +${n} жизни`,
   wait: 'Подождать',

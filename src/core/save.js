@@ -9,7 +9,7 @@
 //   undos    — запас отмен хода, общий на всю игру;
 //   undoProgress — сколько новых уровней пройдено к следующей бесплатной отмене;
 //   catLevel, xp — уровень кота (общий на игрока) и опыт, набранный к следующему;
-//   lives, refillAt — жизни и момент (мс, Date.now), когда они разом станут полными (null — уже полные);
+//   lives, refillAt — жизни и момент (мс, Date.now), когда придёт следующая (null — жизни полные);
 //   skins, skin — открытые рескины обычного кота (id из CONFIG.skins) и выбранный;
 //   chests   — неоткрытые сундуки;
 //   daily — { last: 'ГГГГ-ММ-ДД' последнего подарка, day: какой по счёту следующий };
@@ -19,10 +19,11 @@
 import { CONFIG } from '../config.js';
 
 const KEY = 'kittyeatty.save';
-const VERSION = 8;
+const VERSION = 9;
 const E = CONFIG.economy;
 const C = CONFIG.catXp;
 const LV = CONFIG.lives;
+const LIFE_MS = LV.refillMinutes * 60 * 1000;
 const START_SKINS = CONFIG.skins.filter((k) => k.start).map((k) => k.id);
 const NAMES = CONFIG.nameList; // список кличек — из темы (theme/cats/names.js), сюда приходит через CONFIG
 const START_NAMES = NAMES.filter((n) => n.start).map((n) => n.id);
@@ -51,6 +52,11 @@ function migrate(d) {
     // звёзд за ходы больше нет (сложные уровни вместо них) — накопленные к сундуку просто забываем
     const { chestStars, ...rest } = d;
     d = { ...rest, v: 8 };
+  }
+  if (d.v === 8) {
+    // жизни по одной: максимум меньше, таймер — до следующей жизни, а не до всех
+    const n = Math.min(d.lives, LV.max);
+    d = { ...d, v: 9, lives: n, refillAt: n < LV.max ? Date.now() + LIFE_MS : null };
   }
   if (d && !Number.isFinite(d.xp)) d.xp = 0; // битый опыт — с нуля, уровень кота не трогаем
   if (d && !d.settings) d.settings = {};
@@ -320,13 +326,15 @@ export function setCustomName(s) {
 
 // ---------- жизни ----------
 
-// Таймер дошёл — жизни разом полные.
+// Сколько раз дотикал таймер (в том числе пока игра была закрыта) — столько жизней пришло, по одной.
 function refill(d) {
-  if (d.refillAt !== null && Date.now() >= d.refillAt) {
-    d.lives = LV.max;
-    d.refillAt = null;
-    write();
+  if (d.refillAt === null || Date.now() < d.refillAt) return;
+  while (d.refillAt !== null && Date.now() >= d.refillAt) {
+    d.lives += 1;
+    d.refillAt = d.lives >= LV.max ? null : d.refillAt + LIFE_MS;
   }
+  d.lives = Math.min(d.lives, LV.max);
+  write();
 }
 
 export function lives() {
@@ -335,19 +343,19 @@ export function lives() {
   return d.lives;
 }
 
-// Сколько мс до полных жизней (0 — уже полные).
+// Сколько мс до следующей жизни (0 — жизни полные).
 export function livesRefillLeft() {
   const d = get();
   refill(d);
   return d.refillAt === null ? 0 : Math.max(0, d.refillAt - Date.now());
 }
 
-// Сжечь жизнь; false — жизней нет. Первая сгоревшая из полных запускает таймер.
+// Сжечь жизнь; false — жизней нет. Первая сгоревшая из полных запускает таймер, дальше он уже идёт.
 export function loseLife() {
   const d = get();
   refill(d);
   if (d.lives <= 0) return false;
-  if (d.lives >= LV.max) d.refillAt = Date.now() + LV.refillHours * 3600 * 1000;
+  if (d.lives >= LV.max) d.refillAt = Date.now() + LIFE_MS;
   d.lives -= 1;
   write();
   return true;

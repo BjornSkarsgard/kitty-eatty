@@ -37,9 +37,9 @@ const META = {
   ultraBoosterSave: 0.2,                       // с ультракотом нужно на столько меньше бустеров (умения сильнее)
   start: { coins: 0, undo: 3, hint: 1, jar: 1 },
   // Жизни: тратится одна, когда игрок жмёт «Заново» или выходит из начатого уровня; победа жизнь не тратит.
-  // Сами — все сразу до max через refillMin минут после первой сгоревшей (таймер идёт и пока игра закрыта, по одной
-  // не копятся); ещё за ролик (+adGives, не больше max) или за монеты.
-  lives: { max: 6, refillMin: 360, adGives: 3, price: 100 },
+  // Сами — по одной каждые refillMin минут до max (таймер идёт и пока игра закрыта); ещё за ролик (+adGives,
+  // не больше max) или за монеты (когда ролика нет).
+  lives: { max: 5, refillMin: 30, adGives: 2, price: 100 },
 };
 
 const PLAYER = {
@@ -110,17 +110,26 @@ for (let i = 0; i < LEVELS.length; i++) {
   const spent = t * (1 + restarts * 0.5);
   s.sec += spent;
   s.real += spent;
-  const refill = () => { if (s.refillAt !== null && s.real >= s.refillAt) { s.lives = META.lives.max; s.refillAt = null; } };
+  const refill = () => {
+    while (s.refillAt !== null && s.real >= s.refillAt) {
+      s.lives++;
+      s.refillAt = s.lives >= META.lives.max ? null : s.refillAt + META.lives.refillMin * 60;
+    }
+  };
   for (let r = 0; r < restarts; r++) {
     refill();
     s.livesLost++;
     if (s.lives < 1) {
       s.outOfLives++;
-      if (rand() < PLAYER.adForLives) { s.livesAds++; s.lives = Math.min(META.lives.max, s.lives + META.lives.adGives); }
+      if (rand() < PLAYER.adForLives) {
+        s.livesAds++;
+        s.lives = Math.min(META.lives.max, s.lives + META.lives.adGives);
+        if (s.lives >= META.lives.max) s.refillAt = null;
+      }
       else if (s.coins >= META.lives.price * 3) { s.coins -= META.lives.price; s.livesBought++; s.lives += 1; }
       else { s.livesWaits++; s.waitedMin += (s.refillAt - s.real) / 60; s.real = s.refillAt; refill(); } // ждёт таймер
     }
-    if (s.lives === META.lives.max) s.refillAt = s.real + META.lives.refillMin * 60; // таймер — от первой сгоревшей
+    if (s.lives === META.lives.max) s.refillAt = s.real + META.lives.refillMin * 60; // таймер запускает первая сгоревшая из полных
     s.lives -= 1;
   }
   // подарок дня — в начале каждого игрового дня; сутки вне игры идут и для таймера жизней

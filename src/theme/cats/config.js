@@ -1,9 +1,11 @@
 // Тема «котики»: цвета корма, окрасы и клички, банка, джут, порция, лапки на обоях, кот и его анимации,
 // экран загрузки, главная, холл. Собирается в CONFIG (src/config.js).
 import { NAMES } from './names.js';
+import { ULTRAS } from './ultras.js';
 
 export const CATS = {
   nameList: NAMES, // клички (src/theme/cats/names.js) — для core/save.js
+  ultras: ULTRAS,  // ультракоты (src/theme/cats/ultras.js) — для core/save.js
   // Цвет корма = цвет кота. Форма дублирует цвет для дальтоников. name — в именах файлов котов (cat_<name>_head.png).
   colors: [
     { fill: 0xff6b6b, shape: 'circle', name: 'red' },

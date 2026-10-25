@@ -17,12 +17,14 @@
 //   daily — { last: 'ГГГГ-ММ-ДД' последнего подарка, day: какой по счёту следующий };
 //   names, name — открытые клички (id из src/theme/cats/names.js) и выбранная ('#custom' — своя); custom — своя кличка (или null);
 //   nameTokens — неиспользованные «именные таблички» (можно придумать кличку самому);
+//   ultras, ultra — купленные / подаренные ультракоты (id из theme/cats/ultras.js) и выбранный (null — играем обычным котом);
+//   ultraIntro — окно знакомства с ультракотом уже показано;
 //   settings — { sound, music, fx, vibro }: переключатели под шестерёнкой.
 import { CONFIG } from '../config.js';
 import { MILESTONES } from './milestones.js';
 
 const KEY = 'kittyeatty.save';
-const VERSION = 11;
+const VERSION = 12;
 const E = CONFIG.economy;
 const C = CONFIG.catXp;
 const LV = CONFIG.lives;
@@ -34,7 +36,7 @@ const START_NAMES = NAMES.filter((n) => n.start).map((n) => n.id);
 export const CUSTOM = '#custom';
 
 const SETTINGS = { sound: true, music: true, fx: true, vibro: true };
-const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, hints: B.hint.start, jars: B.jar.start, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, daily: { last: null, day: 0 }, infiniteUntil: null, msDone: 0,
+const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, hints: B.hint.start, jars: B.jar.start, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, daily: { last: null, day: 0 }, infiniteUntil: null, msDone: 0, ultras: [], ultra: null, ultraIntro: false,
   names: [...START_NAMES], name: START_NAMES[0], custom: null, nameTokens: 0, settings: { ...SETTINGS } });
 
 // Старые версии сохранения дополняем до текущей, прогресс не теряется.
@@ -65,6 +67,7 @@ function migrate(d) {
   // рубежи на карте: уже пройденные откроются с наградой при первом заходе на главную
   if (d.v === 9) d = { ...d, v: 10, infiniteUntil: null, msDone: 0 };
   if (d.v === 10) d = { ...d, v: 11, hints: B.hint.start, jars: B.jar.start };
+  if (d.v === 11) d = { ...d, v: 12, ultras: [], ultra: null, ultraIntro: false };
   if (d && !Number.isFinite(d.xp)) d.xp = 0; // битый опыт — с нуля, уровень кота не трогаем
   if (d && !d.settings) d.settings = {};
   if (d) d.settings = { ...SETTINGS, ...d.settings }; // новые переключатели — со значением по умолчанию
@@ -191,6 +194,7 @@ export function selectSkin(id) {
   const d = get();
   if (!d.skins.includes(id)) return false;
   d.skin = id;
+  d.ultra = null; // выбрал окрас обычного кота — играем обычным котом
   write();
   return true;
 }
@@ -202,6 +206,60 @@ export function buySkin(id) {
   if (!k?.price || d.skins.includes(id) || d.coins < k.price) return false;
   d.coins -= k.price;
   d.skins.push(id);
+  write();
+  return true;
+}
+
+// ---------- ультракоты ----------
+
+const ULTRAS = CONFIG.ultras;
+export const ultrasOwned = () => get().ultras;
+export const selectedUltra = () => ULTRAS.find((u) => u.id === get().ultra) ?? null;
+export const ultraPrice = (u) => (u.gift ? null : CONFIG.ultraPrices[u.tier]);
+
+// Каким окрасом рисовать кота сейчас: ультракот — своим (пока — окрасом-заменой look), иначе выбранный окрас.
+export function catLook() {
+  const u = selectedUltra();
+  return u ? u.look : get().skin;
+}
+
+export function selectUltra(id) {
+  const d = get();
+  if (!d.ultras.includes(id)) return false;
+  d.ultra = id;
+  write();
+  return true;
+}
+
+// Купить ультракота за монеты (сразу выбирается); false — не продаётся, уже есть или не хватает монет.
+export function buyUltra(id) {
+  const d = get();
+  const u = ULTRAS.find((x) => x.id === id);
+  const price = u && ultraPrice(u);
+  if (!price || d.ultras.includes(id) || d.coins < price) return false;
+  d.coins -= price;
+  d.ultras.push(id);
+  d.ultra = id;
+  write();
+  return true;
+}
+
+// Подарок за уровень (gift): уровень пройден, а кота ещё нет — забрать (сразу выбирается). Возвращает ультракота или null.
+export function claimUltraGift() {
+  const d = get();
+  const u = ULTRAS.find((x) => x.gift && d.best[x.gift] !== undefined && !d.ultras.includes(x.id));
+  if (!u) return null;
+  d.ultras.push(u.id);
+  d.ultra = u.id;
+  write();
+  return u;
+}
+
+// Пора показать знакомство с первым ультракотом (один раз, после CONFIG.ultraIntroLevel); true — отмечено, показывай.
+export function takeUltraIntro() {
+  const d = get();
+  if (d.ultraIntro || d.best[CONFIG.ultraIntroLevel] === undefined || d.ultras.length) return false;
+  d.ultraIntro = true;
   write();
   return true;
 }

@@ -7,11 +7,13 @@ import { NAMES, checkCustomName } from '../theme/cats/names.js';
 import {
   skinsOwned, selectedSkin, selectSkin, buySkin, coins,
   namesOwned, selectedName, selectName, buyName, customName, nameTokens, setCustomName, CUSTOM,
+  ultrasOwned, selectedUltra, selectUltra, buyUltra, ultraPrice,
 } from '../core/save.js';
+import { ULTRAS, ULTS_READY } from '../theme/cats/ultras.js';
 import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
 
-// Окно коллекции, две вкладки внизу: «Окрасы» и «Клички».
+// Окно коллекции, три вкладки внизу: «Окрасы», «Клички» и «Породы» (ультракоты).
 // Окрасы — сетка голов кота. Открытый — в цвете, с именем; выбранный — в золотой рамке с галочкой.
 // Закрытый — тёмный силуэт и подпись, как получить (цена / уровень кота / «Сундук»).
 // Клички — список страницами; цвет клетки — редкость. Своя кличка (именная табличка) — первой клеткой.
@@ -66,7 +68,7 @@ export function openCollection(scene, { onChange } = {}) {
   // ---------- окрасы ----------
   const drawSkins = () => {
     const owned = skinsOwned();
-    const cur = selectedSkin();
+    const cur = selectedUltra() ? null : selectedSkin(); // играем ультракотом — окрас обычного не отмечен
     const x0 = -((V.cols - 1) * V.cellW) / 2;
     const y0 = -ph / 2 + V.gridTop;
     CONFIG.skins.forEach((k, i) => {
@@ -93,7 +95,7 @@ export function openCollection(scene, { onChange } = {}) {
 
   const tapSkin = (k, have) => {
     if (have) {
-      if (k.id === selectedSkin()) return;
+      if (k.id === selectedSkin() && !selectedUltra()) return;
       sfx(scene, 'sfx_toggle', CONFIG.audio.toggle);
       selectSkin(k.id);
       onChange?.();
@@ -181,6 +183,61 @@ export function openCollection(scene, { onChange } = {}) {
     });
   };
 
+  // ---------- породы (ультракоты) ----------
+  // Пока своего арта нет — голова окраса-замены (look). Купленная / подаренная — в цвете с названием,
+  // остальные — силуэт и подпись: цена, «Подарок на N уровне» или «Скоро» (ульта ещё не работает).
+  const drawUltras = () => {
+    const owned = ultrasOwned();
+    const cur = selectedUltra()?.id;
+    const x0 = -((V.cols - 1) * V.cellW) / 2;
+    const y0 = -ph / 2 + V.gridTop;
+    ULTRAS.forEach((u, i) => {
+      const x = x0 + (i % V.cols) * V.cellW;
+      const y = y0 + Math.floor(i / V.cols) * V.cellH;
+      const have = owned.includes(u.id);
+      const cw = V.cellW - 14;
+      const ch = V.cellH - 14;
+      grid.add(cell(x, y, cw, ch, have ? PAL.panelLight : PAL.deep, 1, u.id === cur));
+      const file = CONFIG.skins.find((k) => k.id === u.look).file;
+      const head = scene.add.image(x, y - 14, `cat_${file}_head`);
+      head.setScale(V.head / Math.max(head.width, head.height));
+      if (!have) head.setTint(PAL.silhouette).setAlpha(0.75); // силуэт
+      grid.add(head);
+      const ly = y + ch / 2 - 24;
+      const price = ultraPrice(u);
+      if (have) grid.add(text(x, ly, u.name, u.name.length > 10 ? 16 : 20));
+      else if (u.gift) grid.add(text(x, ly, STR.levelShort(u.gift), 22, PAL.textMuted));
+      else if (u.soon || !ULTS_READY.has(u.ult)) grid.add(text(x, ly, STR.soon, 22, PAL.textMuted));
+      else grid.add(priceLabel(x - 14, ly, price));
+      if (u.id === cur) grid.add(check(x + cw / 2 - 18, y - ch / 2 + 18));
+      const zone = scene.add.zone(x, y, cw, ch).setInteractive();
+      zone.on('pointerdown', () => tapUltra(u, have));
+      grid.add(zone);
+    });
+  };
+
+  const tapUltra = (u, have) => {
+    const info = STR.ultraInfo(u.ultName, u.ultText, u.boostText);
+    if (have) {
+      if (u.id === selectedUltra()?.id) return showPopup(scene, { title: u.name, text: info, buttons: [{ label: STR.ok }] });
+      sfx(scene, 'sfx_toggle', CONFIG.audio.toggle);
+      selectUltra(u.id);
+      onChange?.();
+      return draw();
+    }
+    const price = ultraPrice(u);
+    if (price && !u.soon && ULTS_READY.has(u.ult)) {
+      return offerBuy(u.name, `${info}
+${STR.buyUltraQ(price)}`, price, () => buyUltra(u.id));
+    }
+    showPopup(scene, {
+      title: u.name,
+      text: `${info}
+${u.gift ? STR.ultraGiftAt(u.gift) : STR.ultraSoon}`,
+      buttons: [{ label: STR.ok }],
+    });
+  };
+
   // ---------- общее ----------
   const offerBuy = (title, question, price, buy) => {
     showPopup(scene, {
@@ -206,11 +263,12 @@ export function openCollection(scene, { onChange } = {}) {
     grid = scene.add.container(0, 0);
     box.add(grid);
     if (tab === 'skins') drawSkins();
-    else drawNames();
+    else if (tab === 'names') drawNames();
+    else drawUltras();
     // вкладки внизу: выбранная — жёлтая
-    [['skins', STR.tabSkins, -150], ['names', STR.tabNames, 150]].forEach(([key, label, x]) => {
+    [['skins', STR.tabSkins, -205], ['names', STR.tabNames, 0], ['ultras', STR.tabUltras, 205]].forEach(([key, label, x]) => {
       grid.add(makeButton(scene, x, ph / 2 - 52, label, () => { if (tab !== key) { tab = key; page = 0; draw(); } }, {
-        w: 260, h: 74, size: 34, color: tab === key ? PAL.gold : PAL.plate,
+        w: 196, h: 74, size: 30, color: tab === key ? PAL.gold : PAL.plate,
       }));
     });
   };

@@ -9,12 +9,13 @@ import { panDuration, panFx, hud } from '../view/transition.js';
 import { music, sfx } from '../audio.js';
 import { beatPhase } from '../beat.js';
 import {
-  currentLevel, unlockedLevel, levelPassed, coins, catLevel, lives, livesRefillLeft, selectedSkin, skinsOwned,
-  chestsPending, openChest, infiniteLeft, claimMilestones, catXp, dailyAvailable, claimDaily, catName,
+  currentLevel, unlockedLevel, levelPassed, coins, catLevel, lives, livesRefillLeft, skinsOwned,
+  chestsPending, openChest, infiniteLeft, claimMilestones, catXp, catLook, claimUltraGift, takeUltraIntro, dailyAvailable, claimDaily, catName,
 } from '../core/save.js';
 import { openCollection } from '../view/CollectionView.js';
 import { openBox, closedBox } from '../view/ChestView.js';
 import { catXpBar } from '../view/CatXpBar.js';
+import { showUltraIntro } from '../view/UltraView.js';
 import { showPopup } from '../view/Popup.js';
 import { showNoLives, formatLeft } from '../view/lives.js';
 import { LEVELS } from '../core/levels.js';
@@ -117,12 +118,20 @@ export class RoomScene extends Phaser.Scene {
     else this.showMilestones();
   }
 
-  // Открылись рубежи на карте — окно «Награды за путешествие» (все разом); подарки с карты пропадают.
+  // При заходе на главную по очереди: награды открывшихся рубежей («Награды за путешествие», подарки с карты
+  // пропадают) → подарок-ультракот (за его уровень) → знакомство с ультракотом (один раз, после ultraIntroLevel).
   showMilestones() {
     const got = claimMilestones();
-    if (!got) return;
-    this.map.redraw();
-    openBox(this, got.chapter ? 'chest' : 'gift', got.items, () => this.afterBox(), { title: STR.journeyTitle });
+    if (got) {
+      this.map.redraw();
+      return openBox(this, got.chapter ? 'chest' : 'gift', got.items, () => { this.afterBox(); this.showMilestones(); }, { title: STR.journeyTitle });
+    }
+    const ultra = claimUltraGift();
+    if (ultra) {
+      return openBox(this, 'gift', [{ ultra: ultra.id }], () => { this.makeHomeCat(); this.afterBox(); this.map.redraw(); this.showMilestones(); },
+        { title: STR.ultraGiftTitle });
+    }
+    if (takeUltraIntro()) showUltraIntro(this, CONFIG.ultras.find((u) => u.gift));
   }
 
   // Монеты, настройки и вкладки — на своей камере: основная камера приближается (к карте, в дверь кухни),
@@ -520,7 +529,7 @@ export class RoomScene extends Phaser.Scene {
   makeHomeCat() {
     const s = HC.catScale;
     const old = this.cat;
-    this.cat = new CatView(this, W / 2, HC.floorY - CONFIG.cat.origin[2] * s, selectedSkin());
+    this.cat = new CatView(this, W / 2, HC.floorY - CONFIG.cat.origin[2] * s, catLook());
     this.cat.setBaseScale(s).startIdle();
     this.cat.home = { x: this.cat.x, y: this.cat.y };
     this.cat.setInteractive(new Phaser.Geom.Rectangle(-55, -75, 110, 145), Phaser.Geom.Rectangle.Contains);

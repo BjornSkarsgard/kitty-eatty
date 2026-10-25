@@ -2,7 +2,7 @@ import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { CatView } from '../theme/cats/CatView.js';
 import { sfx } from '../audio.js';
-import { unlockedLevel, selectedSkin, milestonesDone } from '../core/save.js';
+import { unlockedLevel, catLook, milestonesDone } from '../core/save.js';
 import { milestoneAt } from '../core/milestones.js';
 import { closedBox } from './ChestView.js';
 import { LEVELS } from '../core/levels.js';
@@ -203,7 +203,7 @@ export class MapView {
 
   // Кот на текущем уровне — голова выглядывает из-за кружка и качается.
   makeCat(x, y) {
-    const cat = new CatView(this.scene, x, y, selectedSkin(), { headOnly: true }).setMood('happy');
+    const cat = new CatView(this.scene, x, y, catLook(), { headOnly: true }).setMood('happy');
     cat.setScale(M.catScale);
     this.scene.tweens.add({ targets: cat, angle: { from: -6, to: 6 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     return cat;

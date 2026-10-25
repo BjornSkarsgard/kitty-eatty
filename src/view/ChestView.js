@@ -136,6 +136,16 @@ function rewardItem(scene, it, font) {
     }).setOrigin(0.5)]);
     return c;
   }
+  if (it.ultra) { // ультракот: голова (пока окраса-замены) и название породы
+    const u = CONFIG.ultras.find((x) => x.id === it.ultra);
+    const file = CONFIG.skins.find((s) => s.id === u.look).file;
+    const head = scene.add.image(0, -6, `cat_${file}_head`);
+    head.setScale(150 / Math.max(head.width, head.height));
+    c.add([head, scene.add.text(0, 84, u.name, {
+      fontFamily: font, fontStyle: 'bold', fontSize: '36px', color: PAL.textGold, stroke: PAL.textStroke, strokeThickness: 8,
+    }).setOrigin(0.5)]);
+    return c;
+  }
   if (it.skin) {
     const k = CONFIG.skins.find((s) => s.id === it.skin);
     const head = scene.add.image(0, -6, `cat_${k.file}_head`);

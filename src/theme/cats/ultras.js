@@ -22,7 +22,7 @@ export const ULTRAS = [
   { id: 'scottish', name: 'Скоттиш-страйт', look: 'smoke', tier: 1, ult: 'magnet', ultName: 'Магнит',
     ultText: 'Банка забирает с верха всех банок порции своего верхнего цвета' },
   { id: 'siamese', name: 'Сиамская', look: 'cream', tier: 1, ult: 'sharpEye', ultName: 'Зоркий глаз',
-    ultText: 'Открывает весь скрытый корм', soon: true },
+    ultText: 'Открывает весь скрытый корм' },
   { id: 'burmese', name: 'Бурманская', look: 'chocolate', tier: 1, ult: 'instinct', ultName: 'Чутьё',
     ultText: 'Показывает 5 правильных ходов' },
   { id: 'bengal', name: 'Бенгальская', look: 'gold', tier: 2, ult: 'hunt', ultName: 'Охота',
@@ -32,10 +32,13 @@ export const ULTRAS = [
   { id: 'russianblue', name: 'Русская голубая', look: 'smoke', tier: 2, ult: 'snack', ultName: 'Перекус',
     ultText: 'Кот съедает все порции одного цвета' },
   { id: 'angora', name: 'Турецкая ангора', look: 'white', tier: 2, ult: 'claws', ultName: 'Когти',
-    ultText: 'Снимает крышку или лёд с банки', soon: true },
+    ultText: 'Снимает лёд с банки' },
   { id: 'norwegian', name: 'Норвежская лесная', look: 'brown', tier: 2, ult: 'blanket', ultName: 'Тёплый плед',
-    ultText: 'Размораживает все банки', soon: true },
+    ultText: 'Размораживает все банки' },
 ];
 
 // Ульты, которые уже работают в игре. Породу с неготовой ультой пока не продаём («Скоро»).
-export const ULTS_READY = new Set(['swap']);
+export const ULTS_READY = new Set([
+  'swap', 'paw', 'leap', 'squeeze', 'pocket', 'flip', 'order', 'magnet', 'sharpEye', 'instinct',
+  'hunt', 'lazy', 'snack', 'claws', 'blanket',
+]);

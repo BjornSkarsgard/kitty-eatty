@@ -56,6 +56,8 @@ export class GameScene extends Phaser.Scene {
     this.ultra = selectedUltra();
     this.ultPick = false;
     this.ultFirst = null;
+    this.instinct = 0; // «Чутьё»: сколько ещё ходов подсвечивать
+    this.pocket = false; // «Карман» манчкина уже на уровне
     // насколько выше обычной может стать банка (место в рядах — с начала уровня): запасная банка ультракота +boost.jarCap
     const U2 = this.ultra;
     this.reserveSlots = U2?.boost?.jarCap ?? 0;
@@ -164,7 +166,7 @@ export class GameScene extends Phaser.Scene {
       return best;
     };
     if (this.scaleCap === undefined) {
-      const extra = boosterUnlocked('jar') ? CONFIG.boosters.jar.perLevel : 0;
+      const extra = (boosterUnlocked('jar') ? CONFIG.boosters.jar.perLevel : 0) + (this.ultra?.ult === 'pocket' ? 1 : 0);
       this.scaleCap = fit(n + extra).scale;
     }
     const { rows, perRow } = fit(n);
@@ -433,10 +435,10 @@ export class GameScene extends Phaser.Scene {
 
   // ---------- ходы ----------
 
-  doMove(from, to) {
+  doMove(from, to, opts) {
     this.moved = true;
     const startSlot = this.portions[to].length;
-    const n = this.board.move(from, to);
+    const n = this.board.move(from, to, opts);
     const moved = this.portions[from].splice(-n);
     this.portions[to].push(...moved);
     this.selected = null;
@@ -445,6 +447,7 @@ export class GameScene extends Phaser.Scene {
     this.settleBowl(from); // если серия влезла не вся — остаток опускается обратно
 
     this.afterChange([to]);
+    if (this.instinct > 0) this.nextInstinct();
   }
 
   // Бейджи на отмене и умениях — сколько осталось; 0 — вместо бейджа цена (тап — покупка); не открытое умение — бледное;
@@ -541,6 +544,9 @@ export class GameScene extends Phaser.Scene {
   // Ульта ультракота (бесплатно, восстанавливается за CONFIG.ultRecharge уровней). «Ловкие лапы»: тап по кнопке —
   // «выбери порцию», тап по порции (любой, хоть со дна) — она светится, тап по второй — мейн-кун меняет их местами.
   // Повторный тап по кнопке — отмена. Обмен — ход в истории: отмена хода возвращает как было (заряд не возвращается).
+  // Остальные ульты — так же: сразу (Зоркий глаз, Тёплый плед, Карман, Лентяй, Чутьё) или после выбора цели —
+  // банки (Кувырок, Порядок, Магнит, Когти), порции (Лапа, Перекус, Охота) или хода «откуда — куда» (Прыжок, Тесно).
+  // Заряд тратится, только когда ульта что-то сделала.
   ult() {
     if (this.won) return;
     if (ultLeft()) {
@@ -549,9 +555,79 @@ export class GameScene extends Phaser.Scene {
     }
     this.deselect();
     if (this.ultPick) return this.endUltPick();
+    const u = this.ultra.ult;
+    const instant = { sharpEye: 1, blanket: 1, pocket: 1, lazy: 1, instinct: 1 };
+    if (instant[u]) return this.ultNow(u);
     this.ultPick = true;
     sfx(this, 'sfx_pick');
-    this.setUltPrompt(STR.ultPick(this.ultra.ultName));
+    this.setUltPrompt(u === 'swap' ? STR.ultPick(this.ultra.ultName) : `«${this.ultra.ultName}»: ${STR.ultPrompt[u]}`);
+  }
+
+  // Ульта сработала: заряд, звёздочки, звук, кнопки.
+  ultDone(x, y) {
+    spendUlt();
+    this.moved = true;
+    if (x !== undefined) this.fxStars.explode(14, x, y);
+    sfx(this, 'sfx_star', CONFIG.audio.star);
+    this.refreshUndo();
+  }
+
+  // Ульты без выбора цели.
+  ultNow(u) {
+    const B = this.board;
+    const nothing = () => showPopup(this, { title: this.ultra.ultName, text: STR.ultNothing[u], buttons: [{ label: STR.ok }] });
+    const level = LEVELS[this.levelIndex];
+    if (u === 'sharpEye') {
+      if (!B.revealAll()) return nothing();
+      this.ultDone();
+      return this.syncBlockers();
+    }
+    if (u === 'blanket') {
+      const all = B.bowls.map((_, i) => i).filter((i) => B.isFrozen(i));
+      if (!all.length) return nothing();
+      B.thawNow(all);
+      this.ultDone();
+      return this.syncBlockers();
+    }
+    if (u === 'pocket') {
+      if (this.pocket) return nothing();
+      this.pocket = true;
+      B.addBowl(1);
+      this.portions.push([]);
+      this.rebuildJars();
+      const last = B.bowls.length - 1;
+      this.ultDone(this.bowlRects[last].x, this.mouthY(last));
+      return;
+    }
+    if (u === 'instinct') {
+      if (!hintFor(level, B)) return nothing();
+      this.ultDone();
+      this.instinct = CONFIG.ultInstinct;
+      return this.nextInstinct();
+    }
+    if (u === 'lazy') {
+      if (!hintFor(level, B)) return nothing();
+      this.ultDone();
+      // кот сам делает несколько правильных ходов (сбились с пути — сначала откат, отмены не тратятся)
+      let left = CONFIG.ultLazy;
+      const step = () => {
+        if (this.won || left <= 0) return;
+        const h = hintFor(level, this.board);
+        if (!h) return;
+        if (h.back) for (let k = 0; k < h.back; k++) this.undoMove();
+        else { this.doMove(...h.move); left--; }
+        this.time.delayedCall(A.moveDuration + 150, step);
+      };
+      step();
+    }
+  }
+
+  // «Чутьё»: подсветить следующий правильный ход (после каждого хода игрока — следующий, пока не кончится).
+  nextInstinct() {
+    const h = hintFor(LEVELS[this.levelIndex], this.board);
+    if (!h?.move) { this.instinct = 0; return; }
+    this.instinct--;
+    this.time.delayedCall(A.moveDuration, () => { if (!this.won && this.selected === null) this.showHint(h.move); });
   }
 
   setUltPrompt(text) {
@@ -561,7 +637,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   endUltPick() {
-    if (this.ultFirst) this.stopPulse(this.portions[this.ultFirst[0]][this.ultFirst[1]]);
+    if (Array.isArray(this.ultFirst)) this.stopPulse(this.portions[this.ultFirst[0]][this.ultFirst[1]]);
+    else if (this.ultFirst !== null) this.settleBowl(this.ultFirst);
     this.ultPick = false;
     this.ultFirst = null;
     this.ultPrompt?.destroy();
@@ -578,9 +655,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   pickForUlt(i, pointer) {
+    const u = this.ultra.ult;
+    if (u !== 'swap') return this.pickTarget(u, i, pointer);
     const slot = pointer ? this.slotAt(i, pointer) : this.board.bowls[i].length - 1;
     const here = [i, slot];
-    if (slot < 0 || this.board.isComplete(i)) return this.shake(i); // пусто или банка уже съедена
+    if (slot < 0 || this.board.isComplete(i) || this.board.isFrozen(i)) return this.shake(i); // пусто, съедена, во льду
     if (!this.ultFirst) {
       this.ultFirst = here;
       sfx(this, 'sfx_pick');
@@ -599,6 +678,84 @@ export class GameScene extends Phaser.Scene {
     sfx(this, 'sfx_star', CONFIG.audio.star);
     this.refreshUndo();
     this.afterChange([first[0], i]);
+  }
+
+  // Цель для остальных ульт выбрана тапом по банке i (pointer — куда именно, для порций).
+  pickTarget(u, i, pointer) {
+    const B = this.board;
+    const r = this.bowlRects[i];
+    const slot = pointer ? this.slotAt(i, pointer) : B.bowls[i].length - 1;
+    const fail = () => this.shake(i);
+    const before = B.bowls.map((_, j) => B.isComplete(j));
+    const newly = () => B.bowls.map((_, j) => j).filter((j) => B.isComplete(j) && !before[j]); // собрались этой ультой
+    // ход «откуда — куда»: первый тап — откуда (банка приподнимается), второй — куда
+    if (u === 'leap' || u === 'squeeze') {
+      if (this.ultFirst === null) {
+        if (!B.canPick(i)) return fail();
+        this.ultFirst = i;
+        this.liftJar(i, -A.liftY * this.dim.scale, 'Back.easeOut');
+        sfx(this, 'sfx_pick');
+        return this.setUltPrompt(STR.ultTo);
+      }
+      const from = this.ultFirst;
+      if (from === i) { this.settleBowl(i); this.ultFirst = null; return this.endUltPick(); }
+      const opts = u === 'leap' ? { anyColor: true } : { anyRoom: true, anyColor: false };
+      if (!B.canMove(from, i, opts)) return fail();
+      this.ultFirst = null;
+      this.endUltPick();
+      this.doMove(from, i, opts);
+      return this.ultDone(r.x, this.mouthY(i));
+    }
+    let ok = false;
+    if (u === 'claws') ok = B.thawNow([i]).length > 0;
+    else if (u === 'flip') ok = B.flip(i);
+    else if (u === 'order') ok = B.order(i);
+    else if (u === 'magnet') ok = B.magnet(i);
+    else if (u === 'paw') ok = slot >= 0 && B.paw(i, slot);
+    else if (u === 'snack' || u === 'hunt') {
+      if (slot < 0 || !B.open(i)) return fail();
+      const c = B.bowls[i][slot];
+      if (u === 'snack') ok = B.snack(c);
+      else {
+        // куда собрать: банка только с этим цветом (где его больше) или пустая
+        const dests = B.bowls.map((_, j) => j).filter((j) => B.canHunt(c, j))
+          .sort((a, b) => B.bowls[b].length - B.bowls[a].length);
+        if (!dests.length) {
+          this.endUltPick();
+          return showPopup(this, { title: this.ultra.ultName, text: STR.ultNoJar, buttons: [{ label: STR.ok }] });
+        }
+        ok = B.hunt(c, dests[0]);
+        if (ok) { this.endUltPick(); this.resyncPortions(); this.ultDone(this.bowlRects[dests[0]].x, this.mouthY(dests[0])); return this.afterChange([dests[0]]); }
+      }
+      if (ok && u === 'snack') {
+        this.endUltPick();
+        const eaten = this.resyncPortions();
+        this.feedLeftovers(eaten, c);
+        this.ultDone(r.x, this.mouthY(i));
+        return this.afterChange(newly());
+      }
+    }
+    if (!ok) return fail();
+    this.endUltPick();
+    if (u === 'claws') { this.ultDone(r.x, this.mouthY(i)); return this.syncBlockers(); }
+    this.resyncPortions();
+    this.ultDone(r.x, this.mouthY(i));
+    this.afterChange(newly());
+  }
+
+  // «Перекус»: съеденные порции летят к коту своего цвета и исчезают.
+  feedLeftovers(list, color) {
+    const cat = this.theme.cats[color];
+    list.forEach((p, k) => {
+      this.tweens.killTweensOf(p);
+      this.stopPulse(p);
+      p.setDepth(6);
+      this.tweens.add({
+        targets: p, x: cat?.x ?? p.x, y: cat?.y ?? p.y - 200, scale: 0.2, alpha: 0, delay: k * 60, duration: 500, ease: 'Cubic.easeIn',
+        onComplete: () => p.destroy(),
+      });
+    });
+    if (cat) cat.meow?.();
   }
 
   // Порции меняются местами в списках и перелетают крест-накрест.

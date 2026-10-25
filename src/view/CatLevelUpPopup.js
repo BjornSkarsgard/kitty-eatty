@@ -29,7 +29,7 @@ export function showCatLevelUps(scene, ups, { fxStars, onTake }) {
   box.add(scene.add.text(0, -72, String(up.level), {
     fontFamily: font, fontStyle: 'bold', fontSize: '96px', color: PAL.text, stroke: PAL.textGoldStroke, strokeThickness: 12,
   }).setOrigin(0.5));
-  const items = [['coin', up.coins], ['undo', up.undos], ['skin', up.skin ? 1 : 0], ['chest', up.chest ? 1 : 0], ['name', up.name ? 1 : 0]].filter(([, n]) => n > 0);
+  const items = [['coin', up.coins], ['undo', up.undos], ['hint', scene.textures.exists('icon_hint') ? up.hints : 0], ['addjar', up.jars], ['skin', up.skin ? 1 : 0], ['chest', up.chest ? 1 : 0], ['name', up.name ? 1 : 0]].filter(([, n]) => n > 0);
   items.forEach(([icon, n], i) => {
     const x = (i - (items.length - 1) / 2) * 170;
     if (icon === 'name') { // новая кличка: табличка цвета редкости

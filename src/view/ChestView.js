@@ -71,6 +71,7 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
   };
 
   // 4. награды выпрыгивают из коробки в ряд над ней
+  items = items.filter((it) => it.icon !== 'hint' || scene.textures.exists('icon_hint')); // подсказка — когда будет иконка
   const showRewards = () => {
     const gap = items.length > 3 ? 150 : 180; // четыре награды — теснее, чтобы подписи не уходили за край
     const y = cy - A.size * 0.95;

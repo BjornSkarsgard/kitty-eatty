@@ -235,8 +235,15 @@ export class CatsLevel {
     cat.walkTo(cat.home.x, cat.home.y, () => cat.setMood('open').setInteractive());
   }
 
+  // Банки пересоздаются (добавили банку «+1 банка»): старые обмотки убрать, список — заново.
+  resetJars() {
+    this.wraps.forEach((w, i) => { if (w) this.unwrapJar(i, true); });
+    this.wraps = [];
+  }
+
   // Банку снизу вверх обматывает джутовая верёвка цвета корма, затем выскакивает картинка корма.
-  wrapJar(bowl, color) {
+  // instant — сразу обмотанная (банку пересоздали на новом месте).
+  wrapJar(bowl, color, instant = false) {
     const game = this.scene;
     this.unwrapJar(bowl, true);
     const J = CONFIG.jute;
@@ -245,6 +252,11 @@ export class CatsLevel {
     const bottom = r.bottom - game.dim.base;
     const wrap = makeJuteWrap(game, color, game.dim.bw, top, bottom).setPosition(r.x, 0).setDepth(2);
     this.wraps[bowl] = wrap;
+    if (instant) {
+      wrap.reveal(1);
+      wrap.icon.setScale(wrap.iconScale);
+      return;
+    }
     wrap.reveal(0);
     wrap.t = 0;
     const wrapTime = J.coilDuration * wrap.coils;

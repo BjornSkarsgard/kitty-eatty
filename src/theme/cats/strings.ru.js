@@ -1,5 +1,14 @@
 // Все надписи интерфейса (русский). Для Яндекс Игр позже добавим strings.en.js с теми же ключами.
 // Тексты с числами — функции. Содержимое темы (имена окрасов, клички) — в config.js и names.js, не здесь.
+// 1 ход, 2 хода, 5 ходов
+const plural = (n, one, few, many) => {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+};
+
 export const STR = {
   gameTitle: 'Накорми котиков',
   loading: 'Загрузка…',
@@ -41,6 +50,10 @@ export const STR = {
   leaveTitle: 'Выйти из уровня?',
   restartTitle: 'Начать заново?',
   noUndosTitle: 'Отмены кончились',
+  booster: { hint: 'Нюх', jar: '+1 банка' },
+  noBoosterTitle: { hint: 'Подсказки кончились', jar: 'Банки кончились' },
+  offTrackTitle: 'Сбились с пути',
+  offTrackText: (n) => `Вернуться на ${n} ${plural(n, 'ход', 'хода', 'ходов')} назад, где всё было верно? Отмены не тратятся.`,
   buyFor: (price) => `Купить за ${price} монет`,
   watchAd: 'Смотреть рекламу',
 

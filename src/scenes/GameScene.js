@@ -4,7 +4,11 @@ import { Board } from '../core/Board.js';
 import { CatsLevel } from '../theme/cats/kitchen.js';
 import { beatPulse } from '../beat.js';
 import { sfx, music } from '../audio.js';
-import { currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo, lives, loseLife, infiniteLeft } from '../core/save.js';
+import {
+  currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo, lives, loseLife, infiniteLeft,
+  boosters, boosterUnlocked, spendBooster, buyBooster,
+} from '../core/save.js';
+import { hintFor } from '../core/hint.js';
 import { confirmLife, showNoLives } from '../view/lives.js';
 import { showWinPopup } from '../view/WinPopup.js';
 import { showPopup } from '../view/Popup.js';
@@ -44,6 +48,8 @@ export class GameScene extends Phaser.Scene {
     this.selected = null;
     this.won = false;
     this.moved = false; // был ли ход — тогда «Заново» и выход сжигают жизнь
+    this.extraJars = 0; // сколько банок добавлено умением «+1 банка»
+    this.scaleCap = undefined; // масштаб банок с запасом под «+1 банка» — считается заново на каждом уровне
     this.pulsing = new Set(); // порции, которые пульсируют в такт музыке
     this.glass = null;
     // всё про котиков — фон кухни, банки, корм, коты, кормление — в теме (src/theme/cats/kitchen.js)
@@ -120,6 +126,8 @@ export class GameScene extends Phaser.Scene {
   // Подбираем число рядов так, чтобы банки были как можно крупнее, и масштабируем размеры под экран.
   // Банка — картинка jar_back: сверху горлышко, снизу донышко, стенки между ними растягиваются по высоте.
   // bowlRects: top — верх стенок (горлышко выше него), bottom — низ донышка (стоит на столе).
+  // Если «+1 банка» открыта, масштаб с самого начала такой, чтобы влезла и лишняя банка: при её появлении
+  // банки только расступаются, а не уменьшаются.
   layoutBowls() {
     const n = this.board.bowls.length;
     const art = this.theme.jarArt();
@@ -130,15 +138,23 @@ export class GameScene extends Phaser.Scene {
     const bh0 = this.board.capacity * L.portionHeight + L.bowlPadding + floor(L.bowlWidth);
     const availW = CONFIG.width - L.sideMargin * 2;
     const availH = L.bowlsBottom - L.bowlsTop - neck(L.bowlWidth);
-    let best = null;
-    for (let rows = 1; rows <= 4; rows++) {
-      const perRow = Math.ceil(n / rows);
-      const w = perRow * L.bowlWidth + (perRow - 1) * L.bowlGapX;
-      const h = rows * bh0 + (rows - 1) * L.bowlGapY;
-      const scale = Math.min(1, availW / w, availH / h);
-      if (perRow <= L.maxPerRow && (!best || scale > best.scale + 0.001)) best = { rows, perRow, scale };
+    const fit = (count) => {
+      let best = null;
+      for (let rows = 1; rows <= 4; rows++) {
+        const perRow = Math.ceil(count / rows);
+        const w = perRow * L.bowlWidth + (perRow - 1) * L.bowlGapX;
+        const h = rows * bh0 + (rows - 1) * L.bowlGapY;
+        const scale = Math.min(1, availW / w, availH / h);
+        if (perRow <= L.maxPerRow && (!best || scale > best.scale + 0.001)) best = { rows, perRow, scale };
+      }
+      return best;
+    };
+    if (this.scaleCap === undefined) {
+      const extra = boosterUnlocked('jar') ? CONFIG.boosters.jar.perLevel : 0;
+      this.scaleCap = fit(n + extra).scale;
     }
-    const { rows, perRow, scale } = best;
+    const { rows, perRow } = fit(n);
+    const scale = Math.min(fit(n).scale, this.scaleCap);
     const bw = L.bowlWidth * scale;
     const d = (this.dim = {
       bw,
@@ -186,10 +202,11 @@ export class GameScene extends Phaser.Scene {
     const jars = this.bowlRects.map((r) => this.theme.createJar(r, this.dim));
     this.jarBack = jars.map((j) => j.back.setDepth(0));
     this.jarFront = jars.map((j) => j.front.setDepth(1));
-    this.bowlRects.forEach((r, i) => {
+    this.zones = this.bowlRects.map((r, i) => {
       const zone = this.add.zone(r.x, (r.top - this.dim.neck + r.bottom) / 2, this.dim.bw + this.dim.gx * 0.9,
         r.bottom - r.top + this.dim.neck + this.dim.gy * 0.9).setInteractive();
       zone.on('pointerdown', () => this.onBowlTap(i));
+      return zone;
     });
   }
 
@@ -210,9 +227,19 @@ export class GameScene extends Phaser.Scene {
     const U = CONFIG.ui;
     const W = CONFIG.width;
     const step = U.iconButton + 48;
-    tray(this, W / 2, U.trayY, step * 2 + 30, U.iconButton + 44);
-    this.undoBtn = iconButton(this, W / 2 - step / 2, U.trayY, 'undo', () => this.undo());
-    iconButton(this, W / 2 + step / 2, U.trayY, 'restart', () => this.restartLevel());
+    // подсказка — только когда есть её иконка icon_hint (арт ещё не готов)
+    const items = [
+      ['undo', () => this.undo()],
+      this.textures.exists('icon_hint') && ['hint', () => this.hint()],
+      ['addjar', () => this.addJar()],
+      ['restart', () => this.restartLevel()],
+    ].filter(Boolean);
+    tray(this, W / 2, U.trayY, step * items.length + 30, U.iconButton + 44);
+    this.trayBtns = {};
+    items.forEach(([icon, onTap], k) => {
+      this.trayBtns[icon] = iconButton(this, W / 2 + (k - (items.length - 1) / 2) * step, U.trayY, icon, onTap);
+    });
+    this.undoBtn = this.trayBtns.undo;
     this.refreshUndo();
   }
 
@@ -357,11 +384,124 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  // Бейдж на отмене — сколько осталось (0 — значок «+»: купить); монеты в пилюле.
+  // Бейджи на отмене и умениях — сколько осталось (0 — значок «+»: купить); не открытое умение — бледное;
+  // монеты в пилюле.
   refreshUndo() {
     const n = undos();
     this.undoBtn.setBadge(n > 0 ? n : '+');
+    for (const [kind, icon] of [['hint', 'hint'], ['jar', 'addjar']]) {
+      const btn = this.trayBtns[icon];
+      if (!btn) continue;
+      const open = boosterUnlocked(kind);
+      const left = boosters(kind);
+      btn.setAlpha(open ? 1 : 0.5).setBadge(open ? (left > 0 ? left : '+') : null);
+    }
     this.coinPill.setValue(coins());
+  }
+
+  // Умение не открыто — окно «откроется на N уровне кота»; true — можно пользоваться.
+  boosterReady(kind) {
+    if (boosterUnlocked(kind)) return true;
+    showPopup(this, { title: STR.booster[kind], text: STR.unlocksAtCatLevel(CONFIG.boosters[kind].from), buttons: [{ label: STR.ok }] });
+    return false;
+  }
+
+  // Потратить заряд умения и сделать use(); запаса нет — окно «купить за монеты» (позже — и ролик).
+  useBooster(kind, use) {
+    if (spendBooster(kind)) {
+      this.refreshUndo();
+      return use();
+    }
+    const price = CONFIG.boosters[kind].price;
+    const buttons = [{
+      label: STR.buyFor(price), color: PAL.buyGreen, disabled: coins() < price,
+      onTap: () => { if (buyBooster(kind)) { sfx(this, 'sfx_coins', CONFIG.audio.coins); this.useBooster(kind, use); } },
+    }];
+    if (CONFIG.ads.enabled) buttons.push({ label: STR.watchAd, color: PAL.adOrange, onTap: () => {} }); // этап 6
+    buttons.push({ label: STR.noThanks });
+    showPopup(this, { title: STR.noBoosterTitle[kind], text: STR.coinsLeft(coins()), buttons });
+  }
+
+  // «+1 банка»: пустая банка до конца уровня; банки расступаются (масштаб не меняется — см. layoutBowls).
+  addJar() {
+    if (this.won || !this.boosterReady('jar')) return;
+    if (this.extraJars >= CONFIG.boosters.jar.perLevel) return this.shakeButton(this.trayBtns.addjar);
+    this.useBooster('jar', () => {
+      this.deselect();
+      this.extraJars += 1;
+      this.board.bowls.push([]);
+      this.portions.push([]);
+      // старые банки, зоны тапа и обмотки — заново на новых местах
+      const wrapped = this.board.bowls.map((_, i) => this.theme.jarExtras(i).length > 0);
+      this.jarBack.forEach((j) => j.destroy());
+      this.jarFront.forEach((j) => j.destroy());
+      this.zones.forEach((z) => z.destroy());
+      this.theme.resetJars();
+      this.layoutBowls();
+      this.createBowls();
+      wrapped.forEach((on, i) => { if (on) this.theme.wrapJar(i, this.board.bowls[i][0], true); });
+      // новые задние стенки созданы позже корма — поднимаем корм над ними (глубина у них одна)
+      this.portions.flat().forEach((p) => this.children.bringToTop(p));
+      // корм переезжает за своей банкой (в съеденных банках его уже не видно)
+      this.portions.forEach((list, i) => {
+        if (this.board.isComplete(i)) return;
+        list.forEach((p, slot) => {
+          const pos = this.slotPos(i, slot);
+          this.tweens.killTweensOf(p);
+          this.stopPulse(p);
+          this.tweens.add({ targets: p, x: pos.x, y: pos.y, duration: A.liftDuration * 2, ease: 'Cubic.easeOut' });
+        });
+      });
+      // новая банка выпрыгивает
+      const last = this.board.bowls.length - 1;
+      for (const j of [this.jarBack[last], this.jarFront[last]]) {
+        j.setScale(0.2).setAlpha(0);
+        this.tweens.add({ targets: j, scale: 1, alpha: 1, duration: 360, ease: 'Back.easeOut' });
+      }
+      sfx(this, 'sfx_popup', CONFIG.audio.popup);
+    });
+  }
+
+  // «Нюх»: подсказать ход из решения уровня; игрок ушёл с пути — сначала предложить откатиться.
+  hint() {
+    if (this.won || !this.boosterReady('hint')) return;
+    this.deselect();
+    const level = LEVELS[this.levelIndex];
+    const h = hintFor(level, this.board);
+    if (!h) return;
+    if (h.move) return this.useBooster('hint', () => this.showHint(h.move));
+    showPopup(this, {
+      title: STR.offTrackTitle,
+      text: STR.offTrackText(h.back),
+      buttons: [
+        {
+          label: STR.yes, color: PAL.buyGreen, onTap: () => this.useBooster('hint', () => {
+            for (let k = 0; k < h.back; k++) this.undoMove();
+            const next = hintFor(level, this.board);
+            if (next?.move) this.time.delayedCall(A.moveDuration, () => this.showHint(next.move));
+          }),
+        },
+        { label: STR.no },
+      ],
+    });
+  }
+
+  // Подсказанный ход: банка, откуда брать, выбрана (тапни, куда класть), банка, куда класть, подпрыгивает.
+  showHint([from, to]) {
+    sfx(this, 'sfx_star', CONFIG.audio.star);
+    this.select(from);
+    const layers = [this.jarBack[to], this.jarFront[to], ...this.theme.jarExtras(to)];
+    const portions = this.portions[to];
+    const dy = -A.liftY * this.dim.scale * 0.6;
+    const repeat = Math.max(1, Math.round(CONFIG.boosters.hintShowMs / 500) - 1);
+    this.tweens.add({ targets: [...layers, ...portions], y: '+=' + dy, duration: 250, yoyo: true, repeat, ease: 'Sine.easeInOut' });
+  }
+
+  // Кнопка лотка «нельзя»: звук и дрожь.
+  shakeButton(btn) {
+    sfx(this, 'sfx_invalid');
+    const x = btn.x;
+    this.tweens.add({ targets: btn, x: x + 8, duration: 50, yoyo: true, repeat: 2, onComplete: () => { btn.x = x; } });
   }
 
   // Отмена тратит общий запас; запас кончился — предлагаем купить за монеты (позже — за рекламу).
@@ -372,6 +512,13 @@ export class GameScene extends Phaser.Scene {
     if (!last) return;
     if (!spendUndo()) return this.offerUndo();
     this.refreshUndo();
+    this.undoMove();
+  }
+
+  // Откатить последний ход с анимацией (запас отмен не трогает — это делает вызывающий).
+  undoMove() {
+    const last = this.board.history[this.board.history.length - 1];
+    if (!last) return;
     sfx(this, 'sfx_undo', CONFIG.audio.undo);
     if (this.board.isComplete(last.to)) this.theme.jarUndone(this.board.bowls[last.to][0]);
 

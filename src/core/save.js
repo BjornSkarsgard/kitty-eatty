@@ -6,7 +6,7 @@
 //   unlocked — сколько уровней открыто (индекс самого дальнего доступного);
 //   best     — { id уровня: лучшее число ходов } — есть запись, значит уровень пройден;
 //   coins    — монеты (за победы; тратятся на отмены, позже — в магазине);
-//   undos    — запас отмен хода, общий на всю игру;
+//   undos    — запас отмен хода, общий на всю игру; hints, jars — запас подсказок «Нюх» и банок «+1 банка»;
 //   undoProgress — сколько новых уровней пройдено к следующей бесплатной отмене;
 //   catLevel, xp — уровень кота (общий на игрока) и опыт, набранный к следующему;
 //   lives, refillAt — жизни и момент (мс, Date.now), когда придёт следующая (null — жизни полные);
@@ -22,10 +22,11 @@ import { CONFIG } from '../config.js';
 import { MILESTONES } from './milestones.js';
 
 const KEY = 'kittyeatty.save';
-const VERSION = 10;
+const VERSION = 11;
 const E = CONFIG.economy;
 const C = CONFIG.catXp;
 const LV = CONFIG.lives;
+const B = CONFIG.boosters;
 const LIFE_MS = LV.refillMinutes * 60 * 1000;
 const START_SKINS = CONFIG.skins.filter((k) => k.start).map((k) => k.id);
 const NAMES = CONFIG.nameList; // список кличек — из темы (theme/cats/names.js), сюда приходит через CONFIG
@@ -33,7 +34,7 @@ const START_NAMES = NAMES.filter((n) => n.start).map((n) => n.id);
 export const CUSTOM = '#custom';
 
 const SETTINGS = { sound: true, music: true, fx: true, vibro: true };
-const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, daily: { last: null, day: 0 }, infiniteUntil: null, msDone: 0,
+const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, hints: B.hint.start, jars: B.jar.start, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, daily: { last: null, day: 0 }, infiniteUntil: null, msDone: 0,
   names: [...START_NAMES], name: START_NAMES[0], custom: null, nameTokens: 0, settings: { ...SETTINGS } });
 
 // Старые версии сохранения дополняем до текущей, прогресс не теряется.
@@ -63,6 +64,7 @@ function migrate(d) {
   }
   // рубежи на карте: уже пройденные откроются с наградой при первом заходе на главную
   if (d.v === 9) d = { ...d, v: 10, infiniteUntil: null, msDone: 0 };
+  if (d.v === 10) d = { ...d, v: 11, hints: B.hint.start, jars: B.jar.start };
   if (d && !Number.isFinite(d.xp)) d.xp = 0; // битый опыт — с нуля, уровень кота не трогаем
   if (d && !d.settings) d.settings = {};
   if (d) d.settings = { ...SETTINGS, ...d.settings }; // новые переключатели — со значением по умолчанию
@@ -140,6 +142,8 @@ export function recordWin(level, index, moves, count) {
     const up = catReward(d.catLevel);
     d.coins += up.coins;
     d.undos += up.undos;
+    d.hints += up.hints;
+    d.jars += up.jars;
     if (up.skin && !d.skins.includes(up.skin)) d.skins.push(up.skin);
     if (up.name && !d.names.includes(up.name)) d.names.push(up.name);
     if (up.chest) reward.chests += 1;
@@ -167,6 +171,8 @@ function catReward(level) {
     level,
     coins: C.rewardCoins + C.rewardCoinsPerLevel * level,
     undos: C.rewardUndos + (level % C.bonusUndoEvery === 0 ? 1 : 0),
+    hints: level % C.hintEvery === 0 ? 1 : 0,
+    jars: level % C.jarEvery === 0 ? 1 : 0,
     skin: CONFIG.skins.find((k) => k.catLevel === level)?.id ?? null, // рескин за этот уровень кота
     chest: level % CONFIG.chest.everyCatLevels === 0,
     name: NAMES.find((n) => n.catLevel === level)?.id ?? null, // кличка за этот уровень кота
@@ -206,9 +212,11 @@ export const chestsPending = () => get().chests;
 // Содержимое сундука — сразу начисляется. Возвращает, что показать: [{ icon, n }] и [{ skin }].
 function rollChest(d) {
   const C = CONFIG.chest;
-  const items = [{ icon: 'coin', n: C.coins }, { icon: 'undo', n: C.undos }];
+  const items = [{ icon: 'coin', n: C.coins }, { icon: 'undo', n: C.undos }, { icon: 'hint', n: C.hints }, { icon: 'addjar', n: C.jars }];
   d.coins += C.coins;
   d.undos += C.undos;
+  d.hints += C.hints;
+  d.jars += C.jars;
   rollName(d, items);
   if (Math.random() < C.skinChance) {
     const pool = CONFIG.skins.filter((k) => !k.catLevel && !d.skins.includes(k.id));
@@ -448,6 +456,32 @@ export function buyUndo() {
   if (d.coins < E.undoPrice) return false;
   d.coins -= E.undoPrice;
   d.undos += 1;
+  write();
+  return true;
+}
+
+// ---------- умения на уровне: подсказка (hint) и банка (jar) ----------
+
+const STOCK = { hint: 'hints', jar: 'jars' };
+export const boosters = (kind) => get()[STOCK[kind]];
+// Открыто ли умение (по уровню кота, CONFIG.boosters[kind].from).
+export const boosterUnlocked = (kind) => get().catLevel >= B[kind].from;
+
+// Потратить заряд; false — запаса нет.
+export function spendBooster(kind) {
+  const d = get();
+  if (d[STOCK[kind]] <= 0) return false;
+  d[STOCK[kind]] -= 1;
+  write();
+  return true;
+}
+
+// Купить заряд за монеты; false — не хватает монет.
+export function buyBooster(kind) {
+  const d = get();
+  if (d.coins < B[kind].price) return false;
+  d.coins -= B[kind].price;
+  d[STOCK[kind]] += 1;
   write();
   return true;
 }

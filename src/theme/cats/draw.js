@@ -78,6 +78,49 @@ export function makePortion(scene, colorIndex, w, h) {
   return p;
 }
 
+// Скрытый корм «?»: серая подложка той же формы поверх порции и знак вопроса. Своего арта пока нет — подложка
+// порции, подкрашенная (для слоя порции tint можно, CLAUDE.md). Кладётся в контейнер порции (p.cover).
+export function makePortionCover(scene, p) {
+  const B = CONFIG.blockers;
+  const g = scene.add.graphics();
+  const parts = [...makeLayer(scene, p.layerW, p.layerH, B.hiddenFill, g), g];
+  parts.push(scene.add.text(0, 1, '?', {
+    fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: `${Math.round(p.layerH * 0.7)}px`,
+    color: '#ffffff', stroke: B.hiddenStroke, strokeThickness: Math.max(3, Math.round(p.layerH * 0.08)),
+  }).setOrigin(0.5));
+  const c = scene.add.container(0, 0, parts);
+  p.add(c);
+  p.cover = c;
+  return c;
+}
+
+// Лёд поверх банки (стекло сзади и спереди уже есть): голубая полупрозрачная корка от горлышка до дна, блики-иней,
+// снежинка и число — сколько ещё собрать банок. Пока без арта. r, dim — как у createJar. setCount(n) — число.
+export function makeIceCover(scene, r, dim) {
+  const B = CONFIG.blockers;
+  const top = r.top - dim.neck * 0.6;
+  const h = r.bottom - top;
+  const w = dim.bw * 0.96;
+  const g = scene.add.graphics();
+  g.fillStyle(B.iceColor, B.iceAlpha).fillRoundedRect(-w / 2, top, w, h, w * 0.22);
+  g.lineStyle(Math.max(3, w * 0.04), 0xffffff, 0.8).strokeRoundedRect(-w / 2, top, w, h, w * 0.22);
+  g.fillStyle(0xffffff, 0.45);
+  for (let k = 0; k < 4; k++) { // иней: косые блики
+    const y = top + h * (0.15 + k * 0.22);
+    g.fillTriangle(-w * 0.38, y, -w * 0.1, y - h * 0.05, -w * 0.32, y + h * 0.04);
+  }
+  const font = `"${CONFIG.font}", sans-serif`;
+  const cy = top + h * 0.5;
+  const flake = scene.add.text(0, cy - w * 0.32, '❄', { fontFamily: font, fontSize: `${Math.round(w * 0.5)}px`, color: '#ffffff' }).setOrigin(0.5);
+  const num = scene.add.text(0, cy + w * 0.22, '', {
+    fontFamily: font, fontStyle: 'bold', fontSize: `${Math.round(w * 0.42)}px`, color: '#ffffff', stroke: B.iceStroke, strokeThickness: Math.max(4, w * 0.07),
+  }).setOrigin(0.5);
+  const c = scene.add.container(r.x, 0, [g, flake, num]);
+  c.setCount = (n) => { num.setText(String(n)); return c; };
+  c.centerY = cy;
+  return c;
+}
+
 // Золотой ореол вокруг плитки: размытый силуэт portion_glow (tools/portion-glow.mjs) под плиткой, сложение цветов,
 // прозрачность ведёт сцена. По ширине — не больше maxW (стекло банки), так что за банку свечение не выходит.
 export function makePortionHalo(scene, p, color, maxW) {

@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../../config.js';
 import { CatView } from './CatView.js';
-import { makePortion, makeFxTextures, makeJuteWrap, makePortionHalo, makeSoftTexture } from './draw.js';
+import { makePortion, makeFxTextures, makeJuteWrap, makePortionHalo, makeSoftTexture, makePortionCover, makeIceCover } from './draw.js';
 import { beatPhase } from '../../beat.js';
 import { sfx, sfxRandom } from '../../audio.js';
 
@@ -123,6 +123,37 @@ export class CatsLevel {
 
   createPortion(color, w, h) {
     return makePortion(this.scene, color, w, h);
+  }
+
+  // Скрыть / открыть порцию «?». animate — открывается на глазах: «?» сжимается, звук.
+  setHidden(p, on, animate = false) {
+    const scene = this.scene;
+    if (on) {
+      if (!p.cover) makePortionCover(scene, p);
+      scene.tweens.killTweensOf(p.cover);
+      p.cover.setVisible(true).setScale(1).setAlpha(1);
+      return;
+    }
+    if (!p.cover || !p.cover.visible) return;
+    if (!animate) return p.cover.setVisible(false);
+    sfx(scene, 'sfx_pick', 0.6);
+    scene.tweens.add({
+      targets: p.cover, scaleX: 0, alpha: 0, duration: CONFIG.blockers.revealMs, ease: 'Back.easeIn',
+      onComplete: () => p.cover.setVisible(false).setScale(1).setAlpha(1),
+    });
+  }
+
+  // Лёд поверх банки (над стеклом спереди). Возвращает контейнер с setCount(n) и melt() — растаять.
+  createIce(r, dim) {
+    const scene = this.scene;
+    const ice = makeIceCover(scene, r, dim).setDepth(3);
+    ice.melt = () => {
+      sfx(scene, 'sfx_complete', 0.5);
+      this.fxCrumbs.setParticleTint(CONFIG.blockers.iceColor);
+      this.fxCrumbs.explode(A.crumbs * 2, r.x, ice.centerY);
+      scene.tweens.add({ targets: ice, alpha: 0, scaleX: 1.15, duration: CONFIG.blockers.thawMs, ease: 'Quad.easeOut', onComplete: () => ice.destroy() });
+    };
+    return ice;
   }
 
   // Что ещё двигается вместе с банкой (подъём, тряска): обмотка, если банка съедена.

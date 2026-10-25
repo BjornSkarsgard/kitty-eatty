@@ -97,13 +97,17 @@ export class GameScene extends Phaser.Scene {
   }
 
   // Сложный или кошмарный уровень — табличка до первого хода (не после «Заново»).
+  // Сложный или кошмарный уровень — табличка до первого хода; первая встреча с механикой — окно «Новинка!»
+  // (не после «Заново»).
   showKind() {
-    const kind = LEVELS[this.levelIndex].kind;
-    if (!kind || this.again) return;
+    const { kind, intro } = LEVELS[this.levelIndex];
+    if (this.again) return;
+    const novelty = () => intro && showPopup(this, { title: STR.novelty, text: STR.noveltyText[intro], buttons: [{ label: STR.ok }] });
+    if (!kind) return novelty();
     showPopup(this, {
       title: STR.kind[kind],
       text: STR.kindText[kind](CONFIG.economy.kindCoins[kind]),
-      buttons: [{ label: STR.letsGo, color: kind === 'nightmare' ? PAL.plateNightmare : PAL.plateHard }],
+      buttons: [{ label: STR.letsGo, color: kind === 'nightmare' ? PAL.plateNightmare : PAL.plateHard, onTap: novelty }],
     });
   }
 
@@ -220,6 +224,8 @@ export class GameScene extends Phaser.Scene {
       zone.on('pointerdown', (p) => this.onBowlTap(i, p));
       return zone;
     });
+    // лёд — поверх замороженных банок, с числом: сколько ещё собрать
+    this.iceViews = this.bowlRects.map((r, i) => (this.board.isFrozen(i) ? this.theme.createIce(r, this.dim).setCount(this.board.iceLeft(i)) : null));
   }
 
   createPortions() {
@@ -229,8 +235,48 @@ export class GameScene extends Phaser.Scene {
       const p = this.theme.createPortion(color, w, h);
       const pos = this.slotPos(i, slot);
       p.setPosition(pos.x, pos.y);
+      if (this.board.isHidden(i, slot)) this.theme.setHidden(p, true);
       return p;
     }));
+  }
+
+  // После любого изменения поля: «?» — как в Board (открылась — на глазах), растаявший лёд — тает, на остальном — новое число.
+  syncBlockers() {
+    this.portions.forEach((list, i) => list.forEach((p, s) => this.theme.setHidden(p, this.board.isHidden(i, s), true)));
+    const { thawed } = this.board.takeChanges();
+    for (const i of thawed) {
+      this.iceViews[i]?.melt();
+      this.iceViews[i] = null;
+    }
+    this.iceViews.forEach((v, i) => v?.setCount(this.board.iceLeft(i)));
+  }
+
+  // Порции разлетаются по местам из Board после ульты или её отмены: банки, где ничего не поменялось, не трогаем;
+  // в остальных каждая порция летит на ближайшее место своего цвета. Возвращает лишние (съеденные «Перекусом»).
+  resyncPortions() {
+    const same = (i) => this.portions[i]?.length === this.board.bowls[i].length
+      && this.portions[i].every((p, s) => p.color === this.board.bowls[i][s]);
+    const changed = this.board.bowls.map((_, i) => !same(i));
+    const pool = [];
+    this.portions.forEach((list, i) => { if (changed[i]) pool.push(...list); });
+    const next = this.board.bowls.map((b, i) => {
+      if (!changed[i]) return this.portions[i];
+      return b.map((c, s) => {
+        const pos = this.slotPos(i, s);
+        let best = -1;
+        let bestD = Infinity;
+        pool.forEach((p, k) => {
+          if (p.color !== c) return;
+          const d = Phaser.Math.Distance.Between(p.x, p.y, pos.x, pos.y);
+          if (d < bestD) { bestD = d; best = k; }
+        });
+        const p = pool.splice(best, 1)[0];
+        this.flyTo(p, pos, 0);
+        return p;
+      });
+    });
+    this.portions = next;
+    return pool;
   }
 
   // Лоток внизу — игровые действия: отмена (с бейджем — сколько осталось), заново; на этапе 6 — «+1 банка».
@@ -469,6 +515,7 @@ export class GameScene extends Phaser.Scene {
   // Банки заново на новых местах (добавили банку, банка выросла): старые банки, зоны тапа и обмотки — пересоздаём,
   // корм перелетает за своей банкой. Масштаб не меняется (см. layoutBowls).
   rebuildJars() {
+      this.iceViews.forEach((v) => v?.destroy());
       const wrapped = this.board.bowls.map((_, i) => this.theme.jarExtras(i).length > 0);
       this.jarBack.forEach((j) => j.destroy());
       this.jarFront.forEach((j) => j.destroy());
@@ -584,6 +631,7 @@ export class GameScene extends Phaser.Scene {
 
   // После хода или обмена: собранные банки — коту, всё собрано — победа.
   afterChange(bowls) {
+    this.syncBlockers();
     for (const b of new Set(bowls)) if (this.board.isComplete(b)) this.theme.jarComplete(b, this.board.bowls[b][0]);
     if (this.board.isSolved()) {
       this.won = true;
@@ -652,23 +700,22 @@ export class GameScene extends Phaser.Scene {
 
   // Откатить последний ход с анимацией (запас отмен не трогает — это делает вызывающий).
   undoMove() {
-    const last = this.board.history[this.board.history.length - 1];
-    if (!last) return;
+    if (!this.board.history.length) return;
     sfx(this, 'sfx_undo', CONFIG.audio.undo);
-    if (last.swap) {
-      // обмен собрал банку — кот бросает есть
-      for (const b of new Set(last.swap.map(([x]) => x))) if (this.board.isComplete(b)) this.theme.jarUndone(this.board.bowls[b][0]);
-      this.board.undo();
-      return this.swapSprites(...last.swap);
-    }
-    if (this.board.isComplete(last.to)) this.theme.jarUndone(this.board.bowls[last.to][0]);
-
-    const startSlot = this.portions[last.from].length;
+    // банки, которые были собраны и после отмены уже нет, — кот бросает есть
+    const done = this.board.bowls.map((b, i) => (this.board.isComplete(i) ? b[0] : null));
     const rec = this.board.undo();
-    const moved = this.portions[rec.to].splice(-rec.n);
-    this.portions[rec.from].push(...moved);
-    this.fly(moved, rec.from, startSlot);
-    this.settleBowl(rec.to);
+    done.forEach((c, i) => { if (c !== null && !this.board.isComplete(i)) this.theme.jarUndone(c); });
+    if (rec.swap) this.swapSprites(...rec.swap);
+    else if (rec.snap) this.resyncPortions();
+    else {
+      const startSlot = this.portions[rec.from].length;
+      const moved = this.portions[rec.to].splice(-rec.n);
+      this.portions[rec.from].push(...moved);
+      this.fly(moved, rec.from, startSlot);
+      this.settleBowl(rec.to);
+    }
+    this.syncBlockers();
   }
 
   // Полёт порций из банки в банку почти по прямой, с лёгким выгибом вверх (moveArc).

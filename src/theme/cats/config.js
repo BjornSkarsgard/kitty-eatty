@@ -6,6 +6,17 @@ import { ULTRAS } from './ultras.js';
 export const CATS = {
   nameList: NAMES, // клички (src/theme/cats/names.js) — для core/save.js
   ultras: ULTRAS,  // ультракоты (src/theme/cats/ultras.js) — для core/save.js
+
+  // Блокеры на уровне (пока без арта): скрытый корм «?» и лёд.
+  blockers: {
+    hiddenFill: 0x8f8aa3,     // подложка скрытой порции
+    hiddenStroke: '#4a3f6b',  // обводка «?»
+    revealMs: 260,            // порция открывается: «?» сжимается
+    iceColor: 0xbfe9ff,
+    iceAlpha: 0.62,
+    iceStroke: '#3a7fb8',     // обводка числа на льду
+    thawMs: 450,              // лёд тает: расползается и бледнеет
+  },
   // Цвет корма = цвет кота. Форма дублирует цвет для дальтоников. name — в именах файлов котов (cat_<name>_head.png).
   colors: [
     { fill: 0xff6b6b, shape: 'circle', name: 'red' },

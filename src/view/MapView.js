@@ -6,7 +6,7 @@ import { unlockedLevel, catLook, milestonesDone } from '../core/save.js';
 import { milestoneAt } from '../core/milestones.js';
 import { closedBox } from './ChestView.js';
 import { LEVELS } from '../core/levels.js';
-import { kindBadge } from './ui.js';
+import { kindBadge, makeIcon } from './ui.js';
 import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
 
@@ -162,15 +162,7 @@ export class MapView {
     }
 
     const ms = milestoneAt(level.id);
-    if (ms && ms.id > milestonesDone()) {
-      // сбоку от кружка, к середине карты — там тропинка не мешает
-      const side = p.x > W / 2 ? -1 : 1;
-      const box = closedBox(scene, ms.chapter ? 'chest' : 'gift', M.milestoneSize)
-        .setPosition(p.x + side * M.nodeSize * M.milestoneX, p.y - M.nodeSize * 0.1);
-      top.add(box);
-      parts.push(box);
-      scene.tweens.add({ targets: box, y: box.y - 8, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    }
+    if (ms) parts.push(...this.makeMilestone(ms, p));
 
     if (state === 'current') {
       node.setScale(M.currentScale);
@@ -180,6 +172,56 @@ export class MapView {
       scene.tweens.add({ targets: node, scale: M.currentScale * M.currentPulse, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     }
     return { node, parts };
+  }
+
+  // Рубеж у уровня: золотое кольцо вокруг кружка (всегда), сбоку подарок (в конце главы — сундук), под ним — что
+  // внутри; награду забрали — подарок бледный, с галочкой. Возвращает созданное (для уборки при прокрутке).
+  makeMilestone(ms, p) {
+    const scene = this.scene;
+    const [, nodes, top] = this.layers;
+    const parts = [];
+    const ring = scene.add.graphics();
+    const r = M.nodeSize / 2 + M.milestoneRing;
+    ring.lineStyle(M.milestoneRing + 4, PAL.goldDark, 1).strokeCircle(p.x, p.y + 3, r);
+    ring.lineStyle(M.milestoneRing, PAL.gold, 1).strokeCircle(p.x, p.y, r);
+    nodes.addAt(ring, 0); // под кружками
+    parts.push(ring);
+
+    const done = ms.id <= milestonesDone();
+    const side = p.x > W / 2 ? -1 : 1; // к середине карты — там тропинка не мешает
+    const bx = p.x + side * M.nodeSize * M.milestoneX;
+    const by = p.y - M.nodeSize * 0.15;
+    const box = closedBox(scene, ms.chapter ? 'chest' : 'gift', M.milestoneSize).setPosition(bx, by);
+    top.add(box);
+    parts.push(box);
+    if (done) {
+      box.setAlpha(0.4);
+      const ok = scene.add.graphics();
+      ok.fillStyle(PAL.okGreen, 1).fillCircle(bx, by, 20);
+      ok.lineStyle(5, PAL.white, 1).beginPath().moveTo(bx - 10, by).lineTo(bx - 2, by + 8).lineTo(bx + 11, by - 7).strokePath();
+      top.add(ok);
+      parts.push(ok);
+      return parts;
+    }
+    scene.tweens.add({ targets: box, y: by - 8, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    // что внутри — плашка под подарком
+    const R = ms.reward;
+    const [icon, label] = R.chests ? ['chest', STR.infiniteMin(R.infiniteMin)] : R.coins ? ['coin', String(R.coins)]
+      : R.undos ? ['undo', `×${R.undos}`] : ['heart', STR.infiniteMin(R.infiniteMin)];
+    const chip = scene.add.container(bx, by + M.milestoneSize * 0.62);
+    const t = scene.add.text(14, 0, R.chests ? `+ ∞ ${label}` : icon === 'heart' ? `∞ ${label}` : label, {
+      fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '22px', color: PAL.textBrown,
+    }).setOrigin(0.5);
+    const w = t.width + 50;
+    const g = scene.add.graphics();
+    g.fillStyle(PAL.black, 0.2).fillRoundedRect(-w / 2 + 2, -17 + 3, w, 34, 17);
+    g.fillStyle(PAL.cream, 1).fillRoundedRect(-w / 2, -17, w, 34, 17);
+    g.lineStyle(3, PAL.brownRim, 1).strokeRoundedRect(-w / 2, -17, w, 34, 17);
+    const ic = makeIcon(scene, icon === 'chest' ? 'heart' : icon, 28).setPosition(-w / 2 + 18, 0);
+    chip.add([g, ic, t]);
+    top.add(chip);
+    parts.push(chip);
+    return parts;
   }
 
   // Кружок уровня: картинка map_node*.png или заглушка-печенька кодом.

@@ -138,6 +138,7 @@ export const LAYOUT = {
     kindBadgeSize: 24,   // её шрифт, px
     milestoneSize: 76,   // подарок (сундук) рубежа сбоку от кружка…
     milestoneX: 0.95,    // …на столько nodeSize от центра кружка
+    milestoneRing: 8,    // толщина золотого кольца вокруг кружка уровня с рубежом
     pawsBetween: 3,      // следов лапок между соседними уровнями
     pawSize: 30,
     pawColor: 0xb07a52,

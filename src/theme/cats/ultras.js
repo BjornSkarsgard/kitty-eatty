@@ -25,8 +25,8 @@ export const ULTRAS = [
     ultText: 'Открывает весь скрытый корм' },
   { id: 'burmese', name: 'Бурманская', look: 'chocolate', tier: 1, ult: 'instinct', ultName: 'Чутьё',
     ultText: 'Показывает 5 правильных ходов' },
-  { id: 'bengal', name: 'Бенгальская', look: 'gold', tier: 2, ult: 'hunt', ultName: 'Охота',
-    ultText: 'Порции выбранного цвета с верха всех банок слетаются в одну банку' },
+  { id: 'bengal', name: 'Бенгальская', look: 'gold', tier: 2, ult: 'raid', ultName: 'Набег',
+    ultText: 'Корм выбранной банки разлетается по банкам с таким же верхним цветом или в пустые' },
   { id: 'persian', name: 'Персидская', look: 'white', tier: 2, ult: 'lazy', ultName: 'Лентяй',
     ultText: 'Сама делает 2 правильных хода' },
   { id: 'russianblue', name: 'Русская голубая', look: 'smoke', tier: 2, ult: 'snack', ultName: 'Перекус',
@@ -40,5 +40,5 @@ export const ULTRAS = [
 // Ульты, которые уже работают в игре. Породу с неготовой ультой пока не продаём («Скоро»).
 export const ULTS_READY = new Set([
   'swap', 'paw', 'leap', 'squeeze', 'pocket', 'flip', 'order', 'magnet', 'sharpEye', 'instinct',
-  'hunt', 'lazy', 'snack', 'claws', 'blanket',
+  'raid', 'lazy', 'snack', 'claws', 'blanket',
 ]);

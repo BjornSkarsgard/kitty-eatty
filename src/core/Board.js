@@ -239,28 +239,25 @@ export class Board {
     });
   }
 
-  // «Охота»: все порции цвета c со всего поля (из любых мест, кроме собранных и замороженных банок) слетаются
-  // в банку dest — пустую или где только этот цвет.
-  canHunt(c, dest) {
-    const d = this.bowls[dest];
-    return this.open(dest, false) && d.every((x) => x === c) && d.length < this.capacity;
-  }
-
-  hunt(c, dest) {
-    if (!this.canHunt(c, dest)) return false;
+  // «Набег»: корм банки i разлетается по полю — каждая верхняя порция летит на банку с таким же верхним цветом
+  // (где корма больше), а нет такой — в пустую; некуда — остаётся. Собранные и замороженные банки не трогаем.
+  raid(i) {
+    if (!this.open(i)) return false;
     return this.ultOp(() => {
       let any = false;
-      this.bowls.forEach((s, j) => {
-        if (j === dest || !this.open(j)) return;
-        for (let k = s.length - 1; k >= 0; k--) {
-          if (s[k] !== c || this.bowls[dest].length >= this.caps[dest]) continue;
-          s.splice(k, 1);
-          this.hid[j].splice(k, 1);
-          this.bowls[dest].push(c);
-          this.hid[dest].push(false);
-          any = true;
-        }
-      });
+      const b = this.bowls[i];
+      while (b.length) {
+        const c = b[b.length - 1];
+        const fits = (j) => j !== i && this.open(j, false) && this.bowls[j].length < this.caps[j];
+        const same = this.bowls.map((_, j) => j).filter((j) => fits(j) && this.bowls[j].length && this.bowls[j].at(-1) === c)
+          .sort((x, y) => this.bowls[y].length - this.bowls[x].length);
+        const to = same[0] ?? this.bowls.findIndex((s, j) => fits(j) && !s.length);
+        if (to === undefined || to < 0) break;
+        this.bowls[to].push(b.pop());
+        this.hid[to].push(false);
+        this.hid[i].pop();
+        any = true;
+      }
       return any;
     });
   }

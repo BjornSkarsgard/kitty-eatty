@@ -570,7 +570,7 @@ export class GameScene extends Phaser.Scene {
   // «выбери порцию», тап по порции (любой, хоть со дна) — она светится, тап по второй — мейн-кун меняет их местами.
   // Повторный тап по кнопке — отмена. Обмен — ход в истории: отмена хода возвращает как было (заряд не возвращается).
   // Остальные ульты — так же: сразу (Зоркий глаз, Тёплый плед, Карман, Лентяй, Чутьё) или после выбора цели —
-  // банки (Кувырок, Порядок, Магнит, Когти), порции (Лапа, Перекус, Охота) или хода «откуда — куда» (Прыжок, Тесно).
+  // банки (Кувырок, Порядок, Магнит, Набег, Когти), порции (Лапа, Перекус) или хода «откуда — куда» (Прыжок, Тесно).
   // Заряд тратится, только когда ульта что-то сделала.
   ult() {
     if (this.won) return;
@@ -740,22 +740,12 @@ export class GameScene extends Phaser.Scene {
     else if (u === 'order') ok = B.order(i);
     else if (u === 'magnet') ok = B.magnet(i);
     else if (u === 'paw') ok = slot >= 0 && B.paw(i, slot);
-    else if (u === 'snack' || u === 'hunt') {
+    else if (u === 'raid') ok = B.raid(i);
+    else if (u === 'snack') {
       if (slot < 0 || !B.open(i)) return fail();
       const c = B.bowls[i][slot];
-      if (u === 'snack') ok = B.snack(c);
-      else {
-        // куда собрать: банка только с этим цветом (где его больше) или пустая
-        const dests = B.bowls.map((_, j) => j).filter((j) => B.canHunt(c, j))
-          .sort((a, b) => B.bowls[b].length - B.bowls[a].length);
-        if (!dests.length) {
-          this.endUltPick();
-          return showPopup(this, { title: this.ultra.ultName, text: STR.ultNoJar, buttons: [{ label: STR.ok }] });
-        }
-        ok = B.hunt(c, dests[0]);
-        if (ok) { this.endUltPick(); this.resyncPortions(); this.ultDone(this.bowlRects[dests[0]].x, this.mouthY(dests[0])); return this.afterChange([dests[0]]); }
-      }
-      if (ok && u === 'snack') {
+      ok = B.snack(c);
+      if (ok) {
         this.endUltPick();
         const eaten = this.resyncPortions();
         this.feedLeftovers(eaten, c);

@@ -1,9 +1,19 @@
 // Чистая логика поля, без Phaser. Миска — массив порций снизу вверх, порция — индекс цвета.
+// capacity — сколько порций одного цвета (столько же вмещает обычная банка); caps — вместимость каждой банки
+// (больше capacity — банка увеличена ультой «Большая миска» или запасная банка ультракота).
 export class Board {
   constructor(level) {
     this.capacity = level.capacity;
     this.bowls = level.bowls.map((b) => [...b]);
+    this.caps = this.bowls.map(() => level.capacity);
     this.history = [];
+  }
+
+  // Добавить пустую банку (умение «+1 банка»); cap — её вместимость. Возвращает её номер.
+  addBowl(cap = this.capacity) {
+    this.bowls.push([]);
+    this.caps.push(cap);
+    return this.bowls.length - 1;
   }
 
   // Сколько одинаковых порций лежит сверху подряд.
@@ -29,7 +39,7 @@ export class Board {
   canMove(from, to) {
     if (from === to || !this.canPick(from)) return false;
     const dst = this.bowls[to];
-    if (dst.length >= this.capacity) return false;
+    if (dst.length >= this.caps[to]) return false;
     const src = this.bowls[from];
     return !dst.length || dst[dst.length - 1] === src[src.length - 1];
   }
@@ -37,7 +47,7 @@ export class Board {
   // Перекладывает верхнюю серию (сколько влезет). Возвращает число порций или 0.
   move(from, to) {
     if (!this.canMove(from, to)) return 0;
-    const n = Math.min(this.topRun(from), this.capacity - this.bowls[to].length);
+    const n = Math.min(this.topRun(from), this.caps[to] - this.bowls[to].length);
     this.bowls[to].push(...this.bowls[from].splice(-n));
     this.history.push({ from, to, n });
     return n;

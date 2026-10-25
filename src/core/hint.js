@@ -31,7 +31,8 @@ export function hintFor(level, board) {
   if (k !== undefined) return k < level.solution.length ? { move: level.solution[k] } : null;
   // прокручиваем историю игрока с начала и запоминаем последнюю позицию на пути решения
   const replay = new Board(level);
-  while (replay.bowls.length < board.bowls.length) replay.bowls.push([]);
+  while (replay.bowls.length < board.bowls.length) replay.addBowl();
+  replay.caps = [...board.caps];
   let last = 0;
   board.history.forEach(({ from, to }, h) => {
     replay.move(from, to);

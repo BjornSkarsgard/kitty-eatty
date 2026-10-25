@@ -88,6 +88,7 @@ ${boostText}.` : ''}
   ultraIntroWhen: (n) => `Будет твоим в подарок на ${n} уровне!`,
   ultraIntroOk: 'Жду!',
   ultraGiftTitle: 'Подарок: ультракот!',
+  ultPick: (ultName) => `«${ultName}»: выбери банку`,
   buyUltraQ: (price) => `Купить породу за ${price} монет?`,
   catLevelShort: (n) => `Ур. кота ${n}`,
   unlocksAtCatLevel: (n) => `Откроется на ${n} уровне кота`,

@@ -6,8 +6,9 @@ import { beatPulse } from '../beat.js';
 import { sfx, music } from '../audio.js';
 import {
   currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo, lives, loseLife, infiniteLeft,
-  boosters, boosterUnlocked, spendBooster, buyBooster,
+  boosters, boosterUnlocked, spendBooster, buyBooster, selectedUltra,
 } from '../core/save.js';
+import { ULTS_READY } from '../theme/cats/ultras.js';
 import { hintFor } from '../core/hint.js';
 import { confirmLife, showNoLives } from '../view/lives.js';
 import { showWinPopup } from '../view/WinPopup.js';
@@ -50,6 +51,14 @@ export class GameScene extends Phaser.Scene {
     this.moved = false; // был ли ход — тогда «Заново» и выход сжигают жизнь
     this.extraJars = 0; // сколько банок добавлено умением «+1 банка»
     this.scaleCap = undefined; // масштаб банок с запасом под «+1 банка» — считается заново на каждом уровне
+    // ультракот: ульта раз за уровень (ultUsed), ultPick — ждём тап по банке, к которой её применить
+    this.ultra = selectedUltra();
+    this.ultUsed = false;
+    this.ultPick = false;
+    // насколько выше обычной может стать банка (место в рядах — с начала уровня): «Большая миска» +2,
+    // запасная банка ультракота +boost.jarCap
+    const U2 = this.ultra;
+    this.reserveSlots = Math.max(U2?.ult === 'bigJar' ? CONFIG.ultBigJar.extra : 0, U2?.boost?.jarCap ?? 0);
     this.pulsing = new Set(); // порции, которые пульсируют в такт музыке
     this.glass = null;
     // всё про котиков — фон кухни, банки, корм, коты, кормление — в теме (src/theme/cats/kitchen.js)
@@ -127,7 +136,8 @@ export class GameScene extends Phaser.Scene {
   // Банка — картинка jar_back: сверху горлышко, снизу донышко, стенки между ними растягиваются по высоте.
   // bowlRects: top — верх стенок (горлышко выше него), bottom — низ донышка (стоит на столе).
   // Если «+1 банка» открыта, масштаб с самого начала такой, чтобы влезла и лишняя банка: при её появлении
-  // банки только расступаются, а не уменьшаются.
+  // банки только расступаются, а не уменьшаются. Ряды — с запасом по высоте на reserveSlots порций
+  // (банка ультракота бывает выше обычной); банка стоит на дне ряда, её высота — по своей вместимости.
   layoutBowls() {
     const n = this.board.bowls.length;
     const art = this.theme.jarArt();
@@ -135,7 +145,7 @@ export class GameScene extends Phaser.Scene {
     const neck = (bw) => (art.top * bw) / tex.width;
     const base = (bw) => ((tex.height - art.bottom) * bw) / tex.width;
     const floor = (bw) => ((tex.height - art.floor) * bw) / tex.width;
-    const bh0 = this.board.capacity * L.portionHeight + L.bowlPadding + floor(L.bowlWidth);
+    const bh0 = (this.board.capacity + this.reserveSlots) * L.portionHeight + L.bowlPadding + floor(L.bowlWidth);
     const availW = CONFIG.width - L.sideMargin * 2;
     const availH = L.bowlsBottom - L.bowlsTop - neck(L.bowlWidth);
     const fit = (count) => {
@@ -168,7 +178,7 @@ export class GameScene extends Phaser.Scene {
       k: bw / tex.width, // пикселей экрана на пиксель картинки банки
       scale,
     });
-    const bh = this.board.capacity * d.ph + d.pad + d.floor;
+    const bh = (this.board.capacity + this.reserveSlots) * d.ph + d.pad + d.floor; // высота ряда
     const totalH = rows * bh + (rows - 1) * d.gy;
     const top0 = L.bowlsBottom - totalH; // нижний ряд стоит на столе
 
@@ -179,7 +189,9 @@ export class GameScene extends Phaser.Scene {
       const x0 = (CONFIG.width - rowW) / 2 + d.bw / 2;
       const top = top0 + r * (bh + d.gy);
       for (let c = 0; c < count; c++) {
-        this.bowlRects.push({ x: x0 + c * (d.bw + d.gx), top, bottom: top + bh });
+        const i = this.bowlRects.length;
+        const own = this.board.caps[i] * d.ph + d.pad + d.floor; // высота самой банки
+        this.bowlRects.push({ x: x0 + c * (d.bw + d.gx), top: top + bh - own, bottom: top + bh });
       }
     }
   }
@@ -228,7 +240,9 @@ export class GameScene extends Phaser.Scene {
     const W = CONFIG.width;
     const step = U.iconButton + 48;
     // подсказка — только когда есть её иконка icon_hint (арт ещё не готов)
+    const ultOn = this.ultra && ULTS_READY.has(this.ultra.ult);
     const items = [
+      ultOn && ['ult', () => this.ult()],
       ['undo', () => this.undo()],
       this.textures.exists('icon_hint') && ['hint', () => this.hint()],
       ['addjar', () => this.addJar()],
@@ -240,6 +254,14 @@ export class GameScene extends Phaser.Scene {
       this.trayBtns[icon] = iconButton(this, W / 2 + (k - (items.length - 1) / 2) * step, U.trayY, icon, onTap);
     });
     this.undoBtn = this.trayBtns.undo;
+    if (ultOn) {
+      // на кнопке ульты — голова ультракота (пока окраса-замены), золотая подложка
+      const b = this.trayBtns.ult;
+      const file = CONFIG.skins.find((k) => k.id === this.ultra.look).file;
+      const head = this.add.image(0, -2, `cat_${file}_head`);
+      b.addAt(head.setScale((U.iconButton * 0.7) / Math.max(head.width, head.height)), 2);
+      b.setColor(PAL.gold);
+    }
     this.refreshUndo();
   }
 
@@ -247,6 +269,7 @@ export class GameScene extends Phaser.Scene {
 
   onBowlTap(i) {
     if (this.won) return;
+    if (this.ultPick) return this.applyUlt(i);
     if (this.selected === null) {
       if (this.board.canPick(i)) this.select(i);
       else this.shake(i);
@@ -389,6 +412,8 @@ export class GameScene extends Phaser.Scene {
   refreshUndo() {
     const n = undos();
     this.undoBtn.setBadge(n > 0 ? n : null).setPrice(n > 0 ? null : CONFIG.economy.undoPrice);
+    // ульта: бейдж «1», пока не потрачена на этом уровне; потрачена — бледная
+    this.trayBtns.ult?.setBadge(this.ultUsed ? null : 1).setAlpha(this.ultUsed ? 0.5 : 1);
     for (const [kind, icon] of [['hint', 'hint'], ['jar', 'addjar']]) {
       const btn = this.trayBtns[icon];
       if (!btn) continue;
@@ -433,9 +458,22 @@ export class GameScene extends Phaser.Scene {
     this.useBooster('jar', () => {
       this.deselect();
       this.extraJars += 1;
-      this.board.bowls.push([]);
+      this.board.addBowl(this.board.capacity + (this.ultra?.boost?.jarCap ?? 0));
       this.portions.push([]);
-      // старые банки, зоны тапа и обмотки — заново на новых местах
+      this.rebuildJars();
+      // новая банка выпрыгивает
+      const last = this.board.bowls.length - 1;
+      for (const j of [this.jarBack[last], this.jarFront[last]]) {
+        j.setScale(0.2).setAlpha(0);
+        this.tweens.add({ targets: j, scale: 1, alpha: 1, duration: 360, ease: 'Back.easeOut' });
+      }
+      sfx(this, 'sfx_popup', CONFIG.audio.popup);
+    });
+  }
+
+  // Банки заново на новых местах (добавили банку, банка выросла): старые банки, зоны тапа и обмотки — пересоздаём,
+  // корм перелетает за своей банкой. Масштаб не меняется (см. layoutBowls).
+  rebuildJars() {
       const wrapped = this.board.bowls.map((_, i) => this.theme.jarExtras(i).length > 0);
       this.jarBack.forEach((j) => j.destroy());
       this.jarFront.forEach((j) => j.destroy());
@@ -456,14 +494,39 @@ export class GameScene extends Phaser.Scene {
           this.tweens.add({ targets: p, x: pos.x, y: pos.y, duration: A.liftDuration * 2, ease: 'Cubic.easeOut' });
         });
       });
-      // новая банка выпрыгивает
-      const last = this.board.bowls.length - 1;
-      for (const j of [this.jarBack[last], this.jarFront[last]]) {
-        j.setScale(0.2).setAlpha(0);
-        this.tweens.add({ targets: j, scale: 1, alpha: 1, duration: 360, ease: 'Back.easeOut' });
-      }
-      sfx(this, 'sfx_popup', CONFIG.audio.popup);
-    });
+  }
+
+  // Ульта ультракота (раз за уровень, бесплатно). «Большая миска»: тап по кнопке — выбери банку (надпись сверху),
+  // тап по банке — она вырастает на CONFIG.ultBigJar.extra порций до конца уровня. Повторный тап по кнопке — отмена.
+  ult() {
+    if (this.won) return;
+    if (this.ultUsed) return this.shakeButton(this.trayBtns.ult);
+    this.deselect();
+    this.ultPick = !this.ultPick;
+    this.ultPrompt?.destroy();
+    this.ultPrompt = null;
+    if (!this.ultPick) return;
+    sfx(this, 'sfx_pick');
+    this.ultPrompt = plate(this, CONFIG.width / 2, CONFIG.layout.bowlsTop - 40, STR.ultPick(this.ultra.ultName), { color: PAL.plate }).setDepth(16);
+    this.tweens.add({ targets: this.ultPrompt, scale: 1.06, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+
+  applyUlt(i) {
+    if (this.board.isComplete(i)) return this.shake(i); // съеденную банку не увеличить
+    this.ultPick = false;
+    this.ultPrompt?.destroy();
+    this.ultPrompt = null;
+    this.ultUsed = true;
+    this.board.caps[i] += CONFIG.ultBigJar.extra;
+    this.rebuildJars();
+    // банка вытягивается вверх
+    for (const j of [this.jarBack[i], this.jarFront[i]]) {
+      j.setAlpha(0.3);
+      this.tweens.add({ targets: j, alpha: 1, duration: 400, ease: 'Quad.easeOut' });
+    }
+    this.fxStars.explode(14, this.bowlRects[i].x, this.mouthY(i));
+    sfx(this, 'sfx_star', CONFIG.audio.star);
+    this.refreshUndo();
   }
 
   // «Нюх»: подсказать ход из решения уровня; игрок ушёл с пути — сначала предложить откатиться.

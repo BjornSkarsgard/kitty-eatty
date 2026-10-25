@@ -7,6 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { milestoneAt } from '../src/core/milestones.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const LEVELS = JSON.parse(readFileSync(join(ROOT, 'src/levels/levels.json'), 'utf8'));
@@ -149,6 +150,13 @@ for (let i = 0; i < LEVELS.length; i++) {
   if (rand() < PLAYER.x2Share) coins(win, true); // ролик «×2»
   s.xp += META.win.xp + META.win.xpPer10Levels * Math.floor(i / 10);
   if (++s.undoProgress >= META.freeUndoEvery) { s.undoProgress = 0; s.undo++; }
+  // рубеж на карте (правило — CONFIG.milestones); бесконечные жизни в прогоне не учитываем — жизней тратится не меньше
+  const ms = milestoneAt(i + 1);
+  if (ms) {
+    coins(ms.reward.coins);
+    s.undo += ms.reward.undos;
+    for (let k = 0; k < ms.reward.chests; k++) openChest();
+  }
   while (s.xp >= META.catNeed(s.cat)) {
     s.xp -= META.catNeed(s.cat);
     s.cat++;

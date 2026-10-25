@@ -253,9 +253,19 @@ export function counterPill(scene, x, y, icon, value, { w = U.pillWidth, depth =
     g.lineStyle(4, PAL.brownRim, 1).strokeRoundedRect(-w / 2, -h / 2, w, h, h / 2);
   }
   const text = scene.add.text(14, 1, '', { fontFamily: font(), fontStyle: 'bold', fontSize: '34px', color: PAL.textBrown }).setOrigin(0.5);
-  box.add([g, makeIcon(scene, icon, 72).setPosition(-w / 2 + 6, 0), text]);
+  box.icon = makeIcon(scene, icon, 72).setPosition(-w / 2 + 6, 0);
+  box.add([g, box.icon, text]);
+  box.text = text;
   box.setValue = (n) => { text.setText(String(n)); return box; };
   return box.setValue(value);
+}
+
+// Белый знак ∞ поверх сердечка (бесконечные жизни); size — ширина сердечка.
+export function infinityMark(scene, x, y, size) {
+  return scene.add.text(x, y - size * 0.04, '∞', {
+    fontFamily: font(), fontStyle: 'bold', fontSize: `${Math.round(size * 0.62)}px`, color: PAL.text,
+    stroke: PAL.heartStroke, strokeThickness: Math.max(3, Math.round(size * 0.07)),
+  }).setOrigin(0.5);
 }
 
 // Табличка с надписью (номер уровня): тёмная плашка с светлой рамкой.

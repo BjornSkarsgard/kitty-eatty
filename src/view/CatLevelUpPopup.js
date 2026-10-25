@@ -70,7 +70,7 @@ export function showCatLevelUps(scene, ups, { fxStars, onTake }) {
     box.destroy();
     showCatLevelUps(scene, ups.slice(1), { fxStars, onTake });
   };
-  box.add(makeButton(scene, 0, 205, STR.take, take, { w: 340, h: 130, size: 46, skin: 'green' }));
+  box.add(makeButton(scene, 0, 205, STR.take, take, { ...CONFIG.ui.bigButton, skin: 'green' }));
   box.setScale(0.5).setAlpha(0);
   sfx(scene, 'sfx_popup', CONFIG.audio.popup);
   scene.tweens.add({ targets: box, scale: 1, alpha: 1, duration: 320, ease: 'Back.easeOut' });

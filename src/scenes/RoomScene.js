@@ -3,14 +3,14 @@ import { CONFIG } from '../config.js';
 import { CatView } from '../theme/cats/CatView.js';
 import { MapView } from '../view/MapView.js';
 import { makeButton } from '../view/Button.js';
-import { counterPill, tabBar, iconButton, plate } from '../view/ui.js';
+import { counterPill, tabBar, iconButton, plate, infinityMark } from '../view/ui.js';
 import { addSettingsMenu } from '../view/settings.js';
 import { panDuration, panFx, hud } from '../view/transition.js';
 import { music, sfx } from '../audio.js';
 import { beatPhase } from '../beat.js';
 import {
   currentLevel, unlockedLevel, levelPassed, coins, catLevel, lives, livesRefillLeft, selectedSkin, skinsOwned,
-  chestsPending, openChest, dailyAvailable, claimDaily, catName,
+  chestsPending, openChest, infiniteLeft, claimMilestones, dailyAvailable, claimDaily, catName,
 } from '../core/save.js';
 import { openCollection } from '../view/CollectionView.js';
 import { openBox, closedBox } from '../view/ChestView.js';
@@ -113,6 +113,15 @@ export class RoomScene extends Phaser.Scene {
     music(this, 'music_game');
     this.layout();
     if (this.fromKitchen) this.backFromKitchen();
+    else this.showMilestones();
+  }
+
+  // Открылись рубежи на карте — окно «Награды за путешествие» (все разом); подарки с карты пропадают.
+  showMilestones() {
+    const got = claimMilestones();
+    if (!got) return;
+    this.map.redraw();
+    openBox(this, got.chapter ? 'chest' : 'gift', got.items, () => this.afterBox(), { title: STR.journeyTitle });
   }
 
   // Монеты, настройки и вкладки — на своей камере: основная камера приближается (к карте, в дверь кухни),
@@ -133,12 +142,16 @@ export class RoomScene extends Phaser.Scene {
     return this.cameras.main.getWorldPoint(p.x, p.y);
   }
 
-  // Жизни в верхней полосе рядом с монетами; не полные — под ними таймер до полных. Обновляются раз в секунду.
+  // Жизни в верхней полосе рядом с монетами; не полные — под ними таймер до следующей. Бесконечные — на сердечке
+  // белый ∞, в плашке — сколько они ещё идут. Обновляются раз в секунду.
   createLives() {
     const U = CONFIG.ui;
-    const w = 130;
+    const w = 150;
     const x = 30 + U.pillWidth + 20 + w / 2;
     this.livesPill = counterPill(this, x, U.topY, 'heart', '', { w, depth: 25 }).setScrollFactor(0);
+    const ic = this.livesPill.icon;
+    this.livesInf = infinityMark(this, ic.x, ic.y, 72).setVisible(false);
+    this.livesPill.add(this.livesInf);
     this.livesTimer = this.add.text(x, U.topY + 46, '', {
       fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '24px', color: PAL.text, stroke: PAL.textStrokeSoft, strokeThickness: 6,
     }).setOrigin(0.5).setDepth(25).setScrollFactor(0);
@@ -148,8 +161,12 @@ export class RoomScene extends Phaser.Scene {
 
   refreshTop() {
     this.coinPill.setValue(coins());
-    this.livesPill.setValue(lives() + '/' + CONFIG.lives.max); // 4/6 — сколько из скольких
-    const left = livesRefillLeft();
+    // 4/5 — сколько из скольких и под плашкой время до следующей; бесконечные — ∞ на сердечке и время в плашке
+    const inf = infiniteLeft();
+    this.livesInf.setVisible(inf > 0);
+    this.livesPill.text.setFontSize(inf ? (inf >= 3600000 ? 24 : 30) : 34);
+    this.livesPill.setValue(inf ? formatLeft(inf) : lives() + '/' + CONFIG.lives.max);
+    const left = inf ? 0 : livesRefillLeft();
     this.livesTimer.setText(left ? formatLeft(left) : '');
   }
 
@@ -368,7 +385,7 @@ export class RoomScene extends Phaser.Scene {
         this.scene.stop('Game');
         const ms = panDuration(RING / 2);
         panFx(this, -1, ms);
-        this.goTo(HOME, { ring: true, dir: -1, ms, onDone: () => { this.tabLock = null; this.input.enabled = true; } });
+        this.goTo(HOME, { ring: true, dir: -1, ms, onDone: () => { this.tabLock = null; this.input.enabled = true; this.showMilestones(); } });
       }),
     });
   }
@@ -397,7 +414,7 @@ export class RoomScene extends Phaser.Scene {
     this.makeHomeCat();
     const level = currentLevel(LEVELS.length);
     const play = makeButton(this, W / 2, HC.playY, STR.play(LEVELS[level].id), () => this.startLevel(level),
-      { w: 380, h: HC.playH, size: 52, skin: 'yellow' });
+      { ...CONFIG.ui.bigButton, skin: 'yellow' });
     room.add([title, shadow, this.cat, play]);
     this.refreshName();
     this.createBoxes(room);

@@ -2,7 +2,9 @@ import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { CatView } from '../theme/cats/CatView.js';
 import { sfx } from '../audio.js';
-import { unlockedLevel, selectedSkin } from '../core/save.js';
+import { unlockedLevel, selectedSkin, milestonesDone } from '../core/save.js';
+import { milestoneAt } from '../core/milestones.js';
+import { closedBox } from './ChestView.js';
 import { LEVELS } from '../core/levels.js';
 import { kindBadge } from './ui.js';
 import { STR } from '../theme/cats/strings.ru.js';
@@ -22,7 +24,8 @@ function nodePos(i) {
 // Карта уровней внутри контейнера: окно шириной с экран, высотой viewH, которое можно уменьшить (рамка на стене)
 // и плавно развернуть на весь экран — это одна и та же карта, меняются только масштаб и высота окна, без скачков.
 // Текущий уровень — в середине окна.
-// Тропинка из следов лапок снизу вверх, кружки с номером (под сложными — табличка), на самом дальнем открытом сидит кот.
+// Тропинка из следов лапок снизу вверх, кружки с номером (под сложными — табличка), у рубежей — подарок
+// (в конце главы — сундук), пока награда не забрана; на самом дальнем открытом сидит кот.
 // На сцене только видимые уровни: 300 штук сразу — тяжело для слабого Android.
 export class MapView {
   constructor(scene, x, y, scale, viewH = H) {
@@ -95,6 +98,13 @@ export class MapView {
     }
   }
 
+  // Пересоздать все видимые уровни (забрали награды рубежей — подарки с карты пропадают).
+  redraw() {
+    for (const v of this.views.values()) v.parts.forEach((o) => o.destroy());
+    this.views.clear();
+    this.refresh();
+  }
+
   // Создаёт уровни, попавшие в окно (с запасом), и убирает ушедшие.
   refresh() {
     const half = Math.max(H, this.viewH) / 2;
@@ -149,6 +159,17 @@ export class MapView {
       const badge = kindBadge(scene, p.x, p.y + M.nodeSize * M.kindBadgeY, level.kind, STR.kindShort[level.kind], M.kindBadgeSize);
       top.add(badge);
       parts.push(badge);
+    }
+
+    const ms = milestoneAt(level.id);
+    if (ms && ms.id > milestonesDone()) {
+      // сбоку от кружка, к середине карты — там тропинка не мешает
+      const side = p.x > W / 2 ? -1 : 1;
+      const box = closedBox(scene, ms.chapter ? 'chest' : 'gift', M.milestoneSize)
+        .setPosition(p.x + side * M.nodeSize * M.milestoneX, p.y - M.nodeSize * 0.1);
+      top.add(box);
+      parts.push(box);
+      scene.tweens.add({ targets: box, y: box.y - 8, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     }
 
     if (state === 'current') {

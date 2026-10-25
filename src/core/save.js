@@ -10,6 +10,8 @@
 //   undoProgress — сколько новых уровней пройдено к следующей бесплатной отмене;
 //   catLevel, xp — уровень кота (общий на игрока) и опыт, набранный к следующему;
 //   lives, refillAt — жизни и момент (мс, Date.now), когда придёт следующая (null — жизни полные);
+//   infiniteUntil — до какого момента бесконечные жизни (null — нет);
+//   msDone — id уровня последнего забранного рубежа на карте (0 — ни одного);
 //   skins, skin — открытые рескины обычного кота (id из CONFIG.skins) и выбранный;
 //   chests   — неоткрытые сундуки;
 //   daily — { last: 'ГГГГ-ММ-ДД' последнего подарка, day: какой по счёту следующий };
@@ -17,9 +19,10 @@
 //   nameTokens — неиспользованные «именные таблички» (можно придумать кличку самому);
 //   settings — { sound, music, fx, vibro }: переключатели под шестерёнкой.
 import { CONFIG } from '../config.js';
+import { MILESTONES } from './milestones.js';
 
 const KEY = 'kittyeatty.save';
-const VERSION = 9;
+const VERSION = 10;
 const E = CONFIG.economy;
 const C = CONFIG.catXp;
 const LV = CONFIG.lives;
@@ -30,7 +33,7 @@ const START_NAMES = NAMES.filter((n) => n.start).map((n) => n.id);
 export const CUSTOM = '#custom';
 
 const SETTINGS = { sound: true, music: true, fx: true, vibro: true };
-const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, daily: { last: null, day: 0 },
+const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, daily: { last: null, day: 0 }, infiniteUntil: null, msDone: 0,
   names: [...START_NAMES], name: START_NAMES[0], custom: null, nameTokens: 0, settings: { ...SETTINGS } });
 
 // Старые версии сохранения дополняем до текущей, прогресс не теряется.
@@ -58,6 +61,8 @@ function migrate(d) {
     const n = Math.min(d.lives, LV.max);
     d = { ...d, v: 9, lives: n, refillAt: n < LV.max ? Date.now() + LIFE_MS : null };
   }
+  // рубежи на карте: уже пройденные откроются с наградой при первом заходе на главную
+  if (d.v === 9) d = { ...d, v: 10, infiniteUntil: null, msDone: 0 };
   if (d && !Number.isFinite(d.xp)) d.xp = 0; // битый опыт — с нуля, уровень кота не трогаем
   if (d && !d.settings) d.settings = {};
   if (d) d.settings = { ...SETTINGS, ...d.settings }; // новые переключатели — со значением по умолчанию
@@ -337,10 +342,17 @@ function refill(d) {
   write();
 }
 
+// Сколько жизней можно тратить; пока идут бесконечные — всегда полные.
 export function lives() {
   const d = get();
   refill(d);
-  return d.lives;
+  return infiniteLeft() > 0 ? LV.max : d.lives;
+}
+
+// Сколько мс ещё идут бесконечные жизни (0 — не идут).
+export function infiniteLeft() {
+  const u = get().infiniteUntil;
+  return u ? Math.max(0, u - Date.now()) : 0;
 }
 
 // Сколько мс до следующей жизни (0 — жизни полные).
@@ -354,6 +366,7 @@ export function livesRefillLeft() {
 export function loseLife() {
   const d = get();
   refill(d);
+  if (infiniteLeft() > 0) return true; // бесконечные — ничего не сгорает
   if (d.lives <= 0) return false;
   if (d.lives >= LV.max) d.refillAt = Date.now() + LIFE_MS;
   d.lives -= 1;
@@ -383,6 +396,36 @@ export function addLives(n) {
   const d = get();
   giveLives(d, n);
   write();
+}
+
+// ---------- рубежи на карте ----------
+
+// Открытые (уровень пройден), но ещё не забранные рубежи — по порядку.
+export function pendingMilestones() {
+  const d = get();
+  return MILESTONES.filter((m) => m.id > d.msDone && d.best[m.id] !== undefined);
+}
+
+// id последнего забранного рубежа — на карте забранные уже без подарка.
+export const milestonesDone = () => get().msDone;
+
+// Забрать все открытые рубежи разом; null — нечего. Возвращает { chapter — был ли среди них конец главы,
+// items: [{ icon, n }] } для окна наград; сундуки добавляются к неоткрытым, бесконечные жизни — к уже идущим.
+export function claimMilestones() {
+  const d = get();
+  const list = pendingMilestones();
+  if (!list.length) return null;
+  const sum = { coins: 0, undos: 0, chests: 0, infiniteMin: 0 };
+  for (const m of list) for (const k in sum) sum[k] += m.reward[k];
+  d.coins += sum.coins;
+  d.undos += sum.undos;
+  d.chests += sum.chests;
+  if (sum.infiniteMin) d.infiniteUntil = Math.max(Date.now(), d.infiniteUntil || 0) + sum.infiniteMin * 60 * 1000;
+  d.msDone = list[list.length - 1].id;
+  write();
+  const items = [['coin', sum.coins], ['undo', sum.undos], ['chest', sum.chests], ['infinite', sum.infiniteMin]]
+    .filter(([, n]) => n > 0).map(([icon, n]) => ({ icon, n }));
+  return { chapter: list.some((m) => m.chapter), items };
 }
 
 // ---------- монеты и отмены ----------

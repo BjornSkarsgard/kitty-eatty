@@ -4,7 +4,7 @@ import { Board } from '../core/Board.js';
 import { CatsLevel } from '../theme/cats/kitchen.js';
 import { beatPulse } from '../beat.js';
 import { sfx, music } from '../audio.js';
-import { currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo, lives, loseLife } from '../core/save.js';
+import { currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo, lives, loseLife, infiniteLeft } from '../core/save.js';
 import { confirmLife, showNoLives } from '../view/lives.js';
 import { showWinPopup } from '../view/WinPopup.js';
 import { showPopup } from '../view/Popup.js';
@@ -94,14 +94,14 @@ export class GameScene extends Phaser.Scene {
 
   // Выход из уровня: если уровень начат и не пройден — сначала предупреждение, что сгорит жизнь.
   leave() {
-    if (this.won || !this.moved || lives() <= 0) return this.goHome();
+    if (this.won || !this.moved || lives() <= 0 || infiniteLeft() > 0) return this.goHome();
     confirmLife(this, STR.leaveTitle, () => { loseLife(); this.goHome(); });
   }
 
   // «Заново»: начатый уровень — за жизнь (с предупреждением); жизней нет — окно «Жизни кончились».
   restartLevel() {
     const again = () => this.scene.restart({ levelIndex: this.levelIndex, again: true });
-    if (!this.moved) return again();
+    if (!this.moved || infiniteLeft() > 0) return again(); // бесконечные жизни — ничего не сгорает
     if (lives() <= 0) return showNoLives(this);
     confirmLife(this, STR.restartTitle, () => { loseLife(); again(); });
   }

@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { makeButton } from './Button.js';
-import { makeIcon } from './ui.js';
+import { makeIcon, infinityMark } from './ui.js';
 import { sfx } from '../audio.js';
 import { NAMES } from '../theme/cats/names.js';
 import { STR } from '../theme/cats/strings.ru.js';
@@ -10,8 +10,9 @@ import { PALETTE as PAL } from '../theme/cats/palette.js';
 // Открытие сундука или подарка (kind: 'chest' | 'gift'), награды уже начислены — здесь только показ:
 // коробка падает сверху с подскоком → раскачивается всё сильнее, сзади разгораются лучи → вспышка, крышка улетает →
 // награды выпрыгивают по одной → «Забрать». items: [{ icon, n }] и [{ skin }]. onDone — после «Забрать».
+// title — надпись сверху («Награды за путешествие»).
 // Всё закреплено на экране (scrollFactor 0), поверх всего.
-export function openBox(scene, kind, items, onDone) {
+export function openBox(scene, kind, items, onDone, { title } = {}) {
   const W = CONFIG.width;
   const H = CONFIG.height;
   const A = CONFIG.chestAnim;
@@ -23,6 +24,12 @@ export function openBox(scene, kind, items, onDone) {
   const cy = H / 2 + 120;
 
   add(scene.add.rectangle(W / 2, H / 2, W, H, PAL.dim, 0.82).setInteractive()); // тапы не проходят вниз
+  if (title) {
+    add(scene.add.text(W / 2, 230, title, {
+      fontFamily: font, fontStyle: 'bold', fontSize: '54px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 10,
+      align: 'center', wordWrap: { width: W - 80 },
+    }).setOrigin(0.5));
+  }
   raysTexture(scene);
   const rays = add(scene.add.image(cx, cy - 40, 'fx_rays').setAlpha(0).setScale(0.4).setBlendMode(Phaser.BlendModes.ADD));
   const box = add(closedBox(scene, kind, A.size)).setPosition(cx, -A.size);
@@ -65,7 +72,7 @@ export function openBox(scene, kind, items, onDone) {
 
   // 4. награды выпрыгивают из коробки в ряд над ней
   const showRewards = () => {
-    const gap = 180;
+    const gap = items.length > 3 ? 150 : 180; // четыре награды — теснее, чтобы подписи не уходили за край
     const y = cy - A.size * 0.95;
     items.forEach((it, i) => {
       const x = cx + (i - (items.length - 1) / 2) * gap;
@@ -79,7 +86,7 @@ export function openBox(scene, kind, items, onDone) {
       const btn = add(makeButton(scene, cx, H - 270, STR.take, () => {
         parts.forEach((o) => o.destroy());
         onDone?.();
-      }, { w: 360, h: 140, size: 50, skin: 'green' }));
+      }, { ...CONFIG.ui.bigButton, skin: 'green' }));
       btn.setScale(0);
       scene.tweens.add({ targets: btn, scale: 1, duration: 260, ease: 'Back.easeOut' });
     });
@@ -134,6 +141,14 @@ function rewardItem(scene, it, font) {
     head.setScale(130 / Math.max(head.width, head.height));
     c.add([head, scene.add.text(0, 70, k.name, {
       fontFamily: font, fontStyle: 'bold', fontSize: '30px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 7,
+    }).setOrigin(0.5)]);
+    return c;
+  }
+  if (it.icon === 'infinite') {
+    // бесконечные жизни: сердце с белым ∞, под ним «30 мин»
+    const heart = makeIcon(scene, 'heart', 110);
+    c.add([heart, infinityMark(scene, 0, 0, 110), scene.add.text(0, 72, STR.infiniteMin(it.n), {
+      fontFamily: font, fontStyle: 'bold', fontSize: '34px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 7,
     }).setOrigin(0.5)]);
     return c;
   }

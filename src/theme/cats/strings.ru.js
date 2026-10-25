@@ -26,6 +26,8 @@ export const STR = {
   gift: 'Подарок',
   chestInfo: (everyCatLevels) => `Сундук даётся за каждый ${everyCatLevels}-й уровень кота и на 7-й день подарка дня.`,
   dailyTitle: 'Подарок дня',
+  journeyTitle: 'Награды за путешествие',
+  infiniteMin: (n) => (n % 60 ? `${n} мин` : `${n / 60} ч`), // бесконечные жизни: сколько
   dailyTomorrow: 'Следующий подарок — завтра',
 
   // уровень

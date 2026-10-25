@@ -70,7 +70,7 @@ export function showWinPopup(scene, { level, reward, isLast, fxStars, onNext, on
   // полоска опыта кота доезжает, когда окно появилось; новые уровни кота — окном поверх
   scene.time.delayedCall(WC.revealMs, () => fillXpBar(scene, bar, reward, fxStars, onTake));
 
-  box.add(makeButton(scene, 0, WC.buttonY, isLast ? STR.again : STR.next, onNext, { w: 380, h: WC.buttonH, size: 50, skin: 'green' }));
+  box.add(makeButton(scene, 0, WC.buttonY, isLast ? STR.again : STR.next, onNext, { ...CONFIG.ui.bigButton, skin: 'green' }));
   box.add(iconButton(scene, pw / 2 - 6, -ph / 2 + 4, 'close', onHome, {
     size: 92, shape: 'round', color: CONFIG.ui.exitColor, depth: 0,
   }));

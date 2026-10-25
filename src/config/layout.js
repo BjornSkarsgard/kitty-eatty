@@ -50,6 +50,7 @@ export const LAYOUT = {
   win: {
     width: 600, height: 860, offsetY: -10,
     praiseY: -250, kindY: -120, xpY: 0, rewardsY: 150, buttonY: 320,
+    buttonH: 128,  // высота кнопки «Продолжить»
     revealMs: 700, // мс после появления окна: звенят монеты и доезжает полоска опыта
   },
 

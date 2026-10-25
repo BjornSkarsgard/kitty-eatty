@@ -510,6 +510,7 @@ export class RoomScene extends Phaser.Scene {
 
   // Кличка — табличкой над котом.
   refreshName() {
+    this.profileName?.setText(catName());
     this.namePlate?.destroy();
     this.namePlate = plate(this, W / 2, HC.nameY, catName(), { depth: 0 });
     this.homeRoom.add(this.namePlate);
@@ -624,7 +625,8 @@ export class RoomScene extends Phaser.Scene {
     const P = R.profile;
     const passed = unlockedLevel(LEVELS.length);
     const hard = LEVELS.filter((l) => l.kind && levelPassed(l)).length;
-    const rows = [[STR.profile.catLevel, catLevel()], [STR.profile.passed, passed], [STR.profile.hard, hard]];
+    // первая строка — кличка (текст помельче: кличка бывает длинной; меняется в коллекции — refreshName)
+    const rows = [[STR.profile.name, catName()], [STR.profile.catLevel, catLevel()], [STR.profile.passed, passed], [STR.profile.hard, hard]];
     const x0 = W / 2 - P.w / 2;
     rows.forEach(([name, value], k) => {
       const y = P.y + k * P.step;
@@ -635,8 +637,10 @@ export class RoomScene extends Phaser.Scene {
       room.add([
         g,
         this.add.text(x0 + 28, y, name, { ...this.noteStyle(), fontSize: '30px', color: PAL.textBrown, strokeThickness: 0 }).setOrigin(0, 0.5),
-        this.add.text(x0 + P.w - 28, y, String(value), { ...this.titleStyle(), fontSize: '44px' }).setOrigin(1, 0.5),
       ]);
+      const val = this.add.text(x0 + P.w - 28, y, String(value), { ...this.titleStyle(), fontSize: k === 0 ? '34px' : '44px', strokeThickness: k === 0 ? 8 : 12 }).setOrigin(1, 0.5);
+      room.add(val);
+      if (k === 0) this.profileName = val;
     });
   }
 

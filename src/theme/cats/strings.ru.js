@@ -28,7 +28,7 @@ export const STR = {
   tabs: { shop: 'Магазин', map: 'Карта', home: 'Главная', collection: 'Коллекция', profile: 'Профиль' },
   play: (n) => `Играть ${n}`,
   soon: 'Скоро откроется',
-  profile: { catLevel: 'Уровень кота', passed: 'Пройдено уровней', hard: 'Сложных пройдено' },
+  profile: { name: 'Кличка', catLevel: 'Уровень кота', passed: 'Пройдено уровней', hard: 'Сложных пройдено' },
 
   // сундук и подарок дня
   chest: 'Сундук',

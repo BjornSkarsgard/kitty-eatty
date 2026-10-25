@@ -15,24 +15,29 @@ export function showUltraIntro(scene, u, onDone) {
   const parts = [];
   const add = (o) => { parts.push(o); return o.setDepth(depth).setScrollFactor(0); };
   add(scene.add.rectangle(W / 2, H / 2, W, H, PAL.dim, 0.82).setInteractive()); // тапы не проходят вниз
-  const box = add(scene.add.container(W / 2, H / 2));
-  const pw = 560;
-  const ph = 960;
+  // окно по высоте текста: сверху голова и название, ниже текст, под ним кнопка (между верхней полосой и вкладками)
+  const box = add(scene.add.container(W / 2, H / 2 - 10));
+  const pw = 600;
+  const body = scene.add.text(0, 0, `${STR.ultraInfo(u.ultName, u.ultText, u.boostText)}\n\n${STR.ultraIntroWhen(u.gift)}`, {
+    fontFamily: font, fontStyle: 'bold', fontSize: '26px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 6,
+    align: 'center', wordWrap: { width: pw - 70 },
+  }).setOrigin(0.5, 0);
+  const headH = 190;
+  const ph = 60 + headH + 70 + body.height + 40 + 150; // отступ, голова, название, текст, зазор, кнопка
+  const top = -ph / 2;
   box.add(panel(scene, pw + 20, ph + 20));
-  box.add(plate(scene, 0, -ph / 2 + 4, STR.ultraIntroTitle, { depth: 0, color: PAL.plate }).setScale(1.1));
+  box.add(plate(scene, 0, top + 4, STR.ultraIntroTitle, { depth: 0, color: PAL.plate }).setScale(1.1));
   const file = CONFIG.skins.find((k) => k.id === u.look).file;
-  const head = scene.add.image(0, -250, `cat_${file}_head`);
-  head.setScale(230 / Math.max(head.width, head.height)).setTint(PAL.silhouette);
-  const q = scene.add.text(0, -250, '?', {
-    fontFamily: font, fontStyle: 'bold', fontSize: '120px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 14,
+  const hy = top + 60 + headH / 2;
+  const head = scene.add.image(0, hy, `cat_${file}_head`);
+  head.setScale(headH / Math.max(head.width, head.height)).setTint(PAL.silhouette);
+  const q = scene.add.text(0, hy, '?', {
+    fontFamily: font, fontStyle: 'bold', fontSize: '100px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 12,
   }).setOrigin(0.5);
-  const name = scene.add.text(0, -95, u.name, {
-    fontFamily: font, fontStyle: 'bold', fontSize: '52px', color: PAL.textGold, stroke: PAL.textStroke, strokeThickness: 10,
+  const name = scene.add.text(0, top + 60 + headH + 35, u.name, {
+    fontFamily: font, fontStyle: 'bold', fontSize: '48px', color: PAL.textGold, stroke: PAL.textStroke, strokeThickness: 10,
   }).setOrigin(0.5);
-  const body = scene.add.text(0, -45, `${STR.ultraInfo(u.ultName, u.ultText, u.boostText)}\n\n${STR.ultraIntroWhen(u.gift)}`, {
-    fontFamily: font, fontStyle: 'bold', fontSize: '28px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 6,
-    align: 'center', wordWrap: { width: pw - 80 },
-  }).setOrigin(0.5, 0); // сверху вниз под названием
+  body.setY(top + 60 + headH + 70);
   box.add([head, q, name, body]);
   let untrack = null;
   const finish = () => {
@@ -43,7 +48,7 @@ export function showUltraIntro(scene, u, onDone) {
     onDone?.();
   };
   untrack = trackWindow(scene, finish);
-  box.add(makeButton(scene, 0, ph / 2 - 80, STR.ultraIntroOk, finish, { ...CONFIG.ui.bigButton, skin: 'green' }));
+  box.add(makeButton(scene, 0, ph / 2 - 90, STR.ultraIntroOk, finish, { ...CONFIG.ui.bigButton, skin: 'green' }));
   sfx(scene, 'sfx_popup', CONFIG.audio.popup);
   box.setScale(0.5).setAlpha(0);
   scene.tweens.add({ targets: box, scale: 1, alpha: 1, duration: 320, ease: 'Back.easeOut' });

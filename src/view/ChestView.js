@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { makeButton } from './Button.js';
-import { makeIcon, infinityMark } from './ui.js';
+import { makeIcon, infinityMark, trackWindow } from './ui.js';
 import { sfx } from '../audio.js';
 import { NAMES } from '../theme/cats/names.js';
 import { STR } from '../theme/cats/strings.ru.js';
@@ -22,6 +22,16 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
   const add = (o) => { parts.push(o); return o.setDepth(depth).setScrollFactor(0); };
   const cx = W / 2;
   const cy = H / 2 + 120;
+  // закрыть: награды уже начислены, поэтому и закрытие вкладкой посреди анимации — как «Забрать»
+  let closed = false;
+  const untrack = trackWindow(scene, () => finish());
+  const finish = () => {
+    if (closed) return;
+    closed = true;
+    untrack();
+    parts.forEach((o) => o.destroy());
+    onDone?.();
+  };
 
   add(scene.add.rectangle(W / 2, H / 2, W, H, PAL.dim, 0.82).setInteractive()); // тапы не проходят вниз
   if (title) {
@@ -45,6 +55,7 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
 
   // 2. раскачивается всё сильнее и чаще, лучи разгораются и крутятся
   const spin = () => {
+    if (closed) return;
     scene.tweens.add({ targets: rays, alpha: 0.9, scale: 1.1, duration: A.spin, ease: 'Quad.easeIn' });
     scene.tweens.add({ targets: rays, angle: 120, duration: A.spin + 4000 });
     scene.tweens.addCounter({
@@ -60,6 +71,7 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
 
   // 3. вспышка: крышка улетает, коробка открыта
   const burst = () => {
+    if (closed) return;
     box.setAngle(0).setScale(1);
     sfx(scene, 'sfx_star', CONFIG.audio.star, CONFIG.audio.starPitch[2]);
     const flash = add(scene.add.rectangle(W / 2, H / 2, W, H, PAL.white, 1).setAlpha(0));
@@ -73,6 +85,7 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
   // 4. награды выпрыгивают из коробки в ряд над ней
   items = items.filter((it) => it.icon !== 'hint' || scene.textures.exists('icon_hint')); // подсказка — когда будет иконка
   const showRewards = () => {
+    if (closed) return;
     const gap = items.length > 3 ? 150 : 180; // четыре награды — теснее, чтобы подписи не уходили за край
     const y = cy - A.size * 0.95;
     items.forEach((it, i) => {
@@ -84,10 +97,8 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
       });
     });
     scene.time.delayedCall(items.length * A.rewardsDelay + 300, () => {
-      const btn = add(makeButton(scene, cx, H - 270, STR.take, () => {
-        parts.forEach((o) => o.destroy());
-        onDone?.();
-      }, { ...CONFIG.ui.bigButton, skin: 'green' }));
+      if (closed) return;
+      const btn = add(makeButton(scene, cx, H - 270, STR.take, finish, { ...CONFIG.ui.bigButton, skin: 'green' }));
       btn.setScale(0);
       scene.tweens.add({ targets: btn, scale: 1, duration: 260, ease: 'Back.easeOut' });
     });

@@ -1,6 +1,6 @@
 import { CONFIG } from '../config.js';
 import { makeButton } from './Button.js';
-import { panel, plate, iconButton, makeIcon } from './ui.js';
+import { panel, plate, iconButton, makeIcon, trackWindow } from './ui.js';
 import { sfx } from '../audio.js';
 import { devEdit, devState, devSet, catNeed } from '../core/save.js';
 import { MILESTONES } from '../core/milestones.js';
@@ -53,7 +53,15 @@ export function openDevPanel(scene, onClose, onChange) {
   const font = `"${CONFIG.font}", sans-serif`;
   const parts = [];
   const add = (o) => { parts.push(o); return o.setDepth(depth).setScrollFactor(0); };
-  const close = () => { parts.forEach((o) => o.destroy()); onClose?.(); };
+  let untrack = null;
+  const close = () => {
+    if (!untrack) return;
+    untrack();
+    untrack = null;
+    parts.forEach((o) => o.destroy());
+    onClose?.();
+  };
+  untrack = trackWindow(scene, close);
   add(scene.add.rectangle(W / 2, H / 2, W, H, PAL.black, 0.6).setInteractive());
   // между верхней полосой и вкладками (они рисуются поверх окон своей камерой)
   const box = add(scene.add.container(W / 2, H / 2 - 10));

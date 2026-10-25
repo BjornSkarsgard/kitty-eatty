@@ -326,6 +326,19 @@ export function kindBadge(scene, x, y, kind, label, size = 28) {
   return scene.add.container(x, y, [g, text]);
 }
 
+// Открытые окна сцены: каждое окно при открытии записывается сюда своим close(), при закрытии — убирается.
+// Нужно, чтобы переход по вкладкам (они поверх окон) сначала закрывал окна. Возвращает «вычеркнуть».
+export function trackWindow(scene, close) {
+  if (!scene.windows) scene.windows = new Set();
+  scene.windows.add(close);
+  return () => scene.windows.delete(close);
+}
+
+// Закрыть все открытые окна сцены (как будто нажали крестик / «Забрать»).
+export function closeWindows(scene) {
+  [...(scene.windows ?? [])].forEach((close) => close());
+}
+
 // Лоток под кнопками внизу экрана.
 export function tray(scene, x, y, w, h, { depth = 14 } = {}) {
   if (hasArt(scene, 'ui_tray')) {

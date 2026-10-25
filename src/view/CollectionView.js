@@ -1,6 +1,6 @@
 import { CONFIG } from '../config.js';
 import { showPopup } from './Popup.js';
-import { iconButton, plate, makeIcon, panel } from './ui.js';
+import { iconButton, plate, makeIcon, panel, trackWindow } from './ui.js';
 import { makeButton } from './Button.js';
 import { sfx } from '../audio.js';
 import { NAMES, checkCustomName } from '../theme/cats/names.js';
@@ -26,7 +26,14 @@ export function openCollection(scene, { onChange } = {}) {
   const depth = 40;
   const font = `"${CONFIG.font}", sans-serif`;
   const parts = [];
-  const close = () => parts.forEach((o) => o.destroy());
+  let untrack = null;
+  const close = () => {
+    if (!untrack) return;
+    untrack();
+    untrack = null;
+    parts.forEach((o) => o.destroy());
+  };
+  untrack = trackWindow(scene, close);
 
   const shade = scene.add.rectangle(W / 2, H / 2, W, H, PAL.black, 0.6).setDepth(depth).setScrollFactor(0).setInteractive();
   shade.on('pointerdown', close);

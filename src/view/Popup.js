@@ -1,6 +1,6 @@
 import { CONFIG } from '../config.js';
 import { makeButton } from './Button.js';
-import { panel } from './ui.js';
+import { panel, trackWindow } from './ui.js';
 import { sfx } from '../audio.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
 
@@ -13,7 +13,14 @@ export function showPopup(scene, { title, text = '', buttons = [], depth = 50 })
   const W = CONFIG.width;
   const H = CONFIG.height;
   const parts = [];
-  const close = () => parts.forEach((o) => o.destroy());
+  let untrack = null;
+  const close = () => {
+    if (!untrack) return;
+    untrack();
+    untrack = null;
+    parts.forEach((o) => o.destroy());
+  };
+  untrack = trackWindow(scene, close);
   sfx(scene, 'sfx_popup', CONFIG.audio.popup);
 
   const shade = scene.add.rectangle(W / 2, H / 2, W, H, PAL.black, 0.55).setDepth(depth).setScrollFactor(0).setInteractive();

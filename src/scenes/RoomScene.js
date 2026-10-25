@@ -3,7 +3,7 @@ import { CONFIG } from '../config.js';
 import { CatView } from '../theme/cats/CatView.js';
 import { MapView } from '../view/MapView.js';
 import { makeButton } from '../view/Button.js';
-import { counterPill, tabBar, iconButton, plate, infinityMark } from '../view/ui.js';
+import { counterPill, tabBar, iconButton, plate, infinityMark, closeWindows } from '../view/ui.js';
 import { addSettingsMenu } from '../view/settings.js';
 import { panDuration, panFx, hud } from '../view/transition.js';
 import { music, sfx } from '../audio.js';
@@ -95,6 +95,7 @@ export class RoomScene extends Phaser.Scene {
   }
 
   create() {
+    this.windows = new Set(); // открытые окна (view/ui.js trackWindow) — сцена переиспользуется, список с нуля
     this.slots = SLOTS.map((s, i) => this.createSlot(s, i));
     this.createShop(this.slots[slotOf('shop')].room);
     this.createMap();
@@ -111,7 +112,7 @@ export class RoomScene extends Phaser.Scene {
     // Меню шестерёнки выпадает на его место — пока оно открыто, ключ спрятан.
     const dev = addDevButton(this, W - 62, U.topY + 110, () => this.scene.restart({ zone: 'home' }), () => this.refreshTop());
     if (dev) gear.onToggle = (open) => { dev.hidden = open; };
-    this.tabs = tabBar(this, TABS.map((z) => ({ ...z, enabled: z.enabled ? z.enabled() : true })), (i) => this.goTo(i + 1));
+    this.tabs = tabBar(this, TABS.map((z) => ({ ...z, enabled: z.enabled ? z.enabled() : true })), (i) => { closeWindows(this); this.goTo(i + 1); }); // вкладка — сначала закрыть открытые окна
     this.mapBack = iconButton(this, 62, U.topY + 110, 'close', () => this.collapseMap(), {
       size: 84, shape: 'round', color: CONFIG.ui.exitColor, depth: 26,
     }).setScrollFactor(0).setVisible(false);

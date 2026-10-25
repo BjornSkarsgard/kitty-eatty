@@ -1,6 +1,6 @@
 import { CONFIG } from '../config.js';
 import { makeButton } from './Button.js';
-import { plate, makeIcon, panel } from './ui.js';
+import { plate, makeIcon, panel, trackWindow } from './ui.js';
 import { sfx } from '../audio.js';
 import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
@@ -63,7 +63,10 @@ export function showCatLevelUps(scene, ups, { fxStars, onTake }) {
       fontFamily: font, fontStyle: 'bold', fontSize: '44px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 8,
     }).setOrigin(0.5));
   });
+  // закрыли вкладкой — награды уже начислены: счётчики обновить, следующие окна не показывать
+  const untrack = trackWindow(scene, () => { untrack(); onTake?.(); shade.destroy(); box.destroy(); });
   const take = () => {
+    untrack();
     sfx(scene, 'sfx_coins', CONFIG.audio.coins);
     onTake?.();
     shade.destroy();

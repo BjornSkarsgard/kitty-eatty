@@ -1,6 +1,6 @@
 import { CONFIG } from '../config.js';
 import { makeButton } from './Button.js';
-import { panel, plate } from './ui.js';
+import { panel, plate, trackWindow } from './ui.js';
 import { sfx } from '../audio.js';
 import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
@@ -34,10 +34,16 @@ export function showUltraIntro(scene, u, onDone) {
     align: 'center', wordWrap: { width: pw - 80 },
   }).setOrigin(0.5, 0); // сверху вниз под названием
   box.add([head, q, name, body]);
-  box.add(makeButton(scene, 0, ph / 2 - 80, STR.ultraIntroOk, () => {
+  let untrack = null;
+  const finish = () => {
+    if (!untrack) return;
+    untrack();
+    untrack = null;
     parts.forEach((o) => o.destroy());
     onDone?.();
-  }, { ...CONFIG.ui.bigButton, skin: 'green' }));
+  };
+  untrack = trackWindow(scene, finish);
+  box.add(makeButton(scene, 0, ph / 2 - 80, STR.ultraIntroOk, finish, { ...CONFIG.ui.bigButton, skin: 'green' }));
   sfx(scene, 'sfx_popup', CONFIG.audio.popup);
   box.setScale(0.5).setAlpha(0);
   scene.tweens.add({ targets: box, scale: 1, alpha: 1, duration: 320, ease: 'Back.easeOut' });

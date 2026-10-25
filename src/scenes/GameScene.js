@@ -46,6 +46,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
+    this.windows = new Set(); // открытые окна (view/ui.js trackWindow) — сцена переиспользуется, список с нуля
     const level = LEVELS[this.levelIndex];
     this.board = new Board(level);
     this.selected = null;

@@ -211,22 +211,28 @@ export class Board {
     });
   }
 
-  // «Магнит»: банка i забирает с верха остальных банок серии своего верхнего цвета, сколько влезет.
+  // «Магнит»: банка i собирает наверх весь корм своего верхнего цвета — со всего поля, из любой глубины,
+  // и закопанный в ней самой (кроме собранных и замороженных банок). Места мало — банка вырастает (after).
   magnet(i) {
     const b = this.bowls[i];
     if (!this.open(i)) return false;
     const c = b[b.length - 1];
+    const run = this.topRun(i);
+    const elsewhere = this.bowls.some((s, j) => this.open(j) && s.some((x, k) => x === c && !(j === i && k >= s.length - run)));
+    if (!elsewhere) return false; // весь этот цвет уже сверху банки
     return this.ultOp(() => {
-      let any = false;
-      for (let j = 0; j < this.bowls.length && b.length < this.caps[i]; j++) {
-        const s = this.bowls[j];
-        if (j === i || !this.open(j) || s[s.length - 1] !== c) continue;
-        const n = Math.min(this.topRun(j), this.caps[i] - b.length);
-        b.push(...s.splice(-n));
-        this.hid[i].push(...this.hid[j].splice(-n).map(() => false));
-        any = true;
-      }
-      return any;
+      let got = 0;
+      this.bowls.forEach((s, j) => {
+        if (!this.open(j)) return;
+        for (let k = s.length - 1; k >= 0; k--) {
+          if (s[k] !== c) continue;
+          s.splice(k, 1);
+          this.hid[j].splice(k, 1);
+          got++;
+        }
+      });
+      for (let k = 0; k < got; k++) { b.push(c); this.hid[i].push(false); }
+      return true;
     });
   }
 

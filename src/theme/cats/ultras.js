@@ -20,7 +20,7 @@ export const ULTRAS = [
   { id: 'british', name: 'Британская', look: 'gray', tier: 1, ult: 'order', ultName: 'Порядок',
     ultText: 'Одинаковый корм в банке ложится подряд' },
   { id: 'scottish', name: 'Скоттиш-страйт', look: 'smoke', tier: 1, ult: 'magnet', ultName: 'Магнит',
-    ultText: 'Банка забирает с верха всех банок порции своего верхнего цвета' },
+    ultText: 'Банка собирает наверх весь корм своего верхнего цвета со всего поля' },
   { id: 'siamese', name: 'Сиамская', look: 'cream', tier: 1, ult: 'sharpEye', ultName: 'Зоркий глаз',
     ultText: 'Открывает весь скрытый корм' },
   { id: 'burmese', name: 'Бурманская', look: 'chocolate', tier: 1, ult: 'instinct', ultName: 'Чутьё',

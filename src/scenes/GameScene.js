@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { Board } from '../core/Board.js';
 import { CatsLevel } from '../theme/cats/kitchen.js';
+import { CatView } from '../theme/cats/CatView.js';
 import { beatPulse } from '../beat.js';
 import { sfx, music } from '../audio.js';
 import {
@@ -324,11 +325,14 @@ export class GameScene extends Phaser.Scene {
     });
     this.undoBtn = this.trayBtns.undo;
     if (ultOn) {
-      // на кнопке ульты — голова ультракота (пока окраса-замены), золотая подложка
+      // на кнопке ульты — голова ультракота из частей (пока окраса-замены): глаза открыты и моргают; золотая подложка
       const b = this.trayBtns.ult;
-      const file = CONFIG.skins.find((k) => k.id === this.ultra.look).file;
-      const head = this.add.image(0, -2, `cat_${file}_head`);
-      b.addAt(head.setScale((U.iconButton * 0.7) / Math.max(head.width, head.height)), 2);
+      const head = new CatView(this, 0, 0, this.ultra.look, { headOnly: true }).setMood('open');
+      const box = head.getBounds();
+      const k = (U.iconButton * 0.74) / Math.max(box.width, box.height);
+      head.setScale(k).setPosition(-box.centerX * k, -box.centerY * k - 2);
+      b.addAt(head, 2);
+      head.startIdle();
       b.setColor(PAL.gold);
     }
     this.refreshUndo();

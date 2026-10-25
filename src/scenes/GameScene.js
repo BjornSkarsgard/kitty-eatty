@@ -239,9 +239,13 @@ export class GameScene extends Phaser.Scene {
     this.iceViews = this.bowlRects.map((r, i) => (this.board.isFrozen(i) ? this.theme.createIce(r, this.dim).setCount(this.board.iceLeft(i)) : null));
   }
 
+  // Размер плитки корма под текущую раскладку.
+  portionSize() {
+    return { w: this.dim.bw - this.theme.jarArt().edge * 2 * this.dim.k - 2, h: this.dim.ph - 4 * this.dim.scale };
+  }
+
   createPortions() {
-    const w = this.dim.bw - this.theme.jarArt().edge * 2 * this.dim.k - 2;
-    const h = this.dim.ph - 4 * this.dim.scale;
+    const { w, h } = this.portionSize();
     this.portions = this.board.bowls.map((bowl, i) => bowl.map((color, slot) => {
       const p = this.theme.createPortion(color, w, h);
       const pos = this.slotPos(i, slot);
@@ -294,6 +298,13 @@ export class GameScene extends Phaser.Scene {
           const d = Phaser.Math.Distance.Between(p.x, p.y, pos.x, pos.y);
           if (d < bestD) { bestD = d; best = k; }
         });
+        if (best < 0) {
+          // такого корма на экране нет — его съели «Перекусом», а теперь отменили: плитка появляется на месте
+          const { w, h } = this.portionSize();
+          const p = this.theme.createPortion(c, w, h).setPosition(pos.x, pos.y).setScale(0).setAlpha(0);
+          this.tweens.add({ targets: p, scale: 1, alpha: 1, duration: A.liftDuration * 2, ease: 'Back.easeOut' });
+          return p;
+        }
         const p = pool.splice(best, 1)[0];
         this.flyTo(p, pos, 0);
         return p;

@@ -97,12 +97,15 @@ export class Board {
     return now;
   }
 
-  // Открыть верхние порции. Возвращает [[банка, место], …] открывшихся сейчас.
+  // Открыть верхние порции, а в собранной банке — всё (под «?» мог лежать тот же корм).
+  // Возвращает [[банка, место], …] открывшихся сейчас.
   reveal() {
     const now = [];
     this.bowls.forEach((b, i) => {
-      const s = b.length - 1;
-      if (s >= 0 && this.hid[i][s]) { this.hid[i][s] = false; now.push([i, s]); }
+      const all = this.isComplete(i);
+      b.forEach((_, s) => {
+        if ((all || s === b.length - 1) && this.hid[i][s]) { this.hid[i][s] = false; now.push([i, s]); }
+      });
     });
     return now;
   }

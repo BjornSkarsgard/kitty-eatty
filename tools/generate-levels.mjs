@@ -11,8 +11,27 @@ const G = CONFIG.levelGen;
 const rand = rng(G.seed);
 const lerp = (a, b, t) => a + (b - a) * t;
 
+// Сложный или кошмарный уровень n (место в главе) — или null.
+function kindOf(n) {
+  const pos = ((n - 1) % G.chapter) + 1;
+  if (pos === G.chapter) return 'nightmare';
+  return G.hard.at.includes(pos) ? 'hard' : null;
+}
+
 // Параметры уровня n (с 1) по ступеням из конфига.
 function paramsFor(n) {
+  const kind = kindOf(n);
+  if (kind) {
+    const K = G[kind];
+    const p = tierParams(n, false);
+    return {
+      ...p,
+      colors: Math.min(CONFIG.colors.length, p.colors + K.colors),
+      dead: Math.min(0.95, p.dead + K.dead),
+      tries: K.tries,
+      kind,
+    };
+  }
   const P = G.puzzle;
   if (n >= P.from && n % P.every === P.offset) {
     const t = (n - P.from) / (G.count - P.from);
@@ -24,12 +43,17 @@ function paramsFor(n) {
       puzzle: true,
     };
   }
+  return tierParams(n, true);
+}
+
+// Обычный уровень n по своей ступени; breather — с передышкой на каждом breatherEvery-м.
+function tierParams(n, breather) {
   let from = 1;
   for (const tier of G.tiers) {
     if (n <= tier.upTo) {
       const t = tier.upTo > from ? (n - from) / (tier.upTo - from) : 0;
       let dead = lerp(tier.dead[0], tier.dead[1], t);
-      if (n % G.breatherEvery === 0) dead *= G.breatherFactor;
+      if (breather && n % G.breatherEvery === 0) dead *= G.breatherFactor;
       return {
         colors: Math.round(lerp(tier.colors[0], tier.colors[1], t)),
         capacity: tier.capacity,
@@ -57,7 +81,8 @@ for (let n = 1; n <= G.count; n++) {
   const p = paramsFor(n);
   let best = null;
   let attempts = 0;
-  while (attempts < G.candidates * 20 && (best === null || attempts < G.candidates)) {
+  const tries = G.candidates * (p.tries ?? 1);
+  while (attempts < tries * 20 && (best === null || attempts < tries)) {
     attempts++;
     const bowls = scramble(p.colors, p.capacity, p.empties, p.colors * p.capacity * 3, rand);
     if (bowls.some((b) => isComplete(b, p.capacity))) continue;
@@ -81,6 +106,7 @@ for (let n = 1; n <= G.count; n++) {
     solution: best.sol.moves,
   };
   if (p.puzzle) level.puzzle = true;
+  if (p.kind) level.kind = p.kind;
   if (!verify(level)) throw new Error(`Решение уровня ${n} не прошло проверку игровой логикой`);
   used.add(best.key);
   levels.push(level);
@@ -93,15 +119,18 @@ writeFileSync(new URL('../src/levels/levels.json', import.meta.url), out);
 
 console.log('\nУровни   цвета  вмест  пустых  ходов(ср)  трудность(ср)');
 for (let i = 0; i < levels.length; i += 10) {
-  const chunk = levels.slice(i, i + 10).filter((l) => !l.puzzle);
+  const chunk = levels.slice(i, i + 10).filter((l) => !l.puzzle && !l.kind);
   const avg = (f) => chunk.reduce((s, l) => s + f(l), 0) / chunk.length;
   const colors = [...new Set(chunk.map((l) => Math.max(...l.bowls.flat()) + 1))].join(',');
   console.log(
-    `${String(i + 1).padStart(3)}-${String(i + chunk.length).padEnd(4)}  ${colors.padEnd(6)} ${String(chunk[0].capacity).padEnd(6)} ` +
+    `${String(i + 1).padStart(3)}-${String(Math.min(i + 10, levels.length)).padEnd(4)}${colors.padEnd(6)} ${String(chunk[0].capacity).padEnd(6)} ` +
     `${String(chunk[0].bowls.filter((b) => !b.length).length).padEnd(7)} ${avg((l) => l.minMoves).toFixed(1).padEnd(10)} ${avg((l) => l.difficulty).toFixed(2)}`,
   );
 }
 const puzzles = levels.filter((l) => l.puzzle);
 console.log('\nГоловоломки (1 пустая миска, в средних выше не учтены):');
 console.log(puzzles.map((l) => `${l.id}: ${Math.max(...l.bowls.flat()) + 1} цв, ${l.minMoves} х, ${l.difficulty}`).join(' | '));
+const special = levels.filter((l) => l.kind);
+console.log('\nСложные (h) и кошмарные (N), в средних выше не учтены:');
+console.log(special.map((l) => `${l.id}${l.kind === 'hard' ? 'h' : 'N'}: ${Math.max(...l.bowls.flat()) + 1} цв, ${l.minMoves} х, ${l.difficulty}`).join(' | '));
 console.log(`\nГотово: ${levels.length} уровней за ${((Date.now() - t0) / 1000).toFixed(1)} с → src/levels/levels.json`);

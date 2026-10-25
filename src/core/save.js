@@ -4,14 +4,14 @@
 // Что храним (версия v на случай, если формат поменяется):
 //   current  — индекс уровня, который открыть при запуске (последний начатый);
 //   unlocked — сколько уровней открыто (индекс самого дальнего доступного);
-//   best     — { id уровня: лучшее число ходов } — из него считаются звёзды;
+//   best     — { id уровня: лучшее число ходов } — есть запись, значит уровень пройден;
 //   coins    — монеты (за победы; тратятся на отмены, позже — в магазине);
 //   undos    — запас отмен хода, общий на всю игру;
 //   undoProgress — сколько новых уровней пройдено к следующей бесплатной отмене;
 //   catLevel, xp — уровень кота (общий на игрока) и опыт, набранный к следующему;
 //   lives, refillAt — жизни и момент (мс, Date.now), когда они разом станут полными (null — уже полные);
 //   skins, skin — открытые рескины обычного кота (id из CONFIG.skins) и выбранный;
-//   chests, chestStars — неоткрытые сундуки и звёзды, накопленные к следующему;
+//   chests   — неоткрытые сундуки;
 //   daily — { last: 'ГГГГ-ММ-ДД' последнего подарка, day: какой по счёту следующий };
 //   names, name — открытые клички (id из src/theme/cats/names.js) и выбранная ('#custom' — своя); custom — своя кличка (или null);
 //   nameTokens — неиспользованные «именные таблички» (можно придумать кличку самому);
@@ -19,7 +19,7 @@
 import { CONFIG } from '../config.js';
 
 const KEY = 'kittyeatty.save';
-const VERSION = 7;
+const VERSION = 8;
 const E = CONFIG.economy;
 const C = CONFIG.catXp;
 const LV = CONFIG.lives;
@@ -29,7 +29,7 @@ const START_NAMES = NAMES.filter((n) => n.start).map((n) => n.id);
 export const CUSTOM = '#custom';
 
 const SETTINGS = { sound: true, music: true, fx: true, vibro: true };
-const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, chestStars: 0, daily: { last: null, day: 0 },
+const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, daily: { last: null, day: 0 },
   names: [...START_NAMES], name: START_NAMES[0], custom: null, nameTokens: 0, settings: { ...SETTINGS } });
 
 // Старые версии сохранения дополняем до текущей, прогресс не теряется.
@@ -46,6 +46,11 @@ function migrate(d) {
   if (d.v === 6) {
     const byLevel = NAMES.filter((n) => n.catLevel && n.catLevel <= d.catLevel).map((n) => n.id);
     d = { ...d, v: 7, names: [...START_NAMES, ...byLevel], name: START_NAMES[0], custom: null, nameTokens: 0 };
+  }
+  if (d.v === 7) {
+    // звёзд за ходы больше нет (сложные уровни вместо них) — накопленные к сундуку просто забываем
+    const { chestStars, ...rest } = d;
+    d = { ...rest, v: 8 };
   }
   if (d && !Number.isFinite(d.xp)) d.xp = 0; // битый опыт — с нуля, уровень кота не трогаем
   if (d && !d.settings) d.settings = {};
@@ -96,35 +101,24 @@ export function setCurrentLevel(index) {
 }
 
 // Победа: запоминаем лучший результат, открываем следующий уровень и запускаться будем с него
-// (даже если игру закрыли, не нажав «Дальше»). Награда — CONFIG.economy:
-// за первое прохождение монеты за победу и звёзды и шаг к бесплатной отмене;
-// за переигровку — монеты только за новые звёзды (фармить старые уровни невыгодно). Так же опыт кота.
-// Возвращает, что показать в окне победы: { stars, coins, undos, xp, cat: { level, xp } — каким кот был до победы,
+// (даже если игру закрыли, не нажав «Дальше»). Награда — CONFIG.economy, только за первое прохождение
+// (фармить старые уровни нельзя): монеты (на сложном и кошмарном — ×kindCoins), опыт кота, шаг к бесплатной отмене.
+// Возвращает, что показать в окне победы: { coins, undos, xp, cat: { level, xp } — каким кот был до победы,
 // levelUps: [{ level, coins, undos, skin, chest }] — новые уровни кота и их награды (уже начислены),
-// chests — сколько сундуков добавилось (за звёзды и уровни кота) }.
+// chests — сколько сундуков добавилось (за уровни кота) }.
 export function recordWin(level, index, moves, count) {
   const d = get();
-  const prevStars = levelStars(level);
-  const stars = starsFor(moves, level.minMoves);
+  const first = !levelPassed(level);
   if (!(d.best[level.id] <= moves)) d.best[level.id] = moves;
-  const reward = { stars, coins: 0, undos: 0, xp: 0, cat: { level: d.catLevel, xp: d.xp }, levelUps: [], chests: 0 };
-  // новые звёзды копятся к сундуку
-  d.chestStars += Math.max(0, stars - prevStars);
-  while (d.chestStars >= CONFIG.chest.everyStars) {
-    d.chestStars -= CONFIG.chest.everyStars;
-    reward.chests += 1;
-  }
-  if (prevStars === 0) {
-    reward.coins = E.winCoins + E.coinsPer25Levels * Math.floor(index / 25) + E.starCoins * stars;
-    reward.xp = C.winXp + C.starXp * stars + C.xpPer10Levels * Math.floor(index / 10);
+  const reward = { coins: 0, undos: 0, xp: 0, cat: { level: d.catLevel, xp: d.xp }, levelUps: [], chests: 0 };
+  if (first) {
+    reward.coins = (E.winCoins + E.coinsPer25Levels * Math.floor(index / 25)) * (E.kindCoins[level.kind] ?? 1);
+    reward.xp = C.winXp + C.xpPer10Levels * Math.floor(index / 10);
     d.undoProgress += 1;
     if (d.undoProgress >= E.undoEveryLevels) {
       d.undoProgress = 0;
       reward.undos = 1;
     }
-  } else {
-    reward.coins = E.starCoins * Math.max(0, stars - prevStars);
-    reward.xp = C.starXp * Math.max(0, stars - prevStars);
   }
   d.coins += reward.coins;
   d.undos += reward.undos;
@@ -148,23 +142,8 @@ export function recordWin(level, index, moves, count) {
   return reward;
 }
 
-function bestMoves(id) {
-  return get().best[id];
-}
-
-// Сколько звёзд за прохождение: 3, 2 или 1 (правило — CONFIG.stars).
-function starsFor(moves, minMoves) {
-  const S = CONFIG.stars;
-  if (moves <= minMoves + Math.ceil(minMoves * S.three)) return 3;
-  if (moves <= minMoves + Math.ceil(minMoves * S.two)) return 2;
-  return 1;
-}
-
-// Лучшие звёзды уровня (0 — не пройден) — для карты уровней.
-export function levelStars(level) {
-  const best = bestMoves(level.id);
-  return best === undefined ? 0 : starsFor(best, level.minMoves);
-}
+// Пройден ли уровень хоть раз.
+export const levelPassed = (level) => get().best[level.id] !== undefined;
 
 // ---------- уровень кота ----------
 
@@ -212,7 +191,6 @@ export function buySkin(id) {
 // ---------- сундуки и подарок дня ----------
 
 export const chestsPending = () => get().chests;
-export const chestStars = () => get().chestStars;
 
 // Содержимое сундука — сразу начисляется. Возвращает, что показать: [{ icon, n }] и [{ skin }].
 function rollChest(d) {

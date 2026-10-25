@@ -9,8 +9,8 @@ import { panDuration, panFx, hud } from '../view/transition.js';
 import { music, sfx } from '../audio.js';
 import { beatPhase } from '../beat.js';
 import {
-  currentLevel, unlockedLevel, levelStars, coins, catLevel, lives, livesRefillLeft, selectedSkin, skinsOwned,
-  chestsPending, chestStars, openChest, dailyAvailable, claimDaily, catName,
+  currentLevel, unlockedLevel, levelPassed, coins, catLevel, lives, livesRefillLeft, selectedSkin, skinsOwned,
+  chestsPending, openChest, dailyAvailable, claimDaily, catName,
 } from '../core/save.js';
 import { openCollection } from '../view/CollectionView.js';
 import { openBox, closedBox } from '../view/ChestView.js';
@@ -403,7 +403,7 @@ export class RoomScene extends Phaser.Scene {
     this.createBoxes(room);
   }
 
-  // По бокам от «Играть»: сундук (число неоткрытых, звёзды до следующего) и подарок дня («!», если можно забрать).
+  // По бокам от «Играть»: сундук (число неоткрытых) и подарок дня («!», если можно забрать).
   // Есть что открыть — коробка покачивается.
   createBoxes(room) {
     const B = HC.boxes;
@@ -434,7 +434,7 @@ export class RoomScene extends Phaser.Scene {
   refreshBoxes() {
     const n = chestsPending();
     this.chestBtn.badge(n);
-    this.chestBtn.label.setText(`★ ${chestStars()}/${CONFIG.chest.everyStars}`);
+    this.chestBtn.label.setText(STR.chest);
     const gift = dailyAvailable();
     this.giftBtn.badge(gift ? '!' : '');
     this.giftBtn.label.setText(STR.gift);
@@ -459,7 +459,7 @@ export class RoomScene extends Phaser.Scene {
     if (!items) {
       return showPopup(this, {
         title: STR.chest,
-        text: STR.chestInfo(CONFIG.chest.everyStars, CONFIG.chest.everyCatLevels, chestStars()),
+        text: STR.chestInfo(CONFIG.chest.everyCatLevels),
         buttons: [{ label: STR.ok }],
       });
     }
@@ -589,8 +589,8 @@ export class RoomScene extends Phaser.Scene {
   createProfile(room) {
     const P = R.profile;
     const passed = unlockedLevel(LEVELS.length);
-    const stars = LEVELS.reduce((sum, l) => sum + levelStars(l), 0);
-    const rows = [[STR.profile.catLevel, catLevel()], [STR.profile.passed, passed], [STR.profile.stars, stars]];
+    const hard = LEVELS.filter((l) => l.kind && levelPassed(l)).length;
+    const rows = [[STR.profile.catLevel, catLevel()], [STR.profile.passed, passed], [STR.profile.hard, hard]];
     const x0 = W / 2 - P.w / 2;
     rows.forEach(([name, value], k) => {
       const y = P.y + k * P.step;

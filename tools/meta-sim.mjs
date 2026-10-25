@@ -11,11 +11,12 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const LEVELS = JSON.parse(readFileSync(join(ROOT, 'src/levels/levels.json'), 'utf8'));
 const SHOW_LEVELS = process.argv.includes('--levels');
-// --saver[=доля ×2]: «копилка» — всё на 3 звезды, монеты не тратит (по ней ставим цену первого ультракота)
+// --saver[=доля ×2]: «копилка» — монеты не тратит (по ней ставим цену первого ультракота)
 const SAVER = process.argv.find((a) => a.startsWith('--saver'));
 
 const META = {
-  win: { coins: 10, coinsPer25Levels: 2, starCoins: 5, xp: 20, starXp: 5, xpPer10Levels: 2 }, // за первое прохождение
+  win: { coins: 20, coinsPer25Levels: 2, xp: 35, xpPer10Levels: 2 }, // за первое прохождение, без учёта ходов
+  kindCoins: { hard: 3, nightmare: 5 },     // монеты за победу ×N на сложном и кошмарном (level.kind)
   catNeed: (L) => 60 + 30 * (L - 1),        // опыта от уровня кота L до L+1
   catReward: (L) => ({                       // награда за уровень кота L
     coins: 25 + 5 * L,
@@ -26,7 +27,6 @@ const META = {
     skin: [4, 12, 20, 30].includes(L),       // гарантированный рескин обычного кота
   }),
   boostersFrom: { undo: 1, hint: 4, jar: 8 }, // с какого уровня кота умение появляется
-  starChestEvery: 30,                          // сундук за каждые N звёзд
   chest: { coins: 80, undo: 2, hint: 1, jar: 1, skinChance: 0.35, dupCoins: 150 }, // содержимое сундука
   daily: [30, 40, 50, 60, 80, 100, 'chest'],  // подарок дня по кругу; 7-й день — сундук
   freeUndoEvery: 3,                            // бесплатная отмена за каждые N новых уровней
@@ -52,14 +52,12 @@ const PLAYER = {
   undoUse: (d) => 0.5 + 3 * d,     // сколько отмен хотел бы за уровень
   hintUse: (d) => (d > 0.3 ? 0.5 : 0.1),
   jarUse: (d) => (d > 0.4 ? 0.3 : 0.05),
-  starsAvg: (d) => Math.max(1.3, 2.6 - 2.2 * d),
   ultraReserve: 300,               // покупает ультракота, если после покупки останется столько на бустеры
   adForLives: 0.7,                 // жизни кончились: смотрит ролик с такой вероятностью, иначе покупает за монеты или ждёт
 };
 // --hard: игрок, который часто начинает заново (несколько раз подряд на трудных уровнях)
 if (process.argv.includes('--hard')) PLAYER.restartChance = (d) => Math.min(0.8, 1.5 * d + 0.05);
 if (SAVER) {
-  PLAYER.starsAvg = () => 3;
   PLAYER.x2Share = Number(SAVER.split('=')[1] || 0);
 }
 
@@ -67,7 +65,7 @@ let seed = 12345;
 const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
 
 const s = { coins: META.start.coins, undo: META.start.undo, hint: META.start.hint, jar: META.start.jar,
-  xp: 0, cat: 1, chestStars: 0, sec: 0, earned: 0, earnedX2: 0, spentBoost: 0, spentUltra: 0,
+  xp: 0, cat: 1, sec: 0, earned: 0, earnedX2: 0, spentBoost: 0, spentUltra: 0,
   missing: { undo: 0, hint: 0, jar: 0 }, skins: new Set(), chests: 0, ultra: 0, ultraAt: [], day: 0, undoProgress: 0,
   lives: META.lives.max, refillAt: null, real: 0, livesLost: 0, outOfLives: 0, livesAds: 0, livesBought: 0, livesWaits: 0, waitedMin: 0 };
 const catLog = [];
@@ -137,13 +135,10 @@ for (let i = 0; i < LEVELS.length; i++) {
   useBooster('hint', PLAYER.hintUse(d));
   useBooster('jar', PLAYER.jarUse(d));
   // победа
-  const stars = Math.round(PLAYER.starsAvg(d) * 10) / 10;
-  const win = META.win.coins + META.win.coinsPer25Levels * Math.floor(i / 25) + META.win.starCoins * stars;
+  const win = (META.win.coins + META.win.coinsPer25Levels * Math.floor(i / 25)) * (META.kindCoins[l.kind] ?? 1);
   coins(win);
   if (rand() < PLAYER.x2Share) coins(win, true); // ролик «×2»
-  s.xp += META.win.xp + META.win.starXp * stars + META.win.xpPer10Levels * Math.floor(i / 10);
-  s.chestStars += stars;
-  while (s.chestStars >= META.starChestEvery) { s.chestStars -= META.starChestEvery; openChest(); }
+  s.xp += META.win.xp + META.win.xpPer10Levels * Math.floor(i / 10);
   if (++s.undoProgress >= META.freeUndoEvery) { s.undoProgress = 0; s.undo++; }
   while (s.xp >= META.catNeed(s.cat)) {
     s.xp -= META.catNeed(s.cat);

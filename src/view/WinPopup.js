@@ -1,39 +1,39 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { makeButton } from './Button.js';
-import { iconButton, plate, makeIcon, panel } from './ui.js';
+import { iconButton, plate, makeIcon, panel, kindBadge } from './ui.js';
 import { sfx } from '../audio.js';
 import { catNeed } from '../core/save.js';
 import { showCatLevelUps } from './CatLevelUpPopup.js';
 import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
 
-// Окно победы (как в референсе): панель с табличкой «Уровень N» и крестиком, звёзды, похвала по звёздам,
-// число ходов, полоска опыта кота, «Награды:» на подставке, зелёная «Продолжить». Крестик — onHome.
+// Окно победы (как в референсе): панель с табличкой «Уровень N» и крестиком, похвала, у сложного уровня —
+// строка «Сложный · монеты ×3», полоска опыта кота, «Награды:» на подставке, зелёная «Продолжить». Крестик — onHome.
 // reward — что вернул recordWin (награды уже начислены). fxStars — частицы-звёздочки сцены.
 // Новые уровни кота — окнами поверх (CatLevelUpPopup), onTake — обновить счётчики после «Забрать».
-export function showWinPopup(scene, { level, moves, reward, isLast, fxStars, onNext, onHome, onTake }) {
+export function showWinPopup(scene, { level, reward, isLast, fxStars, onNext, onHome, onTake }) {
   const W = CONFIG.width;
   const H = CONFIG.height;
   const WC = CONFIG.win;
   const font = `"${CONFIG.font}", sans-serif`;
   scene.add.rectangle(W / 2, H / 2, W, H, PAL.black, 0.6).setDepth(20).setInteractive();
 
-  // всё, кроме звёзд, — в одном контейнере, он «выпрыгивает»; звёзды появляются следом
+  // всё окно — в одном контейнере, он «выпрыгивает»
   const cy = H / 2 + WC.offsetY;
   const box = scene.add.container(W / 2, cy).setDepth(21);
   const pw = WC.width;
   const ph = WC.height;
   box.add(panel(scene, pw + 20, ph + 20));
   const g = scene.add.graphics();
-  g.fillStyle(PAL.white, 0.08).fillRoundedRect(-pw / 2 + 24, -ph / 2 + 24, pw - 48, ph * 0.43, 34); // светлее под звёздами
+  g.fillStyle(PAL.white, 0.08).fillRoundedRect(-pw / 2 + 24, -ph / 2 + 24, pw - 48, ph * 0.43, 34); // светлее под похвалой
   // подставка под награды
   g.fillStyle(PAL.deep, 1).fillEllipse(0, WC.rewardsY + 58, 380, 70);
   g.fillStyle(PAL.pedestal, 1).fillEllipse(0, WC.rewardsY + 46, 380, 64);
   box.add(g);
   box.add(plate(scene, 0, -ph / 2 + 4, STR.level(level.id), { depth: 0, color: PAL.plate }).setScale(1.25));
 
-  const praise = scene.add.text(0, WC.praiseY, STR.praise[reward.stars - 1], {
+  const praise = scene.add.text(0, WC.praiseY, STR.praise[level.kind ?? 'normal'], {
     fontFamily: font, fontStyle: 'bold', fontSize: '84px', stroke: PAL.textGoldStroke, strokeThickness: 14,
     shadow: { offsetX: 0, offsetY: 6, color: PAL.praiseShadow, blur: 0, stroke: true, fill: true },
   }).setOrigin(0.5);
@@ -43,15 +43,8 @@ export function showWinPopup(scene, { level, moves, reward, isLast, fxStars, onN
   praise.setFill(grad);
   box.add(praise);
 
-  // ходы — на тёмной полоске, в стиле табличек окна
-  const movesText = scene.add.text(0, WC.movesY, STR.moves(moves, level.minMoves), {
-    fontFamily: font, fontStyle: 'bold', fontSize: '32px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 6,
-  }).setOrigin(0.5);
-  const mw = movesText.width + 48;
-  const mg = scene.add.graphics();
-  mg.fillStyle(PAL.deep, 1).fillRoundedRect(-mw / 2, WC.movesY - 26, mw, 52, 26);
-  mg.lineStyle(3, PAL.rim, 1).strokeRoundedRect(-mw / 2, WC.movesY - 26, mw, 52, 26);
-  box.add([mg, movesText]);
+  // сложный / кошмарный — табличкой своего цвета
+  if (level.kind) box.add(kindBadge(scene, 0, WC.kindY, level.kind, STR.kindWin[level.kind](CONFIG.economy.kindCoins[level.kind]), 32));
 
   box.add(scene.add.text(0, WC.rewardsY - 92, STR.rewards, {
     fontFamily: font, fontStyle: 'bold', fontSize: '36px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 7,
@@ -74,8 +67,8 @@ export function showWinPopup(scene, { level, moves, reward, isLast, fxStars, onN
   }
   const bar = xpBar(scene, box, WC.xpY, reward);
 
-  // полоска опыта кота доезжает, когда звёзды отпрыгали; новые уровни кота — окном поверх
-  scene.time.delayedCall(400 + reward.stars * CONFIG.stars.popDelay + 300, () => fillXpBar(scene, bar, reward, fxStars, onTake));
+  // полоска опыта кота доезжает, когда окно появилось; новые уровни кота — окном поверх
+  scene.time.delayedCall(WC.revealMs, () => fillXpBar(scene, bar, reward, fxStars, onTake));
 
   box.add(makeButton(scene, 0, WC.buttonY, isLast ? STR.again : STR.next, onNext, { w: 380, h: 150, size: 50, skin: 'green' }));
   box.add(iconButton(scene, pw / 2 - 6, -ph / 2 + 4, 'close', onHome, {
@@ -84,35 +77,15 @@ export function showWinPopup(scene, { level, moves, reward, isLast, fxStars, onN
 
   box.setScale(0.5).setAlpha(0);
   sfx(scene, 'sfx_popup', CONFIG.audio.popup);
-  // монеты звенят, когда звёзды отпрыгали
-  if (reward.coins) scene.time.delayedCall(400 + reward.stars * CONFIG.stars.popDelay + 200, () => sfx(scene, 'sfx_coins', CONFIG.audio.coins));
-  scene.tweens.add({ targets: box, scale: 1, alpha: 1, duration: 320, ease: 'Back.easeOut' });
-  showStars(scene, box, WC.starsY, reward.stars, fxStars);
-}
-
-// Три звезды в ряд внутри окна победы (box): сначала все пустые — выпрыгивают вместе с окном,
-// потом заработанные по очереди заполняются со вспышкой. Картинки ui_star / ui_star_empty;
-// пока их нет — растянутая искорка fx_star (пустая — бледная).
-function showStars(scene, box, y, count, fxStars) {
-  const S = CONFIG.stars;
-  const full = scene.textures.exists('ui_star') ? 'ui_star' : 'fx_star';
-  const hasEmpty = scene.textures.exists('ui_star_empty');
-  const fit = (img) => img.setScale(S.size / Math.max(img.width, img.height));
-  for (let i = 0; i < 3; i++) {
-    const sx = (i - 1) * (S.size + S.gap);
-    const sy = y + (i === 1 ? 0 : S.size * 0.12); // средняя чуть выше — дугой
-    box.add(fit(scene.add.image(sx, sy, hasEmpty ? 'ui_star_empty' : full)).setAlpha(hasEmpty ? 1 : S.emptyAlpha));
-    if (i >= count) continue;
-    const star = fit(scene.add.image(sx, sy, full));
-    box.add(star);
-    const target = star.scale;
-    star.setScale(0);
-    scene.tweens.add({
-      targets: star, scale: target, duration: 380, ease: 'Back.easeOut', delay: 400 + i * S.popDelay,
-      onStart: () => sfx(scene, 'sfx_star', CONFIG.audio.star, CONFIG.audio.starPitch[i]), // до — ми — соль
-      onComplete: () => fxStars.setDepth(23).explode(10, box.x + sx, box.y + sy),
-    });
-  }
+  // похвала вспыхивает искорками, монеты звенят, когда окно появилось
+  if (reward.coins) scene.time.delayedCall(WC.revealMs - 100, () => sfx(scene, 'sfx_coins', CONFIG.audio.coins));
+  scene.tweens.add({
+    targets: box, scale: 1, alpha: 1, duration: 320, ease: 'Back.easeOut',
+    onComplete: () => {
+      sfx(scene, 'sfx_star', CONFIG.audio.star, CONFIG.audio.starPitch[2]);
+      fxStars.setDepth(23).explode(16, box.x, box.y + WC.praiseY);
+    },
+  });
 }
 
 // Полоска опыта в окне победы: слева кружок с уровнем кота, в полоске «опыт / нужно», справа сверху «+N опыта».

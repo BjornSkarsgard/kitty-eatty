@@ -8,7 +8,7 @@ import { currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyU
 import { confirmLife, showNoLives } from '../view/lives.js';
 import { showWinPopup } from '../view/WinPopup.js';
 import { showPopup } from '../view/Popup.js';
-import { iconButton, counterPill, plate, tray } from '../view/ui.js';
+import { iconButton, counterPill, plate, tray, kindBadge } from '../view/ui.js';
 import { addSettingsMenu } from '../view/settings.js';
 import { LEVELS } from '../core/levels.js';
 import { STR } from '../theme/cats/strings.ru.js';
@@ -35,6 +35,7 @@ export class GameScene extends Phaser.Scene {
     this.levelIndex = data.levelIndex ?? levelFromUrl() ?? currentLevel(LEVELS.length);
     setCurrentLevel(this.levelIndex);
     this.behindDoor = data.behindDoor; // запущен из холла за дверью кухни — холл сам доведёт камеру и включит ввод
+    this.again = data.again; // «Заново» — табличку сложного уровня второй раз не показываем
   }
 
   create() {
@@ -55,6 +56,7 @@ export class GameScene extends Phaser.Scene {
     const U = CONFIG.ui;
     this.coinPill = counterPill(this, 30 + U.pillWidth / 2, U.topY, 'coin', coins());
     plate(this, CONFIG.width / 2, U.topY, STR.level(level.id), { color: level.puzzle ? PAL.platePuzzle : undefined });
+    if (level.kind) kindBadge(this, CONFIG.width / 2, U.topY + U.kindBadgeY, level.kind, STR.kindShort[level.kind]).setDepth(15);
     addSettingsMenu(this, { onExit: () => this.leave() });
 
     this.layoutBowls();
@@ -65,7 +67,10 @@ export class GameScene extends Phaser.Scene {
     if (this.behindDoor) {
       this.scene.moveBelow('Room'); // виден только в проёме двери, холл — сверху
       this.input.enabled = false;
-    } else this.theme.setMirrors(false); // не из холла — продолжения кухни за краями не видны
+    } else {
+      this.theme.setMirrors(false); // не из холла — продолжения кухни за краями не видны
+      this.showKind();
+    }
   }
 
   // Холл довёл влёт через дверь: уровень во весь экран, можно играть; продолжения кухни за краями больше не нужны.
@@ -73,6 +78,18 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setZoom(1).setScroll(0, 0);
     this.input.enabled = true;
     this.theme.setMirrors(false);
+    this.showKind();
+  }
+
+  // Сложный или кошмарный уровень — табличка до первого хода (не после «Заново»).
+  showKind() {
+    const kind = LEVELS[this.levelIndex].kind;
+    if (!kind || this.again) return;
+    showPopup(this, {
+      title: STR.kind[kind],
+      text: STR.kindText[kind](CONFIG.economy.kindCoins[kind]),
+      buttons: [{ label: STR.letsGo, color: kind === 'nightmare' ? PAL.plateNightmare : PAL.plateHard }],
+    });
   }
 
   // Выход из уровня: если уровень начат и не пройден — сначала предупреждение, что сгорит жизнь.
@@ -83,7 +100,7 @@ export class GameScene extends Phaser.Scene {
 
   // «Заново»: начатый уровень — за жизнь (с предупреждением); жизней нет — окно «Жизни кончились».
   restartLevel() {
-    const again = () => this.scene.restart({ levelIndex: this.levelIndex });
+    const again = () => this.scene.restart({ levelIndex: this.levelIndex, again: true });
     if (!this.moved) return again();
     if (lives() <= 0) return showNoLives(this);
     confirmLife(this, STR.restartTitle, () => { loseLife(); again(); });
@@ -436,7 +453,7 @@ export class GameScene extends Phaser.Scene {
     // следующий уровень — только если есть жизни (иначе окно «Жизни кончились»; купил — сразу дальше)
     const go = () => this.scene.restart({ levelIndex: isLast ? 0 : this.levelIndex + 1 });
     showWinPopup(this, {
-      level, moves: this.board.history.length, reward, isLast, fxStars: this.fxStars,
+      level, reward, isLast, fxStars: this.fxStars,
       onNext: () => (lives() > 0 ? go() : showNoLives(this, go)),
       onHome: () => this.leave(),
       onTake: () => { this.coinPill.setValue(coins()); this.refreshUndo(); },

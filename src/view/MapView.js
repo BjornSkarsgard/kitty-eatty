@@ -2,8 +2,10 @@ import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { CatView } from '../theme/cats/CatView.js';
 import { sfx } from '../audio.js';
-import { unlockedLevel, levelStars, selectedSkin } from '../core/save.js';
+import { unlockedLevel, selectedSkin } from '../core/save.js';
 import { LEVELS } from '../core/levels.js';
+import { kindBadge } from './ui.js';
+import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
 
 const M = CONFIG.map;
@@ -20,7 +22,7 @@ function nodePos(i) {
 // Карта уровней внутри контейнера: окно шириной с экран, высотой viewH, которое можно уменьшить (рамка на стене)
 // и плавно развернуть на весь экран — это одна и та же карта, меняются только масштаб и высота окна, без скачков.
 // Текущий уровень — в середине окна.
-// Тропинка из следов лапок снизу вверх, кружки с номером и звёздами, на самом дальнем открытом сидит кот.
+// Тропинка из следов лапок снизу вверх, кружки с номером (под сложными — табличка), на самом дальнем открытом сидит кот.
 // На сцене только видимые уровни: 300 штук сразу — тяжело для слабого Android.
 export class MapView {
   constructor(scene, x, y, scale, viewH = H) {
@@ -133,7 +135,6 @@ export class MapView {
     }
 
     const level = LEVELS[i];
-    const stars = levelStars(level);
     const state = i === this.current ? 'current' : i < this.current ? 'done' : 'locked';
     const node = scene.add.container(p.x, p.y);
     node.add(this.makeNodeFace(state, level.puzzle));
@@ -144,14 +145,10 @@ export class MapView {
     nodes.add(node);
     parts.push(node);
 
-    if (stars > 0) {
-      for (let k = 0; k < 3; k++) {
-        const key = k < stars ? 'ui_star' : 'ui_star_empty';
-        if (!scene.textures.exists(key)) continue;
-        const img = scene.add.image(p.x + (k - 1) * M.starSize * 0.95, p.y + M.nodeSize * 0.52 + (k === 1 ? 4 : 0), key);
-        top.add(img.setScale(M.starSize / img.width));
-        parts.push(img);
-      }
+    if (level.kind) {
+      const badge = kindBadge(scene, p.x, p.y + M.nodeSize * M.kindBadgeY, level.kind, STR.kindShort[level.kind], M.kindBadgeSize);
+      top.add(badge);
+      parts.push(badge);
     }
 
     if (state === 'current') {

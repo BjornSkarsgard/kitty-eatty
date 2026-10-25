@@ -19,18 +19,23 @@ export const STR = {
   tabs: { shop: 'Магазин', map: 'Карта', home: 'Главная', collection: 'Коллекция', profile: 'Профиль' },
   play: (n) => `Играть ${n}`,
   soon: 'Скоро откроется',
-  profile: { catLevel: 'Уровень кота', passed: 'Пройдено уровней', stars: 'Звёзд собрано' },
+  profile: { catLevel: 'Уровень кота', passed: 'Пройдено уровней', hard: 'Сложных пройдено' },
 
   // сундук и подарок дня
   chest: 'Сундук',
   gift: 'Подарок',
-  chestInfo: (everyStars, everyCatLevels, stars) =>
-    `Сундук даётся за каждые ${everyStars} звёзд и каждый ${everyCatLevels}-й уровень кота.\nЗвёзд: ${stars}/${everyStars}`,
+  chestInfo: (everyCatLevels) => `Сундук даётся за каждый ${everyCatLevels}-й уровень кота и на 7-й день подарка дня.`,
   dailyTitle: 'Подарок дня',
   dailyTomorrow: 'Следующий подарок — завтра',
 
   // уровень
   level: (n) => `Уровень ${n}`,
+  // сложные уровни (level.kind): табличка до начала уровня и строка в окне победы
+  kind: { hard: 'Сложный уровень', nightmare: 'Кошмарный уровень' },
+  kindShort: { hard: 'Сложный', nightmare: 'Кошмарный' }, // под кружком на карте
+  kindText: { hard: (k) => `Монеты за победу ×${k}`, nightmare: (k) => `Самый трудный в главе!\nМонеты за победу ×${k}` },
+  kindWin: { hard: (k) => `Сложный  ·  монеты ×${k}`, nightmare: (k) => `Кошмарный  ·  монеты ×${k}` },
+  letsGo: 'Вперёд!',
   leaveTitle: 'Выйти из уровня?',
   restartTitle: 'Начать заново?',
   noUndosTitle: 'Отмены кончились',
@@ -38,8 +43,7 @@ export const STR = {
   watchAd: 'Смотреть рекламу',
 
   // победа и уровень кота
-  praise: ['Неплохо!', 'Отлично!', 'Идеально!'], // по числу звёзд (1, 2, 3)
-  moves: (moves, min) => `Ходов: ${moves}  ·  минимум ${min}`,
+  praise: { normal: 'Идеально!', hard: 'Справились!', nightmare: 'Невероятно!' }, // по level.kind
   rewards: 'Награды:',
   alreadyPassed: 'Уровень уже пройден',
   again: 'С начала',

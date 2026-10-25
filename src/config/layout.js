@@ -13,6 +13,7 @@ export const LAYOUT = {
     badgeColor: 0xe0245e,
     pillWidth: 180,
     topY: 62,            // верхняя полоса: монеты, табличка уровня, настройки
+    kindBadgeY: 64,      // табличка «Сложный / Кошмарный» — на столько ниже таблички уровня
     trayY: 1196,         // лоток с кнопками в игре
     onColor: 0x43c43a,   // переключатель включён / выключен
     offColor: 0x8d8a99,
@@ -48,7 +49,8 @@ export const LAYOUT = {
   // Окно победы: размеры панели и положения внутри неё (от центра панели); похвала — в theme/cats/strings.ru.js.
   win: {
     width: 600, height: 860, offsetY: -10,
-    starsY: -290, praiseY: -175, movesY: -85, xpY: 0, rewardsY: 150, buttonY: 320,
+    praiseY: -250, kindY: -120, xpY: 0, rewardsY: 150, buttonY: 320,
+    revealMs: 700, // мс после появления окна: звенят монеты и доезжает полоска опыта
   },
 
   // Эффекты (свет, свечения; позже — postFX). На этапе 5 — переключатель «Эффекты» в настройках.
@@ -131,7 +133,8 @@ export const LAYOUT = {
     nodeSize: 128,       // диаметр кружка уровня
     currentScale: 1.15,  // текущий уровень крупнее…
     currentPulse: 1.06,  // …и дышит
-    starSize: 40,
+    kindBadgeY: 0.56,    // табличка «Сложный / Кошмарный» под кружком (доля nodeSize вниз от центра)
+    kindBadgeSize: 24,   // её шрифт, px
     pawsBetween: 3,      // следов лапок между соседними уровнями
     pawSize: 30,
     pawColor: 0xb07a52,

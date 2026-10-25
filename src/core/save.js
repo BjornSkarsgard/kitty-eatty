@@ -12,7 +12,8 @@
 //   lives, refillAt — жизни и момент (мс, Date.now), когда придёт следующая (null — жизни полные);
 //   infiniteUntil — до какого момента бесконечные жизни (null — нет);
 //   msDone — id уровня последнего забранного рубежа на карте (0 — ни одного);
-//   skins, skin — открытые рескины обычного кота (id из CONFIG.skins) и выбранный;
+//   skins, skin — открытые окрасы (id из CONFIG.skins) и окрас обычного кота («Найдёныш»);
+//   breedSkins — { id ультракота: окрас } — у каждой породы свой (нет — окрас породы по умолчанию, look);
 //   chests   — неоткрытые сундуки;
 //   daily — { last: 'ГГГГ-ММ-ДД' последнего подарка, day: какой по счёту следующий };
 //   names, name — открытые клички (id из src/theme/cats/names.js) и выбранная ('#custom' — своя); custom — своя кличка (или null);
@@ -26,7 +27,7 @@ import { MILESTONES } from './milestones.js';
 import { TEST_TOOLS } from '../dev.js';
 
 const KEY = 'kittyeatty.save';
-const VERSION = 13;
+const VERSION = 14;
 const E = CONFIG.economy;
 const C = CONFIG.catXp;
 const LV = CONFIG.lives;
@@ -38,7 +39,7 @@ const START_NAMES = NAMES.filter((n) => n.start).map((n) => n.id);
 export const CUSTOM = '#custom';
 
 const SETTINGS = { sound: true, music: true, fx: true, vibro: true };
-const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, hints: B.hint.start, jars: B.jar.start, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, daily: { last: null, day: 0 }, infiniteUntil: null, msDone: 0, ultras: [], ultra: null, ultraIntro: false, ultCharge: CONFIG.ultRecharge,
+const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, hints: B.hint.start, jars: B.jar.start, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, daily: { last: null, day: 0 }, infiniteUntil: null, msDone: 0, ultras: [], ultra: null, ultraIntro: false, ultCharge: CONFIG.ultRecharge, breedSkins: {},
   names: [...START_NAMES], name: START_NAMES[0], custom: null, nameTokens: 0, settings: { ...SETTINGS } });
 
 // Старые версии сохранения дополняем до текущей, прогресс не теряется.
@@ -71,6 +72,7 @@ function migrate(d) {
   if (d.v === 10) d = { ...d, v: 11, hints: B.hint.start, jars: B.jar.start };
   if (d.v === 11) d = { ...d, v: 12, ultras: [], ultra: null, ultraIntro: false };
   if (d.v === 12) d = { ...d, v: 13, ultCharge: CONFIG.ultRecharge };
+  if (d.v === 13) d = { ...d, v: 14, breedSkins: {} };
   if (d && !Number.isFinite(d.xp)) d.xp = 0; // битый опыт — с нуля, уровень кота не трогаем
   if (d && !d.settings) d.settings = {};
   if (d) d.settings = { ...SETTINGS, ...d.settings }; // новые переключатели — со значением по умолчанию
@@ -194,11 +196,15 @@ export const catXp = () => get().xp; // опыт, набранный к след
 export const skinsOwned = () => get().skins;
 export const selectedSkin = () => get().skin;
 
+// Надеть окрас на выбранную сейчас породу (ультракот или обычный кот). Пока любой открытый окрас подходит
+// любой породе; позже у каждой породы будет свой список.
+// Родной окрас породы (look) ей доступен всегда, даже если в коллекции его нет.
 export function selectSkin(id) {
   const d = get();
-  if (!d.skins.includes(id)) return false;
-  d.skin = id;
-  d.ultra = null; // выбрал окрас обычного кота — играем обычным котом
+  const native = d.ultra && ULTRAS.find((u) => u.id === d.ultra)?.look === id;
+  if (!d.skins.includes(id) && !native) return false;
+  if (d.ultra) d.breedSkins = { ...d.breedSkins, [d.ultra]: id };
+  else d.skin = id;
   write();
   return true;
 }
@@ -221,15 +227,20 @@ export const ultrasOwned = () => get().ultras;
 export const selectedUltra = () => ULTRAS.find((u) => u.id === get().ultra) ?? null;
 export const ultraPrice = (u) => (u.gift ? null : CONFIG.ultraPrices[u.tier]);
 
-// Каким окрасом рисовать кота сейчас: ультракот — своим (пока — окрасом-заменой look), иначе выбранный окрас.
-export function catLook() {
-  const u = selectedUltra();
-  return u ? u.look : get().skin;
+// Окрас породы: id ультракота — его окрас (выбранный или по умолчанию look); null — обычного кота.
+export function breedSkin(id) {
+  const d = get();
+  if (!id) return d.skin;
+  return d.breedSkins?.[id] ?? ULTRAS.find((u) => u.id === id)?.look ?? d.skin;
 }
 
+// Каким окрасом рисовать кота сейчас — окрас выбранной породы.
+export const catLook = () => breedSkin(get().ultra);
+
+// Выбрать породу; null — обычный кот («Найдёныш»).
 export function selectUltra(id) {
   const d = get();
-  if (!d.ultras.includes(id)) return false;
+  if (id !== null && !d.ultras.includes(id)) return false;
   d.ultra = id;
   write();
   return true;

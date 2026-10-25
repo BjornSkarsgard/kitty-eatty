@@ -7,7 +7,7 @@ import { beatPulse } from '../beat.js';
 import { sfx, music } from '../audio.js';
 import {
   currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo, lives, loseLife, infiniteLeft,
-  boosters, boosterUnlocked, spendBooster, buyBooster, selectedUltra, ultLeft, spendUlt,
+  boosters, boosterUnlocked, spendBooster, buyBooster, selectedUltra, ultLeft, spendUlt, catLook,
 } from '../core/save.js';
 import { ULTS_READY } from '../theme/cats/ultras.js';
 import { hintFor } from '../core/hint.js';
@@ -339,7 +339,7 @@ export class GameScene extends Phaser.Scene {
     if (ultOn) {
       // на кнопке ульты — голова ультракота из частей (пока окраса-замены): глаза открыты и моргают; золотая подложка
       const b = this.trayBtns.ult;
-      const head = new CatView(this, 0, 0, this.ultra.look, { headOnly: true }).setMood('open');
+      const head = new CatView(this, 0, 0, catLook(), { headOnly: true }).setMood('open');
       const box = head.getBounds();
       const k = (U.iconButton * 0.74) / Math.max(box.width, box.height);
       head.setScale(k).setPosition(-box.centerX * k, -box.centerY * k - 2);

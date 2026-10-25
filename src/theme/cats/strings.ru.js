@@ -83,6 +83,10 @@ export const STR = {
   tabSkins: 'Окрасы',
   tabNames: 'Клички',
   tabUltras: 'Породы',
+  breedRegular: 'Найдёныш', // обычный кот, с тобой с самого начала
+  regularInfo: 'Обычный кот — с тобой с самого начала. Ульты нет, зато свой!',
+  changeSkin: 'Изменить окрас',
+  skinFor: (breed) => `Окрас: ${breed}`,
   levelShort: (n) => `Ур. ${n}`,
   soon: 'Скоро',
   ultraGiftAt: (n) => `Подарок на ${n} уровне`,

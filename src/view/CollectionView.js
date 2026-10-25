@@ -5,16 +5,18 @@ import { makeButton } from './Button.js';
 import { sfx } from '../audio.js';
 import { NAMES, checkCustomName } from '../theme/cats/names.js';
 import {
-  skinsOwned, selectedSkin, selectSkin, buySkin, coins,
+  skinsOwned, selectSkin, buySkin, coins,
   namesOwned, selectedName, selectName, buyName, customName, nameTokens, setCustomName, CUSTOM,
-  ultrasOwned, selectedUltra, selectUltra, buyUltra, ultraPrice,
+  ultrasOwned, selectedUltra, selectUltra, buyUltra, ultraPrice, breedSkin, catLook,
 } from '../core/save.js';
 import { ULTRAS, ULTS_READY } from '../theme/cats/ultras.js';
 import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
 
-// Окно коллекции, три вкладки внизу: «Окрасы», «Клички» и «Породы» (ультракоты).
-// Окрасы — сетка голов кота. Открытый — в цвете, с именем; выбранный — в золотой рамке с галочкой.
+// Окно коллекции, две вкладки внизу: «Породы» (первой — обычный кот «Найдёныш», дальше ультракоты) и «Клички».
+// Под породами — «Изменить окрас»: сетка окрасов для выбранной породы (у каждой породы свой окрас; пока любой
+// открытый окрас подходит любой породе), «Готово» — назад к породам.
+// Окрасы — сетка голов кота. Открытый — в цвете, с именем; надетый — в золотой рамке с галочкой.
 // Закрытый — тёмный силуэт и подпись, как получить (цена / уровень кота / «Сундук»).
 // Клички — список страницами; цвет клетки — редкость. Своя кличка (именная табличка) — первой клеткой.
 // Тап по открытому — выбрать, по закрытому с ценой — купить, по остальным — подсказка, откуда он берётся.
@@ -48,7 +50,7 @@ export function openCollection(scene, { onChange } = {}) {
   box.add(plate(scene, 0, -ph / 2 + 4, STR.collection, { depth: 0, color: PAL.plate }).setScale(1.2));
   box.add(iconButton(scene, pw / 2 - 26, -ph / 2 + 4, 'close', close, { size: 84, shape: 'round', color: CONFIG.ui.exitColor, depth: 0 }));
 
-  let tab = 'skins';
+  let tab = 'breeds'; // 'breeds' | 'names' | 'skins' (окрасы выбранной породы)
   let page = 0;
   let grid = null;
   const text = (x, y, s, size, color = PAL.text) => scene.add.text(x, y, s, {
@@ -75,13 +77,14 @@ export function openCollection(scene, { onChange } = {}) {
   // ---------- окрасы ----------
   const drawSkins = () => {
     const owned = skinsOwned();
-    const cur = selectedUltra() ? null : selectedSkin(); // играем ультракотом — окрас обычного не отмечен
+    const cur = catLook(); // окрас выбранной породы
+    const native = selectedUltra()?.look; // родной окрас породы — ей доступен всегда
     const x0 = -((V.cols - 1) * V.cellW) / 2;
     const y0 = -ph / 2 + V.gridTop;
     CONFIG.skins.forEach((k, i) => {
       const x = x0 + (i % V.cols) * V.cellW;
       const y = y0 + Math.floor(i / V.cols) * V.cellH;
-      const have = owned.includes(k.id);
+      const have = owned.includes(k.id) || k.id === native;
       const cw = V.cellW - 14;
       const ch = V.cellH - 14;
       grid.add(cell(x, y, cw, ch, have ? PAL.panelLight : PAL.deep, 1, k.id === cur));
@@ -102,7 +105,7 @@ export function openCollection(scene, { onChange } = {}) {
 
   const tapSkin = (k, have) => {
     if (have) {
-      if (k.id === selectedSkin() && !selectedUltra()) return;
+      if (k.id === catLook()) return;
       sfx(scene, 'sfx_toggle', CONFIG.audio.toggle);
       selectSkin(k.id);
       onChange?.();
@@ -190,22 +193,23 @@ export function openCollection(scene, { onChange } = {}) {
     });
   };
 
-  // ---------- породы (ультракоты) ----------
-  // Пока своего арта нет — голова окраса-замены (look). Купленная / подаренная — в цвете с названием,
-  // остальные — силуэт и подпись: цена, «Подарок на N уровне» или «Скоро» (ульта ещё не работает).
+  // ---------- породы ----------
+  // Первой — обычный кот «Найдёныш» (есть всегда), дальше ультракоты. Своего арта у пород пока нет — голова окраса
+  // породы. Купленная / подаренная — в цвете с названием, остальные — силуэт и подпись: цена, «Ур. 100» или «Скоро».
+  const REGULAR = { id: null, name: STR.breedRegular };
   const drawUltras = () => {
     const owned = ultrasOwned();
-    const cur = selectedUltra()?.id;
+    const cur = selectedUltra()?.id ?? null;
     const x0 = -((V.cols - 1) * V.cellW) / 2;
     const y0 = -ph / 2 + V.gridTop;
-    ULTRAS.forEach((u, i) => {
+    [REGULAR, ...ULTRAS].forEach((u, i) => {
       const x = x0 + (i % V.cols) * V.cellW;
       const y = y0 + Math.floor(i / V.cols) * V.cellH;
-      const have = owned.includes(u.id);
+      const have = u === REGULAR || owned.includes(u.id);
       const cw = V.cellW - 14;
       const ch = V.cellH - 14;
       grid.add(cell(x, y, cw, ch, have ? PAL.panelLight : PAL.deep, 1, u.id === cur));
-      const file = CONFIG.skins.find((k) => k.id === u.look).file;
+      const file = CONFIG.skins.find((k) => k.id === (have ? breedSkin(u.id) : u.look)).file;
       const head = scene.add.image(x, y - 14, `cat_${file}_head`);
       head.setScale(V.head / Math.max(head.width, head.height));
       if (!have) head.setTint(PAL.silhouette).setAlpha(0.75); // силуэт
@@ -218,9 +222,21 @@ export function openCollection(scene, { onChange } = {}) {
       else grid.add(priceLabel(x - 14, ly, price));
       if (u.id === cur) grid.add(check(x + cw / 2 - 18, y - ch / 2 + 18));
       const zone = scene.add.zone(x, y, cw, ch).setInteractive();
-      zone.on('pointerdown', () => tapUltra(u, have));
+      zone.on('pointerdown', () => (u === REGULAR ? tapRegular() : tapUltra(u, have)));
       grid.add(zone);
     });
+    // окрас выбранной породы
+    grid.add(makeButton(scene, 0, ph / 2 - 140, STR.changeSkin, () => { tab = 'skins'; draw(); }, {
+      w: 380, h: 74, size: 32, color: PAL.buyGreen,
+    }));
+  };
+
+  const tapRegular = () => {
+    if (!selectedUltra()) return showPopup(scene, { title: STR.breedRegular, text: STR.regularInfo, buttons: [{ label: STR.ok }] });
+    sfx(scene, 'sfx_toggle', CONFIG.audio.toggle);
+    selectUltra(null);
+    onChange?.();
+    draw();
   };
 
   const tapUltra = (u, have) => {
@@ -272,10 +288,18 @@ ${u.gift ? STR.ultraGiftAt(u.gift) : STR.ultraSoon}`,
     if (tab === 'skins') drawSkins();
     else if (tab === 'names') drawNames();
     else drawUltras();
+    if (tab === 'skins') {
+      // окрасы породы: внизу — для какой породы и «Готово» (назад к породам)
+      grid.add(text(-130, ph / 2 - 52, STR.skinFor(selectedUltra()?.name ?? STR.breedRegular), 26));
+      grid.add(makeButton(scene, 170, ph / 2 - 52, STR.done, () => { tab = 'breeds'; draw(); }, {
+        w: 220, h: 74, size: 32, color: PAL.gold,
+      }));
+      return;
+    }
     // вкладки внизу: выбранная — жёлтая
-    [['skins', STR.tabSkins, -205], ['names', STR.tabNames, 0], ['ultras', STR.tabUltras, 205]].forEach(([key, label, x]) => {
+    [['breeds', STR.tabUltras, -140], ['names', STR.tabNames, 140]].forEach(([key, label, x]) => {
       grid.add(makeButton(scene, x, ph / 2 - 52, label, () => { if (tab !== key) { tab = key; page = 0; draw(); } }, {
-        w: 196, h: 74, size: 30, color: tab === key ? PAL.gold : PAL.plate,
+        w: 260, h: 74, size: 32, color: tab === key ? PAL.gold : PAL.plate,
       }));
     });
   };

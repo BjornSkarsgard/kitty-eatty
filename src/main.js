@@ -18,11 +18,11 @@ if (import.meta.env.DEV) {
     url.searchParams.delete('give');
     history.replaceState(null, '', url);
   }
-  // ?set=milestone,chests2,gifts3,coins850 (или level25) — выставить точно, см. devSet в src/core/save.js
+  // ?set=milestone,chests2,gifts3,coins850,cat8,jars3,hints2 (или level25) — выставить точно, см. devSet в src/core/save.js
   const set = url.searchParams.get('set');
   if (set) {
     const n = (key) => { const m = set.match(new RegExp(`${key}(\\d+)`)); return m ? Number(m[1]) : null; };
-    devSet({ milestone: /milestone/.test(set), level: n('level') ?? 0, chests: n('chests'), gifts: n('gifts'), coins: n('coins') });
+    devSet({ milestone: /milestone/.test(set), level: n('level') ?? 0, chests: n('chests'), gifts: n('gifts'), coins: n('coins'), cat: n('cat'), jars: n('jars'), hints: n('hints') });
     url.searchParams.delete('set');
     history.replaceState(null, '', url);
   }

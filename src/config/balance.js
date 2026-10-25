@@ -120,5 +120,17 @@ export const BALANCE = {
     chapter: 20,
     hard: { at: [7, 14], colors: 1, dead: 0.2, tries: 2 },
     nightmare: { colors: 1, dead: 0.35, tries: 3 },
+    // Механики (блокеры), docs/meta.md. intro — первый уровень с механикой (окно «Новинка!»), до него её нет;
+    // дальше — на доле share уровней (на сложных и кошмарных ×kindBoost). Случайность — своя (seed + 1),
+    // поэтому уровни без механик такие же, как без этого раздела.
+    //   hiddenPart — скрытый корм «?»: каждая не верхняя порция скрыта с шансом part (верхняя всегда видна);
+    //   hiddenFull — скрыто всё, кроме верхних порций (вместо hiddenPart, не вместе);
+    //   ice — замороженные банки: jars штук (с уровня jars2From — до двух), тает после thaw[0]…thaw[1] собранных банок.
+    mechanics: {
+      hiddenPart: { intro: 8, share: 0.3, part: 0.45 },
+      hiddenFull: { intro: 41, share: 0.2 },
+      ice: { intro: 21, share: 0.25, jars2From: 80, thaw: [1, 2] },
+      kindBoost: 1.5,
+    },
   },
 };

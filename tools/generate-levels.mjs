@@ -8,7 +8,9 @@ import { Board } from '../src/core/Board.js';
 import { scramble, solve, deadEndRate, keyOf, isComplete, isNearComplete, rng } from './lib.mjs';
 
 const G = CONFIG.levelGen;
+const MX = G.mechanics;
 const rand = rng(G.seed);
+const mrand = rng(G.seed + 1); // для механик — отдельно, чтобы не сдвигать раскладки остальных уровней
 const lerp = (a, b, t) => a + (b - a) * t;
 
 // Сложный или кошмарный уровень n (место в главе) — или null.
@@ -66,6 +68,51 @@ function tierParams(n, breather) {
   throw new Error(`Нет ступени для уровня ${n}`);
 }
 
+// Какие механики на уровне n: { hiddenPart, hiddenFull, ice } и intro — какая здесь впервые.
+function mechanicsFor(n, kind) {
+  const k = kind ? MX.kindBoost : 1;
+  const on = (m) => n === m.intro || (n > m.intro && mrand() < m.share * k);
+  const res = { ice: on(MX.ice), hiddenFull: on(MX.hiddenFull) };
+  res.hiddenPart = !res.hiddenFull && on(MX.hiddenPart);
+  res.intro = n === MX.hiddenPart.intro ? 'hidden' : n === MX.ice.intro ? 'ice' : n === MX.hiddenFull.intro ? 'hiddenFull' : null;
+  if (res.intro) { // на уровне-знакомстве — только новая механика
+    res.ice = res.intro === 'ice';
+    res.hiddenFull = res.intro === 'hiddenFull';
+    res.hiddenPart = res.intro === 'hidden';
+  }
+  return res;
+}
+
+// Лёд: выбираем банки и сколько собрать до таяния; солвер проверяет, что уровень так решается.
+// Возвращает { ice: [[банка, k], …], sol } или null.
+function placeIce(bowls, cap, n) {
+  const count = n >= MX.ice.jars2From && mrand() < 0.5 ? 2 : 1;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const ice = bowls.map(() => 0);
+    const list = [];
+    for (let j = 0; j < count; j++) {
+      let i;
+      do i = Math.floor(mrand() * bowls.length); while (ice[i]);
+      const k = MX.ice.thaw[0] + Math.floor(mrand() * (MX.ice.thaw[1] - MX.ice.thaw[0] + 1));
+      ice[i] = k;
+      list.push([i, k]);
+    }
+    const sol = solve(bowls, cap, 500_000, ice);
+    if (sol) return { ice: list, iceArr: ice, sol };
+  }
+  return null;
+}
+
+// Скрытый корм: маска по банкам (1 — скрыта), верхняя порция всегда видна.
+function hideMask(bowls, full) {
+  const mask = bowls.map((b) => b.map((_, s) => (s < b.length - 1 && (full || mrand() < MX.hiddenPart.part) ? 1 : 0)));
+  if (!full && !mask.flat().some(Boolean)) { // хоть одна скрытая
+    const i = bowls.findIndex((b) => b.length > 1);
+    if (i >= 0) mask[i][0] = 1;
+  }
+  return mask;
+}
+
 // Проверка решения настоящей игровой логикой.
 function verify(level) {
   const b = new Board(level);
@@ -97,16 +144,31 @@ for (let n = 1; n <= G.count; n++) {
   }
   if (!best) throw new Error(`Не удалось сгенерировать уровень ${n} (${JSON.stringify(p)})`);
 
+  const mech = mechanicsFor(n, p.kind);
+  let sol = best.sol;
+  let dead = best.dead;
+  let ice = null;
+  if (mech.ice) {
+    const placed = placeIce(best.bowls, p.capacity, n);
+    if (placed) {
+      ice = placed.ice;
+      sol = placed.sol;
+      dead = deadEndRate(best.bowls, p.capacity, mrand, 80, 400, placed.iceArr);
+    } else if (mech.intro === 'ice') throw new Error(`Не удалось заморозить банку на уровне-знакомстве ${n}`);
+  }
   const level = {
     id: n,
     capacity: p.capacity,
-    minMoves: best.sol.moves.length,
-    difficulty: Math.round(best.dead * 100) / 100,
+    minMoves: sol.moves.length,
+    difficulty: Math.round(dead * 100) / 100,
     bowls: best.bowls,
-    solution: best.sol.moves,
+    solution: sol.moves,
   };
   if (p.puzzle) level.puzzle = true;
   if (p.kind) level.kind = p.kind;
+  if (ice) level.ice = ice;
+  if (mech.hiddenFull || mech.hiddenPart) level.hidden = hideMask(best.bowls, mech.hiddenFull);
+  if (mech.intro) level.intro = mech.intro;
   if (!verify(level)) throw new Error(`Решение уровня ${n} не прошло проверку игровой логикой`);
   used.add(best.key);
   levels.push(level);
@@ -130,6 +192,10 @@ for (let i = 0; i < levels.length; i += 10) {
 const puzzles = levels.filter((l) => l.puzzle);
 console.log('\nГоловоломки (1 пустая миска, в средних выше не учтены):');
 console.log(puzzles.map((l) => `${l.id}: ${Math.max(...l.bowls.flat()) + 1} цв, ${l.minMoves} х, ${l.difficulty}`).join(' | '));
+const withIce = levels.filter((l) => l.ice).map((l) => l.id);
+const withHidden = levels.filter((l) => l.hidden).map((l) => l.id);
+console.log(`
+Лёд — ${withIce.length} уровней (первый ${withIce[0]}), скрытый корм — ${withHidden.length} (первый ${withHidden[0]})`);
 const special = levels.filter((l) => l.kind);
 console.log('\nСложные (h) и кошмарные (N), в средних выше не учтены:');
 console.log(special.map((l) => `${l.id}${l.kind === 'hard' ? 'h' : 'N'}: ${Math.max(...l.bowls.flat()) + 1} цв, ${l.minMoves} х, ${l.difficulty}`).join(' | '));

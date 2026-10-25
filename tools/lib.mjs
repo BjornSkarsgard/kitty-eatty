@@ -1,5 +1,8 @@
 // Общие функции генератора: правила ходов (как в src/core/Board.js), солвер A*, обратные ходы, оценка трудности.
 // Миска — массив порций снизу вверх, порция — индекс цвета.
+// ice — лёд (необязательно): ice[i] = k — банка i заморожена, пока не собрано k банок (0 / нет — не заморожена).
+// Собранную банку разобрать нельзя, поэтому число собранных только растёт, и растаявшая банка больше не замерзает:
+// заморожена ли банка — видно по самому состоянию, хранить отдельно не нужно.
 
 export function topRun(b) {
   if (!b.length) return 0;
@@ -17,21 +20,26 @@ export const isSolved = (st, cap) => st.every((b) => !b.length || isComplete(b, 
 export const isNearComplete = (b, cap) =>
   (b.length === cap - 1 || b.length === cap) && b.slice(0, cap - 1).every((c) => c === b[0]);
 
-// Канонический ключ: порядок мисок не важен.
-export const keyOf = (st) => st.map((b) => b.join(',')).sort().join('|');
+// Канонический ключ: порядок мисок не важен — кроме замороженных (у них своя метка).
+export const keyOf = (st, ice) => st.map((b, i) => b.join(',') + (ice?.[i] ? `#${ice[i]}` : '')).sort().join('|');
+
+export const completedCount = (st, cap) => st.reduce((n, b) => n + (isComplete(b, cap) ? 1 : 0), 0);
+// Заморожена ли сейчас банка i.
+const frozen = (ice, i, done) => !!ice && ice[i] > done;
 
 // Все разумные ходы [from, to, n]. Отсекаем заведомо бесполезные:
 // переливание целой однотонной миски в пустую и перебор нескольких пустых мисок.
-export function legalMoves(st, cap) {
+export function legalMoves(st, cap, ice) {
   const res = [];
+  const done = ice ? completedCount(st, cap) : 0;
   for (let f = 0; f < st.length; f++) {
     const s = st[f];
-    if (!s.length || isComplete(s, cap)) continue;
+    if (!s.length || isComplete(s, cap) || frozen(ice, f, done)) continue;
     const c = s[s.length - 1];
     const run = topRun(s);
     let emptyTried = false;
     for (let t = 0; t < st.length; t++) {
-      if (t === f) continue;
+      if (t === f || frozen(ice, t, done)) continue;
       const d = st[t];
       if (d.length >= cap) continue;
       if (d.length) {
@@ -102,24 +110,24 @@ class Heap {
 }
 
 // Минимальное решение A*. Возвращает { moves: [[from,to],...], expanded } или null.
-export function solve(start, cap, maxExpanded = 2_000_000) {
-  const startKey = keyOf(start);
+export function solve(start, cap, maxExpanded = 2_000_000, ice = null) {
+  const startKey = keyOf(start, ice);
   const g = new Map([[startKey, 0]]);
   const heap = new Heap();
   heap.push({ st: start, g: 0, f: heuristic(start), prev: null, move: null });
   let expanded = 0;
   while (heap.size) {
     const node = heap.pop();
-    if (node.g > g.get(keyOf(node.st))) continue;
+    if (node.g > g.get(keyOf(node.st, ice))) continue;
     if (isSolved(node.st, cap)) {
       const moves = [];
       for (let n = node; n.prev; n = n.prev) moves.push([n.move[0], n.move[1]]);
       return { moves: moves.reverse(), expanded };
     }
     if (++expanded > maxExpanded) return null;
-    for (const m of legalMoves(node.st, cap)) {
+    for (const m of legalMoves(node.st, cap, ice)) {
       const ns = applyMove(node.st, m);
-      const k = keyOf(ns);
+      const k = keyOf(ns, ice);
       const ng = node.g + 1;
       if (g.has(k) && g.get(k) <= ng) continue;
       g.set(k, ng);
@@ -181,18 +189,18 @@ export function rng(seed) {
 
 // Трудность: доля случайных прохождений, зашедших в тупик (0 — легко, 1 — без мысли не пройти).
 // Игрок-бот ходит случайно, но не возвращается в уже виденные состояния.
-export function deadEndRate(start, cap, rand, playouts = 120, maxSteps = 400) {
+export function deadEndRate(start, cap, rand, playouts = 120, maxSteps = 400, ice = null) {
   let fails = 0;
   for (let p = 0; p < playouts; p++) {
     let st = start;
-    const seen = new Set([keyOf(st)]);
+    const seen = new Set([keyOf(st, ice)]);
     let ok = false;
     for (let step = 0; step < maxSteps; step++) {
       if (isSolved(st, cap)) { ok = true; break; }
-      const opts = legalMoves(st, cap).map((m) => applyMove(st, m)).filter((ns) => !seen.has(keyOf(ns)));
+      const opts = legalMoves(st, cap, ice).map((m) => applyMove(st, m)).filter((ns) => !seen.has(keyOf(ns, ice)));
       if (!opts.length) break;
       st = opts[Math.floor(rand() * opts.length)];
-      seen.add(keyOf(st));
+      seen.add(keyOf(st, ice));
     }
     if (!ok) fails++;
   }

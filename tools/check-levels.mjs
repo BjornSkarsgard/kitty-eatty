@@ -1,7 +1,8 @@
 // Независимая проверка готовых уровней: npm run levels:check
 // - каждый уровень решается солвером, минимум ходов совпадает с записанным;
 // - записанное решение проходит через игровую логику (src/core/Board.js);
-// - в каждом цвете ровно `capacity` порций, нет собранных мисок на старте, нет повторов.
+// - в каждом цвете ровно `capacity` порций, нет собранных мисок на старте, нет повторов;
+// - лёд — в пределах банок (решается с учётом льда), маска скрытого корма — по банкам, верхние порции видны.
 import { readFileSync } from 'node:fs';
 import { CONFIG } from '../src/config.js';
 import { Board } from '../src/core/Board.js';
@@ -25,7 +26,14 @@ for (const l of levels) {
   if (seen.has(key)) err('повтор другого уровня');
   seen.add(key);
 
-  const sol = solve(l.bowls, l.capacity);
+  const ice = l.ice ? l.bowls.map(() => 0) : null;
+  for (const [i, k] of l.ice ?? []) {
+    if (!(i >= 0 && i < l.bowls.length && k >= 1)) err(`лёд [${i}, ${k}] вне банок`);
+    else ice[i] = k;
+  }
+  if (l.hidden && (l.hidden.length !== l.bowls.length || l.hidden.some((h, i) => h.length !== l.bowls[i].length || h[h.length - 1])))
+    err('маска скрытого корма не совпадает с банками или скрыта верхняя порция');
+  const sol = solve(l.bowls, l.capacity, 2_000_000, ice);
   if (!sol) err('солвер не нашёл решения');
   else if (sol.moves.length !== l.minMoves) err(`минимум ходов ${sol.moves.length}, записано ${l.minMoves}`);
 

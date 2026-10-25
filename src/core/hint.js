@@ -1,7 +1,7 @@
 // Подсказка «Нюх»: ход берётся из решения, заранее записанного в JSON уровня (игра ничего не ищет сама).
 // Позиции решения — поле после 0, 1, 2… его ходов. Поле игрока совпало с одной из них — подсказываем следующий
-// ход решения. Не совпало — игрок ушёл с пути: ищем последний момент в его истории, когда поле совпадало,
-// и предлагаем откатиться туда (дальше — снова по решению). Банки «+1 банка» в конце списка: пустые не мешают
+// ход решения. Не совпало — игрок ушёл с пути: ищем последний момент в его истории (ходы, обмены, ульты),
+// когда поле совпадало, и предлагаем откатиться туда (дальше — снова по решению). Банки «+1 банка» в конце списка: пустые не мешают
 // совпадению, с кормом — поле уже не из решения.
 import { Board } from './Board.js';
 
@@ -29,15 +29,14 @@ export function hintFor(level, board) {
   const at = (bowls) => (extrasEmpty(bowls, n) ? steps.get(keyOf(bowls, n)) : undefined);
   const k = at(board.bowls);
   if (k !== undefined) return k < level.solution.length ? { move: level.solution[k] } : null;
-  // прокручиваем историю игрока с начала и запоминаем последнюю позицию на пути решения
-  const replay = new Board(level);
-  while (replay.bowls.length < board.bowls.length) replay.addBowl();
-  replay.caps = [...board.caps];
-  let last = 0;
-  board.history.forEach((rec, h) => {
-    if (rec.swap) replay.swap(...rec.swap);
-    else replay.move(rec.from, rec.to);
-    if (at(replay.bowls) !== undefined) last = h + 1;
-  });
-  return { back: board.history.length - last };
+  // откатываем копию поля с конца (ходы, обмены, ульты), пока не попадём на позицию решения
+  const copy = Object.assign(Object.create(Board.prototype), structuredClone({ ...board, changes: undefined }));
+  copy.changes = { revealed: [], thawed: [] };
+  let back = 0;
+  while (copy.history.length) {
+    copy.undo();
+    back++;
+    if (at(copy.bowls) !== undefined) break;
+  }
+  return { back };
 }

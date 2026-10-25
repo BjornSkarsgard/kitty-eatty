@@ -1,6 +1,6 @@
 import { CONFIG } from '../config.js';
 import { makeButton } from './Button.js';
-import { panel, plate, iconButton } from './ui.js';
+import { panel, plate, iconButton, makeIcon } from './ui.js';
 import { sfx } from '../audio.js';
 import { devEdit, devState, devSet, catNeed } from '../core/save.js';
 import { MILESTONES } from '../core/milestones.js';
@@ -11,17 +11,26 @@ import { PALETTE as PAL } from '../theme/cats/palette.js';
 // окно с кнопками — монеты, уровень кота, жизни, умения, сундуки и подарки, ульта, уровень игры, открыть всё.
 // Меняет сохранение сразу; onClose — после закрытия (холл перерисовывается целиком). Тексты здесь — только для тестов,
 // поэтому не в strings.ru.js.
-// onChange — после каждой кнопки (обновить верхнюю полосу); ключ ещё раз — закрыть панель.
+// onChange — после каждой кнопки (обновить верхнюю полосу). Пока панель открыта, на месте ключа — красный крестик:
+// тап по нему закрывает панель.
 export function addDevButton(scene, x, y, onClose, onChange) {
   if (!TEST_TOOLS) return null;
   let close = null;
   const btn = iconButton(scene, x, y, 'none', () => {
     if (close) return close();
-    close = openDevPanel(scene, () => { close = null; onClose?.(); }, onChange);
+    close = openDevPanel(scene, () => { close = null; setOpen(false); onClose?.(); }, onChange);
+    setOpen(true);
   }, {
     size: 84, shape: 'round', color: PAL.adOrange, depth: 26,
   }).setScrollFactor(0);
-  btn.add(scene.add.text(0, -2, '🔧', { fontSize: '44px' }).setOrigin(0.5));
+  const wrench = scene.add.text(0, -2, '🔧', { fontSize: '44px' }).setOrigin(0.5);
+  const cross = makeIcon(scene, 'close', 84 * 0.62).setPosition(0, -3).setVisible(false);
+  btn.add([wrench, cross]);
+  const setOpen = (on) => {
+    btn.setColor(on ? CONFIG.ui.exitColor : PAL.adOrange);
+    wrench.setVisible(!on);
+    cross.setVisible(on);
+  };
   return btn;
 }
 
@@ -41,8 +50,6 @@ export function openDevPanel(scene, onClose, onChange) {
   box.add(panel(scene, pw, ph));
   box.add(scene.add.zone(0, 0, pw, ph).setInteractive());
   box.add(plate(scene, 0, -ph / 2 + 4, 'Разработка', { depth: 0, color: PAL.plate }));
-  // крестик слева: справа над панелью — ключ и шестерёнка
-  box.add(iconButton(scene, -pw / 2 + 30, -ph / 2 + 4, 'close', close, { size: 76, shape: 'round', color: CONFIG.ui.exitColor, depth: 0 }));
 
   // что сейчас в сохранении
   const status = scene.add.text(0, -ph / 2 + 62, '', {

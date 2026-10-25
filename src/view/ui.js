@@ -353,6 +353,7 @@ export function settingsMenu(scene, x, y, items, actions = [], { size = 84, dept
     if (on !== open) sfx(scene, 'sfx_swipe', CONFIG.audio.swipe, on ? 1.2 : 1);
     open = on;
     catcher.setVisible(open);
+    gear.onToggle?.(open); // кто-то рядом прячется, пока меню открыто (ключ панели разработчика)
     col.forEach((b, i) => {
       scene.tweens.killTweensOf(b);
       if (open) {

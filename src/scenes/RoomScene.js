@@ -106,9 +106,11 @@ export class RoomScene extends Phaser.Scene {
     const U = CONFIG.ui;
     this.coinPill = counterPill(this, 30 + U.pillWidth / 2, U.topY, 'coin', coins(), { depth: 25 }).setScrollFactor(0);
     this.createLives();
-    addSettingsMenu(this);
-    // тесты: ключ под шестерёнкой — панель разработчика; закрыли — холл заново (всё перечитывается из сохранения)
-    addDevButton(this, W - 62, U.topY + 110, () => this.scene.restart({ zone: 'home' }), () => this.refreshTop());
+    const gear = addSettingsMenu(this);
+    // тесты: ключ под шестерёнкой — панель разработчика; закрыли — холл заново (всё перечитывается из сохранения).
+    // Меню шестерёнки выпадает на его место — пока оно открыто, ключ спрятан.
+    const dev = addDevButton(this, W - 62, U.topY + 110, () => this.scene.restart({ zone: 'home' }), () => this.refreshTop());
+    if (dev) gear.onToggle = (open) => dev.setVisible(!open);
     this.tabs = tabBar(this, TABS.map((z) => ({ ...z, enabled: z.enabled ? z.enabled() : true })), (i) => this.goTo(i + 1));
     this.mapBack = iconButton(this, 62, U.topY + 110, 'close', () => this.collapseMap(), {
       size: 84, shape: 'round', color: CONFIG.ui.exitColor, depth: 26,

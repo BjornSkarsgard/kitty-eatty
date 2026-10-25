@@ -1,6 +1,6 @@
 // Чистая логика поля, без Phaser. Миска — массив порций снизу вверх, порция — индекс цвета.
 // capacity — сколько порций одного цвета (столько же вмещает обычная банка); caps — вместимость каждой банки
-// (больше capacity — банка увеличена ультой «Большая миска» или запасная банка ультракота).
+// (больше capacity — запасная банка ультракота).
 export class Board {
   constructor(level) {
     this.capacity = level.capacity;
@@ -53,11 +53,32 @@ export class Board {
     return n;
   }
 
-  // Откатывает последний ход. Возвращает его запись или null.
+  // Ульта «Ловкие лапы»: поменять местами две порции [банка, место снизу]. Собранные банки не трогаем.
+  // Ход записывается в историю ({ swap: [a, b] }) — отмена возвращает как было. false — нельзя.
+  canSwap([b1, s1], [b2, s2]) {
+    const ok = (b, s) => s >= 0 && s < this.bowls[b].length && !this.isComplete(b);
+    return ok(b1, s1) && ok(b2, s2) && !(b1 === b2 && s1 === s2);
+  }
+
+  swap(a, b) {
+    if (!this.canSwap(a, b)) return false;
+    this.exchange(a, b);
+    this.history.push({ swap: [a, b] });
+    return true;
+  }
+
+  exchange([b1, s1], [b2, s2]) {
+    const t = this.bowls[b1][s1];
+    this.bowls[b1][s1] = this.bowls[b2][s2];
+    this.bowls[b2][s2] = t;
+  }
+
+  // Откатывает последний ход (или обмен). Возвращает его запись или null.
   undo() {
     const rec = this.history.pop();
     if (!rec) return null;
-    this.bowls[rec.from].push(...this.bowls[rec.to].splice(-rec.n));
+    if (rec.swap) this.exchange(...rec.swap);
+    else this.bowls[rec.from].push(...this.bowls[rec.to].splice(-rec.n));
     return rec;
   }
 

@@ -34,8 +34,9 @@ export function hintFor(level, board) {
   while (replay.bowls.length < board.bowls.length) replay.addBowl();
   replay.caps = [...board.caps];
   let last = 0;
-  board.history.forEach(({ from, to }, h) => {
-    replay.move(from, to);
+  board.history.forEach((rec, h) => {
+    if (rec.swap) replay.swap(...rec.swap);
+    else replay.move(rec.from, rec.to);
     if (at(replay.bowls) !== undefined) last = h + 1;
   });
   return { back: board.history.length - last };

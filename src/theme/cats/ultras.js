@@ -2,11 +2,11 @@
 // (id из CONFIG.skins), которым порода выглядит, пока не нарисована.
 //   tier — ярус цены (CONFIG.ultraPrices); gift — даётся в подарок за прохождение уровня с этим номером (не продаётся);
 //   soon — ульта нужна для механики, которой ещё нет (блокеры): пока не продаётся;
-//   ult — id ульты (в игре сейчас работает только 'bigJar'), ultName / ultText — для окон;
+//   ult — id ульты (готовые — ULTS_READY), ultName / ultText — для окон;
 //   boost — чем сильнее стандартные умения (jarCap — запасная банка вмещает на столько порций больше).
 export const ULTRAS = [
-  { id: 'mainecoon', name: 'Мейн-кун', look: 'brown', tier: 0, gift: 100, ult: 'bigJar', ultName: 'Большая миска',
-    ultText: 'Одна банка до конца уровня вмещает на 2 порции больше', boost: { jarCap: 1 }, boostText: 'Запасная банка — на порцию больше' },
+  { id: 'mainecoon', name: 'Мейн-кун', look: 'brown', tier: 0, gift: 100, ult: 'swap', ultName: 'Ловкие лапы',
+    ultText: 'Поменять местами две любые порции на поле — хоть со дна банки', boost: { jarCap: 1 }, boostText: 'Запасная банка — на порцию больше' },
   { id: 'sphynx', name: 'Сфинкс', look: 'peach', tier: 0, ult: 'paw', ultName: 'Лапа',
     ultText: 'Достать любую порцию из середины банки и положить сверху' },
   { id: 'abyssinian', name: 'Абиссинская', look: 'orange', tier: 0, ult: 'leap', ultName: 'Прыжок',
@@ -38,4 +38,4 @@ export const ULTRAS = [
 ];
 
 // Ульты, которые уже работают в игре. Породу с неготовой ультой пока не продаём («Скоро»).
-export const ULTS_READY = new Set(['bigJar']);
+export const ULTS_READY = new Set(['swap']);

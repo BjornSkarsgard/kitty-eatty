@@ -51,13 +51,14 @@ export class GameScene extends Phaser.Scene {
     this.moved = false; // был ли ход — тогда «Заново» и выход сжигают жизнь
     this.extraJars = 0; // сколько банок добавлено умением «+1 банка»
     this.scaleCap = undefined; // масштаб банок с запасом под «+1 банка» — считается заново на каждом уровне
-    // ультракот: ульта восстанавливается за CONFIG.ultRecharge уровней (save.ultLeft), ultPick — ждём тап по банке
+    // ультракот: ульта восстанавливается за CONFIG.ultRecharge уровней (save.ultLeft); ultPick — ждём тап по порции,
+    // ultFirst — первая выбранная порция [банка, место]
     this.ultra = selectedUltra();
     this.ultPick = false;
-    // насколько выше обычной может стать банка (место в рядах — с начала уровня): «Большая миска» +2,
-    // запасная банка ультракота +boost.jarCap
+    this.ultFirst = null;
+    // насколько выше обычной может стать банка (место в рядах — с начала уровня): запасная банка ультракота +boost.jarCap
     const U2 = this.ultra;
-    this.reserveSlots = Math.max(U2?.ult === 'bigJar' ? CONFIG.ultBigJar.extra : 0, U2?.boost?.jarCap ?? 0);
+    this.reserveSlots = U2?.boost?.jarCap ?? 0;
     this.pulsing = new Set(); // порции, которые пульсируют в такт музыке
     this.glass = null;
     // всё про котиков — фон кухни, банки, корм, коты, кормление — в теме (src/theme/cats/kitchen.js)
@@ -216,7 +217,7 @@ export class GameScene extends Phaser.Scene {
     this.zones = this.bowlRects.map((r, i) => {
       const zone = this.add.zone(r.x, (r.top - this.dim.neck + r.bottom) / 2, this.dim.bw + this.dim.gx * 0.9,
         r.bottom - r.top + this.dim.neck + this.dim.gy * 0.9).setInteractive();
-      zone.on('pointerdown', () => this.onBowlTap(i));
+      zone.on('pointerdown', (p) => this.onBowlTap(i, p));
       return zone;
     });
   }
@@ -266,9 +267,9 @@ export class GameScene extends Phaser.Scene {
 
   // ---------- ввод ----------
 
-  onBowlTap(i) {
+  onBowlTap(i, pointer) {
     if (this.won) return;
-    if (this.ultPick) return this.applyUlt(i);
+    if (this.ultPick) return this.pickForUlt(i, pointer);
     if (this.selected === null) {
       if (this.board.canPick(i)) this.select(i);
       else this.shake(i);
@@ -397,13 +398,7 @@ export class GameScene extends Phaser.Scene {
     this.fly(moved, to, startSlot);
     this.settleBowl(from); // если серия влезла не вся — остаток опускается обратно
 
-    if (this.board.isComplete(to)) {
-      this.theme.jarComplete(to, this.board.bowls[to][0]);
-    }
-    if (this.board.isSolved()) {
-      this.won = true;
-      this.time.delayedCall(A.winDelay, () => this.showWin());
-    }
+    this.afterChange([to]);
   }
 
   // Бейджи на отмене и умениях — сколько осталось; 0 — вместо бейджа цена (тап — покупка); не открытое умение — бледное;
@@ -496,8 +491,9 @@ export class GameScene extends Phaser.Scene {
       });
   }
 
-  // Ульта ультракота (раз за уровень, бесплатно). «Большая миска»: тап по кнопке — выбери банку (надпись сверху),
-  // тап по банке — она вырастает на CONFIG.ultBigJar.extra порций до конца уровня. Повторный тап по кнопке — отмена.
+  // Ульта ультракота (бесплатно, восстанавливается за CONFIG.ultRecharge уровней). «Ловкие лапы»: тап по кнопке —
+  // «выбери порцию», тап по порции (любой, хоть со дна) — она светится, тап по второй — мейн-кун меняет их местами.
+  // Повторный тап по кнопке — отмена. Обмен — ход в истории: отмена хода возвращает как было (заряд не возвращается).
   ult() {
     if (this.won) return;
     if (ultLeft()) {
@@ -505,31 +501,94 @@ export class GameScene extends Phaser.Scene {
       return showPopup(this, { title: this.ultra.ultName, text: STR.ultCharging(ultLeft()), buttons: [{ label: STR.ok }] });
     }
     this.deselect();
-    this.ultPick = !this.ultPick;
-    this.ultPrompt?.destroy();
-    this.ultPrompt = null;
-    if (!this.ultPick) return;
+    if (this.ultPick) return this.endUltPick();
+    this.ultPick = true;
     sfx(this, 'sfx_pick');
-    this.ultPrompt = plate(this, CONFIG.width / 2, CONFIG.layout.bowlsTop - 40, STR.ultPick(this.ultra.ultName), { color: PAL.plate }).setDepth(16);
+    this.setUltPrompt(STR.ultPick(this.ultra.ultName));
+  }
+
+  setUltPrompt(text) {
+    this.ultPrompt?.destroy();
+    this.ultPrompt = plate(this, CONFIG.width / 2, CONFIG.layout.bowlsTop - 40, text, { color: PAL.plate }).setDepth(16);
     this.tweens.add({ targets: this.ultPrompt, scale: 1.06, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
   }
 
-  applyUlt(i) {
-    if (this.board.isComplete(i)) return this.shake(i); // съеденную банку не увеличить
+  endUltPick() {
+    if (this.ultFirst) this.stopPulse(this.portions[this.ultFirst[0]][this.ultFirst[1]]);
     this.ultPick = false;
+    this.ultFirst = null;
     this.ultPrompt?.destroy();
     this.ultPrompt = null;
-    spendUlt();
-    this.board.caps[i] += CONFIG.ultBigJar.extra;
-    this.rebuildJars();
-    // банка вытягивается вверх
-    for (const j of [this.jarBack[i], this.jarFront[i]]) {
-      j.setAlpha(0.3);
-      this.tweens.add({ targets: j, alpha: 1, duration: 400, ease: 'Quad.easeOut' });
+  }
+
+  // Какая порция под пальцем: место по высоте тапа (выше корма — верхняя).
+  slotAt(i, pointer) {
+    const n = this.board.bowls[i].length;
+    if (!n) return -1;
+    const r = this.bowlRects[i];
+    const s = Math.floor((r.bottom - this.dim.floor - pointer.worldY) / this.dim.ph);
+    return Phaser.Math.Clamp(s, 0, n - 1);
+  }
+
+  pickForUlt(i, pointer) {
+    const slot = pointer ? this.slotAt(i, pointer) : this.board.bowls[i].length - 1;
+    const here = [i, slot];
+    if (slot < 0 || this.board.isComplete(i)) return this.shake(i); // пусто или банка уже съедена
+    if (!this.ultFirst) {
+      this.ultFirst = here;
+      sfx(this, 'sfx_pick');
+      this.pulse(this.portions[i][slot]);
+      return this.setUltPrompt(STR.ultPick2);
     }
-    this.fxStars.explode(14, this.bowlRects[i].x, this.mouthY(i));
+    const first = this.ultFirst;
+    if (first[0] === i && first[1] === slot) return this.endUltPick(); // та же порция — снять выбор
+    this.endUltPick();
+    if (!this.board.swap(first, here)) return this.shake(i);
+    spendUlt();
+    this.moved = true;
+    this.swapSprites(first, here);
+    this.fxStars.explode(10, this.bowlRects[first[0]].x, this.slotPos(...first).y);
+    this.fxStars.explode(10, this.bowlRects[i].x, this.slotPos(...here).y);
     sfx(this, 'sfx_star', CONFIG.audio.star);
     this.refreshUndo();
+    this.afterChange([first[0], i]);
+  }
+
+  // Порции меняются местами в списках и перелетают крест-накрест.
+  swapSprites([b1, s1], [b2, s2]) {
+    const p1 = this.portions[b1][s1];
+    const p2 = this.portions[b2][s2];
+    this.portions[b1][s1] = p2;
+    this.portions[b2][s2] = p1;
+    this.flyTo(p1, this.slotPos(b2, s2), 0);
+    this.flyTo(p2, this.slotPos(b1, s1), A.moveStagger);
+  }
+
+  flyTo(p, dst, delay) {
+    this.tweens.killTweensOf(p);
+    this.stopPulse(p);
+    p.setAlpha(1).setDepth(5);
+    const x0 = p.x;
+    const y0 = p.y;
+    const arc = A.moveArc * this.dim.scale * 1.5;
+    p.flyT = 0;
+    this.tweens.add({
+      targets: p, flyT: 1, delay, duration: A.moveDuration * 1.3, ease: 'Sine.easeInOut',
+      onUpdate: () => {
+        const t = p.flyT;
+        p.setPosition(x0 + (dst.x - x0) * t, y0 + (dst.y - y0) * t - arc * 4 * t * (1 - t));
+      },
+      onComplete: () => { p.setDepth(0); sfx(this, 'sfx_drop'); },
+    });
+  }
+
+  // После хода или обмена: собранные банки — коту, всё собрано — победа.
+  afterChange(bowls) {
+    for (const b of new Set(bowls)) if (this.board.isComplete(b)) this.theme.jarComplete(b, this.board.bowls[b][0]);
+    if (this.board.isSolved()) {
+      this.won = true;
+      this.time.delayedCall(A.winDelay, () => this.showWin());
+    }
   }
 
   // «Нюх»: подсказать ход из решения уровня; игрок ушёл с пути — сначала предложить откатиться.
@@ -577,6 +636,7 @@ export class GameScene extends Phaser.Scene {
   // Отмена тратит общий запас; запас кончился — предлагаем купить за монеты (позже — за рекламу).
   undo() {
     if (this.won) return;
+    if (this.ultPick) this.endUltPick();
     this.deselect();
     const last = this.board.history[this.board.history.length - 1];
     if (!last) return;
@@ -595,6 +655,12 @@ export class GameScene extends Phaser.Scene {
     const last = this.board.history[this.board.history.length - 1];
     if (!last) return;
     sfx(this, 'sfx_undo', CONFIG.audio.undo);
+    if (last.swap) {
+      // обмен собрал банку — кот бросает есть
+      for (const b of new Set(last.swap.map(([x]) => x))) if (this.board.isComplete(b)) this.theme.jarUndone(this.board.bowls[b][0]);
+      this.board.undo();
+      return this.swapSprites(...last.swap);
+    }
     if (this.board.isComplete(last.to)) this.theme.jarUndone(this.board.bowls[last.to][0]);
 
     const startSlot = this.portions[last.from].length;

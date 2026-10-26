@@ -191,7 +191,7 @@ export class MapView {
     const side = p.x > W / 2 ? -1 : 1; // к середине карты — там тропинка не мешает
     const bx = p.x + side * M.nodeSize * M.milestoneX;
     const by = p.y - M.nodeSize * 0.15;
-    const box = closedBox(scene, ms.chapter ? 'chest' : 'gift', M.milestoneSize).setPosition(bx, by);
+    const box = closedBox(scene, ms.reward.chests ? 'chest' : 'gift', M.milestoneSize).setPosition(bx, by);
     top.add(box);
     parts.push(box);
     if (done) {
@@ -206,7 +206,8 @@ export class MapView {
     scene.tweens.add({ targets: box, y: by - 8, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     // что внутри — плашка под подарком
     const R = ms.reward;
-    const [icon, label] = R.chests ? ['coin', `${R.coins} + ∞ ${STR.infiniteMin(R.infiniteMin)}`]
+    // конец главы — монеты и ∞; середина — мелочь (сундук на первом рубеже виден самой коробкой)
+    const [icon, label] = R.coins ? ['coin', `${R.coins} + ∞ ${STR.infiniteMin(R.infiniteMin)}`]
       : R.undos ? ['undo', `×${R.undos}`] : R.hints ? ['hint', `×${R.hints}`] : ['heart', `×${R.lives}`];
     const chip = scene.add.container(bx, by + M.milestoneSize * 0.62);
     const t = scene.add.text(14, 0, label, {

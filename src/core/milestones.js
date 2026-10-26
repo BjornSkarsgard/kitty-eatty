@@ -11,6 +11,7 @@ function build() {
   for (let id = M.every; id <= CONFIG.levelGen.count; id += M.every) {
     const chapter = id % CHAPTER === 0;
     const reward = { coins: 0, undos: 0, hints: 0, lives: 0, chests: 0, infiniteMin: 0, ...(chapter ? M.chapter : M.cycle[k++ % M.cycle.length]) };
+    if (id === M.firstChest) reward.chests += 1;
     list.push({ id, chapter, reward });
   }
   return list;

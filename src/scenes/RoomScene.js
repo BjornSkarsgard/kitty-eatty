@@ -134,7 +134,7 @@ export class RoomScene extends Phaser.Scene {
     const got = claimMilestones();
     if (got) {
       this.map.redraw();
-      return openBox(this, got.chapter ? 'chest' : 'gift', got.items, () => { this.afterBox(); this.showMilestones(); }, { title: STR.journeyTitle });
+      return openBox(this, got.items.some((it) => it.icon === 'chest') ? 'chest' : 'gift', got.items, () => { this.afterBox(); this.showMilestones(); }, { title: STR.journeyTitle });
     }
     const ultra = claimUltraGift();
     if (ultra) {

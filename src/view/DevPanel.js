@@ -21,7 +21,7 @@ export function addDevButton(scene, x, y, onClose, onChange) {
     close = openDevPanel(scene, () => { close = null; setOpen(false); onClose?.(); }, onChange);
     setOpen(true);
   }, {
-    size: 84, shape: 'round', color: PAL.adOrange, depth: 26,
+    size: 84, shape: 'round', color: PAL.adOrange, depth: 80, // над самой панелью (70): крестик закрытия — эта же кнопка
   }).setScrollFactor(0);
   // надпись «DEV» шрифтом игры (кнопка только для тестов — своего арта не нужно)
   const wrench = scene.add.text(0, -3, 'DEV', {

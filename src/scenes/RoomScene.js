@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { CatView } from '../theme/cats/CatView.js';
 import { adHomeButton, openAdLadder } from '../view/RewardView.js';
+import { preloadRewarded } from '../rewarded.js';
 import { stockShelves, openPacks, openCoinPacks, openUltras, openGoods, offerUltra } from '../view/ShopView.js';
 import { MapView } from '../view/MapView.js';
 import { makeButton } from '../view/Button.js';
@@ -99,6 +100,7 @@ export class RoomScene extends Phaser.Scene {
   }
 
   create() {
+    preloadRewarded(); // ролик за награду грузится заранее (жизнь за ролик, лесенка, магазин)
     this.windows = new Set(); // открытые окна (view/ui.js trackWindow) — сцена переиспользуется, список с нуля
     this.slots = SLOTS.map((s, i) => this.createSlot(s, i));
     this.createShop(this.slots[slotOf('shop')].room);

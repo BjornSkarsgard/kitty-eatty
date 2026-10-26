@@ -14,7 +14,8 @@ import { CatView } from '../theme/cats/CatView.js';
 import { ULTRAS, ULTS_READY } from '../theme/cats/ultras.js';
 import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
-import { coins, buyGoods, buyUltra, ultrasOwned, ultraPrice, breedSkin } from '../core/save.js';
+import { coins, buyGoods, buyUltra, ultrasOwned, ultraPrice, breedSkin, adsState, adCoins, adGoods, adLife } from '../core/save.js';
+import { showRewardedAd } from '../ads.js';
 
 const font = () => `"${CONFIG.font}", sans-serif`;
 // подписи на полках смотрят через камеру с сильным приближением — текст рисуем с запасом по чёткости
@@ -241,15 +242,38 @@ export function openPacks(scene, { only } = {}) {
   });
 }
 
-// Пачки монет за рубли.
-export function openCoinPacks(scene) {
+// Кнопка «за ролик»: оранжевая с иконкой ролика; можно — тап показывает ролик, нельзя — бледная с подписью why.
+function adButton(scene, w, why, onWatched) {
+  const b = makeButton(scene, 0, 0, why || '', () => { if (!why) showRewardedAd(scene, onWatched); },
+    { w, h: 64, size: 22, color: why ? PAL.buttonDisabled : PAL.adOrange });
+  if (!why) b.add(makeIcon(scene, 'video', 46));
+  return b;
+}
+
+// Сколько ждать: мс → «через N мин» / «завтра».
+const waitText = (ms) => (ms === Infinity ? STR.ads.tomorrow : STR.ads.wait(Math.ceil(ms / 60000)));
+
+// Пачки монет за рубли; первая строка — монеты за ролик (CONFIG.ads.shopCoins). onChange — монеты начислены.
+export function openCoinPacks(scene, onChange) {
   const V = CONFIG.shopWindow;
   const list = CONFIG.shop.coinPacks;
   const rh = V.rowH;
-  const h = 150 + list.length * (rh + 14);
-  shopWindow(scene, STR.shop.coins, h, (box) => {
+  const h = 150 + (list.length + 1) * (rh + 14);
+  shopWindow(scene, STR.shop.coins, h, (box, close) => {
+    const A = CONFIG.ads.shopCoins;
+    const left = adsState().coinsLeft;
+    const y0 = -h / 2 + 120 + rh / 2;
+    row(scene, box, y0, V.width - 40, rh, {
+      icon: artIcon(scene, 'coins_2', rh * 0.8), title: STR.ads.coinsRow(A.coins), lines: [STR.ads.left(left, A.perDay)],
+    }, [adButton(scene, 170, left ? null : STR.ads.tomorrow, () => {
+      if (!adCoins()) return;
+      sfx(scene, 'sfx_coins', CONFIG.audio.coins);
+      onChange?.();
+      close();
+      openCoinPacks(scene, onChange);
+    })]);
     list.forEach((p, i) => {
-      const y = -h / 2 + 120 + i * (rh + 14) + rh / 2;
+      const y = -h / 2 + 120 + (i + 1) * (rh + 14) + rh / 2;
       row(scene, box, y, V.width - 40, rh, { icon: artIcon(scene, `coins_${i + 1}`, rh * 0.8), title: STR.shop.packCoins(p.coins) },
         [priceButton(scene, 0, 0, 170, { rub: p.price })]);
     });
@@ -265,15 +289,26 @@ export function openGoods(scene, g, onBought) {
     g.options.forEach((o, i) => {
       const y = -h / 2 + 115 + i * (rh + 10) + rh / 2;
       const buttons = [];
+      // за ролик: самый дешёвый вариант умения — раз в час; одна жизнь — CONFIG.ads.life
+      const ad = adOffer(g, o, i);
+      if (ad) {
+        buttons.push(adButton(scene, 120, ad.why, () => {
+          if (!ad.take()) return;
+          sfx(scene, 'sfx_coins', CONFIG.audio.coins);
+          close();
+          onBought?.();
+          openGoods(scene, g, onBought);
+        }));
+      }
       if (o.coins != null) {
-        buttons.push(priceButton(scene, 0, 0, 150, { coinsPrice: o.coins }, () => {
+        buttons.push(priceButton(scene, 0, 0, ad ? 120 : 150, { coinsPrice: o.coins }, () => {
           if (!buyGoods(o.coins, o.give)) return coins() < o.coins ? notEnough(scene) : null;
           sfx(scene, 'sfx_coins', CONFIG.audio.coins);
           close();
           onBought?.();
         }));
       }
-      if (o.rub != null) buttons.push(priceButton(scene, 0, 0, 150, { rub: o.rub }));
+      if (o.rub != null) buttons.push(priceButton(scene, 0, 0, ad ? 120 : 150, { rub: o.rub }));
       // две кнопки — рядом по горизонтали
       const g2 = scene.add.graphics();
       const w = V.width - 40;
@@ -284,9 +319,23 @@ export function openGoods(scene, g, onBought) {
       box.add(scene.add.text(-w / 2 + rh * 0.95, y, STR.shop.amount(g.icon, o), {
         fontFamily: font(), fontStyle: 'bold', fontSize: '28px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 6,
       }).setOrigin(0, 0.5));
-      buttons.forEach((b, j) => box.add(b.setPosition(w / 2 - 85 - (buttons.length - 1 - j) * 160, y)));
+      const bw = ad ? 128 : 160;
+      buttons.forEach((b, j) => box.add(b.setPosition(w / 2 - bw / 2 - 10 - (buttons.length - 1 - j) * bw, y)));
     });
   });
+}
+
+// Вариант товара за ролик: { why — почему нельзя сейчас (null — можно), take() — начислить }, или null — не за ролик.
+// Умения: только первый (самый дешёвый) вариант, раз в CONFIG.ads.goodsEveryMin; жизни: одна жизнь, CONFIG.ads.life.
+function adOffer(g, o, i) {
+  const st = adsState();
+  if (g.icon === 'heart') {
+    if (o.n !== 1 || o.minutes || o.forever) return null;
+    return { why: st.lifeWait ? waitText(st.lifeWait) : null, take: () => adLife() };
+  }
+  if (i !== 0) return null;
+  const wait = st.goodsWait(g.icon);
+  return { why: wait ? waitText(wait) : null, take: () => adGoods(g.icon, o.give) };
 }
 
 // Все ультракоты: голова, порода, цена (или «Есть»). onPick(u, again) — тап по коту: окно с пояснением открывается

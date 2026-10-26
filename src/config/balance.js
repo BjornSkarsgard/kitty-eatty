@@ -1,8 +1,17 @@
 // Баланс: экономика, жизни, опыт кота, сундуки, подарок дня, генерация уровней, флаги рекламы и магазина.
 // Собирается в CONFIG (src/config.js).
 export const BALANCE = {
-  // Реклама (этап 6). Пока выключена: кнопки «за рекламу» не показываются.
-  ads: { enabled: false },
+  // Реклама за награды (src/ads.js). enabled — настоящий SDK (этап 6); пока выключен: в тестовой сборке вместо ролика
+  // окно «тестовая реклама», в обычной — «скоро».
+  // ladder — лесенка на главной (иконка ролика): после at роликов за день — награда; shopCoins — монеты в магазине;
+  // goodsEveryMin — самый дешёвый вариант подсказки / банки / отмены раз в столько минут; life — жизнь за ролик.
+  ads: {
+    enabled: false,
+    ladder: [{ at: 1, coins: 50 }, { at: 3, coins: 150 }, { at: 5, chests: 1 }],
+    shopCoins: { coins: 100, perDay: 3 },
+    goodsEveryMin: 60,
+    life: { perDay: 3, everyMin: 60 },
+  },
   // Магазин (src/view/ShopView.js): вкладка открыта, товары за монеты работают. Рубли — после ИП (payments,
   // RuStore Pay SDK): до тех пор на кнопках «Скоро». Цены в рублях здесь — только витрина: настоящие приходят из
   // RuStore (CLAUDE.md: цены и состав — на сервере, начислять только после проверки). Бесплатное за ролик — ads.enabled.
@@ -29,36 +38,35 @@ export const BALANCE = {
     // give — что начислить (src/core/save.js buyGoods). Цены — черновик, утрясём.
     goods: [
       { icon: 'hint', options: [
-        { n: 1, coins: 50, rub: 29, give: { hints: 1 } },
-        { n: 5, coins: 220, rub: 59, give: { hints: 5 } },
-        { n: 15, coins: 600, rub: 149, give: { hints: 15 } },
-        { n: 30, coins: 1100, rub: 249, give: { hints: 30 } },
+        { n: 1, coins: 50, rub: 19, give: { hints: 1 } },
+        { n: 5, coins: 220, rub: 29, give: { hints: 5 } },
+        { n: 15, coins: 600, rub: 59, give: { hints: 15 } },
+        { n: 30, coins: 1100, rub: 149, give: { hints: 30 } },
       ] },
       { icon: 'addjar', options: [
-        { n: 1, coins: 100, rub: 29, give: { jars: 1 } },
-        { n: 5, coins: 450, rub: 99, give: { jars: 5 } },
-        { n: 15, coins: 1250, rub: 279, give: { jars: 15 } },
-        { n: 30, coins: 2300, rub: 499, give: { jars: 30 } },
+        { n: 1, coins: 100, rub: 19, give: { jars: 1 } },
+        { n: 5, coins: 450, rub: 29, give: { jars: 5 } },
+        { n: 15, coins: 1250, rub: 99, give: { jars: 15 } },
+        { n: 30, coins: 2300, rub: 279, give: { jars: 30 } },
       ] },
       { icon: 'undo', options: [
-        { n: 5, coins: 130, rub: 29, give: { undos: 5 } },
-        { n: 15, coins: 360, rub: 79, give: { undos: 15 } },
-        { n: 30, coins: 650, rub: 149, give: { undos: 30 } },
-        { n: 45, coins: 900, rub: 199, give: { undos: 45 } },
+        { n: 5, coins: 130, rub: 19, give: { undos: 5 } },
+        { n: 15, coins: 360, rub: 29, give: { undos: 15 } },
+        { n: 30, coins: 650, rub: 79, give: { undos: 30 } },
+        { n: 45, coins: 900, rub: 149, give: { undos: 45 } },
       ] },
       { icon: 'heart', options: [
-        { n: 1, coins: 100, rub: 29, give: { lives: 1 } },
-        { n: 5, coins: 450, rub: 99, give: { lives: 5 } },
-        { icon: 'infinite', minutes: 30, coins: 250, rub: 59, give: { infiniteMin: 30 } },
-        { icon: 'infinite', minutes: 60, coins: 400, rub: 99, give: { infiniteMin: 60 } },
-        { icon: 'infinite', minutes: 720, coins: 2500, rub: 449, give: { infiniteMin: 720 } },
-        { icon: 'infinite', minutes: 1440, coins: 4000, rub: 699, give: { infiniteMin: 1440 } },
-        { icon: 'infinite', minutes: 4320, coins: 10000, rub: 1490, give: { infiniteMin: 4320 } },
-        { icon: 'infinite', minutes: 10080, coins: 20000, rub: 2990, give: { infiniteMin: 10080 } },
-        { icon: 'infinite', forever: true, rub: 4990 },
+        { n: 1, coins: 100, rub: 19, give: { lives: 1 } },
+        { n: 5, coins: 450, rub: 59, give: { lives: 5 } },
+        { icon: 'infinite', minutes: 30, coins: 250, rub: 29, give: { infiniteMin: 30 } },
+        { icon: 'infinite', minutes: 60, coins: 400, rub: 59, give: { infiniteMin: 60 } },
+        { icon: 'infinite', minutes: 720, coins: 2500, rub: 99, give: { infiniteMin: 720 } },
+        { icon: 'infinite', minutes: 1440, coins: 4000, rub: 449, give: { infiniteMin: 1440 } },
+        { icon: 'infinite', minutes: 4320, coins: 10000, rub: 999, give: { infiniteMin: 4320 } },
+        { icon: 'infinite', minutes: 10080, coins: 20000, rub: 1499, give: { infiniteMin: 10080 } },
+        { icon: 'infinite', forever: true, rub: 2990 },
       ] },
     ],
-    free: { coins: 50, perDay: 3 }, // за ролик: монет за просмотр, сколько раз в день
   },
 
   // Экономика: монеты и общий запас отмен хода (src/core/save.js).

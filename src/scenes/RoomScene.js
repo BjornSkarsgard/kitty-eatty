@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { CatView } from '../theme/cats/CatView.js';
+import { adHomeButton, openAdLadder } from '../view/AdsView.js';
 import { stockShelves, openPacks, openCoinPacks, openUltras, openGoods, offerUltra } from '../view/ShopView.js';
 import { MapView } from '../view/MapView.js';
 import { makeButton } from '../view/Button.js';
@@ -444,6 +445,8 @@ export class RoomScene extends Phaser.Scene {
     room.add([title, shadow, this.cat, play, xp]);
     this.refreshName();
     this.createBoxes(room);
+    const AB = HC.adButton;
+    room.add(adHomeButton(this, AB.x, AB.y, () => openAdLadder(this, () => this.afterBox())));
   }
 
   // По бокам от «Играть»: сундук (число неоткрытых) и подарок дня («!», если можно забрать).
@@ -696,7 +699,7 @@ export class RoomScene extends Phaser.Scene {
     };
     if (what === 'starter') openPacks(this, { only: true });
     else if (what === 'packs') openPacks(this);
-    else if (what === 'coins') openCoinPacks(this);
+    else if (what === 'coins') openCoinPacks(this, () => this.refreshTop());
     else if (what === 'ultra') offerUltra(this, data, bought);
     else if (what === 'ultras') openUltras(this, (u, again) => offerUltra(this, u, () => { bought(); again(); }));
     else if (what === 'goods') openGoods(this, data, bought);

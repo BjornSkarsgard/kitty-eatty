@@ -30,7 +30,7 @@ import { dailyReward } from './daily.js';
 import { TEST_TOOLS } from '../dev.js';
 
 const KEY = 'kittyeatty.save';
-const VERSION = 15;
+const VERSION = 16;
 const E = CONFIG.economy;
 const C = CONFIG.catXp;
 const LV = CONFIG.lives;
@@ -42,7 +42,11 @@ const START_NAMES = NAMES.filter((n) => n.start).map((n) => n.id);
 export const CUSTOM = '#custom';
 
 const SETTINGS = { sound: true, music: true, fx: true, vibro: true, track: CONFIG.audio.tracks[0] };
-const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, hints: B.hint.start, jars: B.jar.start, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, daily: { last: null, streak: 0 }, infiniteUntil: null, msDone: 0, ultras: [], ultra: null, ultraIntro: false, ultCharge: CONFIG.ultRecharge, breedSkins: {},
+// Награды за рекламу на сегодня (CONFIG.ads): day — какой день, watched — сколько роликов в лесенке на главной,
+// coins — сколько раз брали монеты в магазине, lives — жизни за ролик, lifeAt — когда последняя;
+// goodsAt — { hint, addjar, undo }: когда последний раз брали умение за ролик (раз в час, не по дням).
+const emptyAds = () => ({ day: null, watched: 0, coins: 0, lives: 0, lifeAt: 0, goodsAt: {} });
+const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, hints: B.hint.start, jars: B.jar.start, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, daily: { last: null, streak: 0 }, ads: emptyAds(), infiniteUntil: null, msDone: 0, ultras: [], ultra: null, ultraIntro: false, ultCharge: CONFIG.ultRecharge, breedSkins: {},
   names: [...START_NAMES], name: START_NAMES[0], custom: null, nameTokens: 0, settings: { ...SETTINGS } });
 
 // Старые версии сохранения дополняем до текущей, прогресс не теряется.
@@ -78,6 +82,7 @@ function migrate(d) {
   if (d.v === 13) d = { ...d, v: 14, breedSkins: {} };
   // подарок дня по кругу из 7 → серия входов: забранные дни круга становятся днями серии
   if (d.v === 14) d = { ...d, v: 15, daily: { last: d.daily.last, streak: d.daily.day || 0, shield: true, clean: 0, extra: d.daily.extra || 0 } };
+  if (d.v === 15) d = { ...d, v: 16, ads: emptyAds() };
   if (d && !Number.isFinite(d.xp)) d.xp = 0; // битый опыт — с нуля, уровень кота не трогаем
   if (d && !d.settings) d.settings = {};
   if (d) d.settings = { ...SETTINGS, ...d.settings }; // новые переключатели — со значением по умолчанию
@@ -635,6 +640,86 @@ export function buyGoods(price, give) {
   d.undos += give.undos || 0;
   if (give.lives) giveLives(d, give.lives);
   if (give.infiniteMin) d.infiniteUntil = Math.max(Date.now(), d.infiniteUntil || 0) + give.infiniteMin * 60 * 1000;
+  write();
+  return true;
+}
+
+// ---------- награды за рекламу ----------
+
+// Счётчики на сегодня: новый день — лесенка, монеты и жизни с нуля (умения — по часам, их не трогаем).
+function adsToday(d) {
+  if (!d.ads) d.ads = emptyAds();
+  if (d.ads.day !== today()) d.ads = { ...d.ads, day: today(), watched: 0, coins: 0, lives: 0 };
+  return d.ads;
+}
+
+const HOUR = 60 * 60 * 1000;
+
+// Что сейчас можно за ролик: { watched — роликов в лесенке, coinsLeft — монет в магазине осталось раз,
+// livesLeft, lifeWait — мс до следующей жизни (0 — можно), goodsWait(kind) — мс до умения (0 — можно) }.
+export function adsState() {
+  const A = CONFIG.ads;
+  const a = adsToday(get());
+  const now = Date.now();
+  const lifeWait = a.lives >= A.life.perDay ? Infinity : Math.max(0, (a.lifeAt || 0) + A.life.everyMin * 60000 - now);
+  return {
+    watched: a.watched,
+    coinsLeft: Math.max(0, A.shopCoins.perDay - a.coins),
+    livesLeft: Math.max(0, A.life.perDay - a.lives),
+    lifeWait,
+    goodsWait: (kind) => Math.max(0, (a.goodsAt[kind] || 0) + A.goodsEveryMin * 60000 - now),
+  };
+}
+
+// Ролик лесенки на главной досмотрен: шаг вперёд; на шагах из CONFIG.ads.ladder — награда (монеты или сундук).
+// Возвращает { step, reward } (reward — { coins } / { chests } / null) или null — на сегодня всё.
+export function adLadder() {
+  const d = get();
+  const a = adsToday(d);
+  const L = CONFIG.ads.ladder;
+  if (a.watched >= L[L.length - 1].at) return null;
+  a.watched += 1;
+  const r = L.find((x) => x.at === a.watched) ?? null;
+  if (r?.coins) d.coins += r.coins;
+  if (r?.chests) d.chests += r.chests;
+  write();
+  return { step: a.watched, reward: r };
+}
+
+// Монеты за ролик в магазине; false — на сегодня всё.
+export function adCoins() {
+  const d = get();
+  const a = adsToday(d);
+  if (a.coins >= CONFIG.ads.shopCoins.perDay) return false;
+  a.coins += 1;
+  d.coins += CONFIG.ads.shopCoins.coins;
+  write();
+  return true;
+}
+
+// Самый дешёвый вариант умения (give) за ролик — раз в час на каждое; false — ещё рано.
+export function adGoods(kind, give) {
+  const d = get();
+  const a = adsToday(d);
+  if ((a.goodsAt[kind] || 0) + CONFIG.ads.goodsEveryMin * 60000 > Date.now()) return false;
+  a.goodsAt = { ...a.goodsAt, [kind]: Date.now() };
+  d.hints += give.hints || 0;
+  d.jars += give.jars || 0;
+  d.undos += give.undos || 0;
+  write();
+  return true;
+}
+
+// Жизнь за ролик: не больше CONFIG.ads.life.perDay в день и не чаще раза в everyMin; false — нельзя (или жизни полные).
+export function adLife() {
+  const d = get();
+  const A = CONFIG.ads.life;
+  const a = adsToday(d);
+  refill(d);
+  if (a.lives >= A.perDay || (a.lifeAt || 0) + A.everyMin * 60000 > Date.now() || d.lives >= LV.max) return false;
+  a.lives += 1;
+  a.lifeAt = Date.now();
+  giveLives(d, 1);
   write();
   return true;
 }

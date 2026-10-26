@@ -35,6 +35,12 @@ export function applyMusicSetting() {
   if (current?.sound) fade(current.sound, musicVolume(), CONFIG.audio.musicFade);
 }
 
+// Фоновая музыка — трек, выбранный в настройках (нет такого файла — первый из загруженных).
+export function gameMusic(scene) {
+  const T = CONFIG.audio.tracks;
+  music(scene, [setting('track'), ...T].find((k) => has(scene, k)) ?? T[0]);
+}
+
 export function music(scene, key) {
   if (current && current.key === key) return;
   stopMusic();

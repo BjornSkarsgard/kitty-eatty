@@ -6,7 +6,7 @@ import { makeButton } from '../view/Button.js';
 import { counterPill, tabBar, iconButton, plate, infinityMark, closeWindows } from '../view/ui.js';
 import { addSettingsMenu } from '../view/settings.js';
 import { panDuration, panFx, hud } from '../view/transition.js';
-import { music, sfx } from '../audio.js';
+import { gameMusic, sfx } from '../audio.js';
 import { beatPhase } from '../beat.js';
 import {
   currentLevel, unlockedLevel, levelPassed, coins, catLevel, lives, livesRefillLeft, skinsOwned,
@@ -119,7 +119,7 @@ export class RoomScene extends Phaser.Scene {
     }).setScrollFactor(0).setVisible(false);
     this.setupHudCamera();
     this.setupInput();
-    music(this, 'music_game');
+    gameMusic(this);
     this.layout();
     if (this.fromKitchen) this.backFromKitchen();
     else this.showMilestones();

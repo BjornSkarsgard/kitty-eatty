@@ -380,9 +380,14 @@ export function settingsMenu(scene, x, y, items, actions = [], { size = 84, dept
   };
   catcher.on('pointerdown', () => toggle(false));
   const gear = iconButton(scene, x, y, 'gear', () => toggle(), { size, shape: 'round', depth: depth + 1, sound: null }).setScrollFactor(0);
+  // it.onTap(refresh) — вместо переключения своё действие (окно выбора); refresh() — перекрасить кнопку
   items.forEach((it) => {
     const on = () => (it.get() ? U.onColor : U.offColor);
     const b = iconButton(scene, x, y, it.icon, () => {
+      if (it.onTap) {
+        toggle(false);
+        return it.onTap(() => b.setColor(on()));
+      }
       it.set(!it.get());
       b.setColor(on());
       sfx(scene, 'sfx_toggle', CONFIG.audio.toggle, it.get() ? 1 : CONFIG.audio.toggleOff); // выключение — ниже тоном

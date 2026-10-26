@@ -4,7 +4,7 @@ import { Board } from '../core/Board.js';
 import { CatsLevel } from '../theme/cats/kitchen.js';
 import { CatView } from '../theme/cats/CatView.js';
 import { beatPulse } from '../beat.js';
-import { sfx, music } from '../audio.js';
+import { sfx, gameMusic } from '../audio.js';
 import { haptic } from '../haptics.js';
 import {
   currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo, lives, loseLife, infiniteLeft,
@@ -72,7 +72,7 @@ export class GameScene extends Phaser.Scene {
     this.theme = new CatsLevel(this);
     this.theme.createBackground();
     this.createEffects();
-    music(this, 'music_game');
+    gameMusic(this);
 
     // верхняя полоса: монеты, табличка уровня (у головоломки — сиреневая), настройки
     const U = CONFIG.ui;

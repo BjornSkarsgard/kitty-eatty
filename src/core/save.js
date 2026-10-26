@@ -41,7 +41,7 @@ const NAMES = CONFIG.nameList; // список кличек — из темы (t
 const START_NAMES = NAMES.filter((n) => n.start).map((n) => n.id);
 export const CUSTOM = '#custom';
 
-const SETTINGS = { sound: true, music: true, fx: true, vibro: true };
+const SETTINGS = { sound: true, music: true, fx: true, vibro: true, track: CONFIG.audio.tracks[0] };
 const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, hints: B.hint.start, jars: B.jar.start, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, daily: { last: null, streak: 0 }, infiniteUntil: null, msDone: 0, ultras: [], ultra: null, ultraIntro: false, ultCharge: CONFIG.ultRecharge, breedSkins: {},
   names: [...START_NAMES], name: START_NAMES[0], custom: null, nameTokens: 0, settings: { ...SETTINGS } });
 

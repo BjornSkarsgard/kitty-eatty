@@ -10,6 +10,9 @@ const plural = (n, one, few, many) => {
 };
 
 export const STR = {
+  musicTitle: 'Музыка',
+  musicOff: 'Без музыки',
+  tracks: { music_lofi: 'Кошачий сон', music_game: 'Мяу-песенка' }, // названия треков CONFIG.audio.tracks
   gameTitle: 'Накорми котиков',
   loading: 'Загрузка…',
 

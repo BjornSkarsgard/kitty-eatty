@@ -5,6 +5,7 @@ import { CatsLevel } from '../theme/cats/kitchen.js';
 import { CatView } from '../theme/cats/CatView.js';
 import { beatPulse } from '../beat.js';
 import { sfx, gameMusic } from '../audio.js';
+import { preloadRewarded } from '../rewarded.js';
 import { haptic } from '../haptics.js';
 import {
   currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo, lives, loseLife, infiniteLeft,
@@ -47,6 +48,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
+    preloadRewarded(); // ролик для бегунка в окне победы грузится, пока идёт уровень
     this.windows = new Set(); // открытые окна (view/ui.js trackWindow) — сцена переиспользуется, список с нуля
     const level = LEVELS[this.levelIndex];
     this.board = new Board(level);

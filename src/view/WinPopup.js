@@ -1,7 +1,7 @@
 import { CONFIG } from '../config.js';
 import { makeButton } from './Button.js';
 import { iconButton, plate, makeIcon, panel, kindBadge } from './ui.js';
-import { showRewardedAd } from '../rewarded.js';
+import { showRewardedAd, rewardedReady } from '../rewarded.js';
 import { showPopup } from './Popup.js';
 import { addWinBoost } from '../core/save.js';
 import { sfx } from '../audio.js';
@@ -66,7 +66,7 @@ export function showWinPopup(scene, { level, reward, isLast, fxStars, onNext, on
     if (icon === 'coin') coinText = t;
     box.add(t);
   });
-  if (reward.coins && level.id >= CONFIG.economy.winBoost.from) winBoost(scene, box, reward.coins, coinText, onTake);
+  if (reward.coins && level.id >= CONFIG.economy.winBoost.from && rewardedReady()) winBoost(scene, box, reward.coins, coinText, onTake);
   if (!items.length) {
     box.add(scene.add.text(0, WC.rewardsY, STR.alreadyPassed, {
       fontFamily: font, fontStyle: 'bold', fontSize: '32px', color: PAL.textDim,
@@ -96,8 +96,9 @@ export function showWinPopup(scene, { level, reward, isLast, fxStars, onNext, on
 }
 
 // Бегунок: шкала ×2 ×3 ×4 ×3 ×2 (CONFIG.economy.winBoost), стрелка ездит туда-обратно; на кнопке — множитель под
-// стрелкой. Нажал — стрелка встаёт, ролик; досмотрел — монеты ×k (сверху начисляется coins × (k − 1)), не досмотрел —
-// стрелка едет дальше. onTake — обновить счётчики.
+// стрелкой. Нажал — стрелка встаёт насовсем, ролик; досмотрел — монеты ×k (сверху начисляется coins × (k − 1)) или
+// сундук, не досмотрел — шкала исчезает, остаются обычные монеты. Ролик не загрузился заранее (rewardedReady) — шкалы нет.
+// onTake — обновить счётчики.
 function winBoost(scene, box, coins, coinText, onTake) {
   const WC = CONFIG.win;
   const Z = CONFIG.economy.winBoost.zones;
@@ -150,6 +151,8 @@ function winBoost(scene, box, coins, coinText, onTake) {
     run.pause();
     const k = kAt(arrow.x);
     btn.setLabel(STR.boostWatch(k));
+    const gone = () => [...parts, btn].forEach((o) => scene.tweens.add({ targets: o, alpha: 0, duration: 250, onComplete: () => o.destroy() }));
+    // попытка одна: досмотрел — награда ×k (или сундук), не досмотрел — шкала исчезает, остаются обычные монеты
     showRewardedAd(scene, () => {
       const chest = k === 'chest';
       addWinBoost(chest ? 0 : coins * (k - 1), chest ? 1 : 0);
@@ -159,21 +162,14 @@ function winBoost(scene, box, coins, coinText, onTake) {
         coinText?.setText(String(coins * k));
         scene.tweens.add({ targets: coinText, scale: 1.4, duration: 160, yoyo: true, ease: 'Quad.easeOut' });
       }
-      [...parts, btn].forEach((o) => scene.tweens.add({ targets: o, alpha: 0, duration: 250, onComplete: () => o.destroy() }));
+      gone();
       run.remove();
       onTake?.();
-    });
-    // ролик не досмотрели (окно закрыли) — стрелка едет дальше
-    scene.time.delayedCall(300, () => { if (run.isPaused() && !scene.windows?.size) run.resume(); });
+    }, () => { run.remove(); gone(); });
   }, { w: 380, h: 84, size: 34, color: PAL.adOrange });
   btn.add(makeIcon(scene, 'video', 50).setPosition(-160, 0));
   parts.push(btn);
   box.add(parts);
-  // окно рекламы закрыли без просмотра — продолжить, когда окон снова нет
-  const watch = scene.time.addEvent({ delay: 250, loop: true, callback: () => {
-    if (!btn.active) return watch.remove();
-    if (run.isPaused() && !scene.windows?.size) run.resume();
-  } });
 }
 
 // Полоска опыта в окне победы: слева кружок с уровнем кота, в полоске «опыт / нужно», справа сверху «+N опыта».

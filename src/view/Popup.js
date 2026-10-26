@@ -9,7 +9,8 @@ import { PALETTE as PAL } from '../theme/cats/palette.js';
 // (keep — переключатели: onTap(btn) сам меняет надпись кнопки через btn.setLabel).
 // Возвращает close(); у него close.setText(s) — поменять текст (таймеры) и close.isOpen().
 // Панель — заготовка ui_panel (src/view/ui.js).
-export function showPopup(scene, { title, text = '', buttons = [], depth = 50 }) {
+// onClose — окно закрылось любым способом (кнопка, тап мимо, переход по вкладке).
+export function showPopup(scene, { title, text = '', buttons = [], depth = 50, onClose }) {
   const W = CONFIG.width;
   const H = CONFIG.height;
   const parts = [];
@@ -19,6 +20,7 @@ export function showPopup(scene, { title, text = '', buttons = [], depth = 50 })
     untrack();
     untrack = null;
     parts.forEach((o) => o.destroy());
+    onClose?.();
   };
   untrack = trackWindow(scene, close);
   sfx(scene, 'sfx_popup', CONFIG.audio.popup);

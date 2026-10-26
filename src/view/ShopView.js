@@ -184,8 +184,9 @@ function paySoon(scene) {
   showPopup(scene, { title: STR.shop.soonTitle, text: STR.shop.soonText, buttons: [{ label: STR.ok }] });
 }
 
+// Монет не хватает — сразу окно покупки монет.
 function notEnough(scene) {
-  showPopup(scene, { title: STR.shop.noCoinsTitle, text: STR.shop.noCoinsText, buttons: [{ label: STR.ok }] });
+  openCoinPacks(scene);
 }
 
 // Строка товара: картинка слева, описание, кнопки цены справа.
@@ -265,8 +266,9 @@ function adButton(scene, w, wait, onWatched, onReady) {
   return b;
 }
 
-// Пачки монет за рубли; первая строка — монеты за ролик (CONFIG.ads.shopCoins). onChange — монеты начислены.
-export function openCoinPacks(scene, onChange) {
+// Пачки монет за рубли; первая строка — монеты за ролик (CONFIG.ads.shopCoins). onChange — монеты начислены
+// (по умолчанию — обновить счётчик монет сцены). Открывается и сам, когда на покупку не хватает монет.
+export function openCoinPacks(scene, onChange = () => { scene.refreshTop?.(); scene.coinPill?.setValue(coins()); }) {
   const V = CONFIG.shopWindow;
   const list = CONFIG.shop.coinPacks;
   const rh = V.coinRowH; // строк семь — пониже, чтобы окно не уходило под счётчики сверху
@@ -400,8 +402,11 @@ export function offerUltra(scene, u, onBought) {
     text: `${STR.ultraInfo(u.ultName, u.ultText, u.boostText)}\n\n${ready ? STR.buyUltraQ(price) : STR.ultraSoon}`,
     buttons: ready ? [
       {
-        label: STR.buy, color: PAL.buyGreen, disabled: coins() < price,
-        onTap: () => { if (buyUltra(u.id)) { sfx(scene, 'sfx_coins', CONFIG.audio.coins); onBought?.(); } },
+        label: STR.buy, color: PAL.buyGreen,
+        onTap: () => {
+          if (coins() < price) return notEnough(scene);
+          if (buyUltra(u.id)) { sfx(scene, 'sfx_coins', CONFIG.audio.coins); onBought?.(); }
+        },
       },
       { label: STR.no },
     ] : [{ label: STR.ok }],

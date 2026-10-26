@@ -2,6 +2,7 @@ import { CONFIG } from '../config.js';
 import { showPopup } from './Popup.js';
 import { lives, livesRefillLeft, buyLife, coins } from '../core/save.js';
 import { sfx } from '../audio.js';
+import { openCoinPacks } from './ShopView.js';
 import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
 
@@ -37,8 +38,11 @@ export function showNoLives(scene, onGot) {
   if (CONFIG.ads.enabled) buttons.push({ label: STR.adLives(L.adGives), color: PAL.adOrange, onTap: () => {} }); // этап 6
   else {
     buttons.push({
-      label: STR.buyLife(L.price), color: PAL.buyGreen, disabled: coins() < L.price,
-      onTap: () => { if (buyLife()) { sfx(scene, 'sfx_coins', CONFIG.audio.coins); onGot?.(); } },
+      label: STR.buyLife(L.price), color: PAL.buyGreen,
+      onTap: () => {
+        if (coins() < L.price) return openCoinPacks(scene); // монет не хватает — окно покупки монет
+        if (buyLife()) { sfx(scene, 'sfx_coins', CONFIG.audio.coins); onGot?.(); }
+      },
     });
   }
   buttons.push({ label: STR.wait });

@@ -556,12 +556,9 @@ export class GameScene extends Phaser.Scene {
     use();
   }
 
-  // Монет не хватает на заряд: окно (на этапе 6 — ещё «посмотреть ролик»).
+  // Монет не хватает на заряд — окно покупки монет (там же монеты за ролик).
   notEnoughCoins() {
-    const buttons = [];
-    if (CONFIG.ads.enabled) buttons.push({ label: STR.watchAd, color: PAL.adOrange, onTap: () => {} }); // этап 6
-    buttons.push({ label: STR.ok });
-    showPopup(this, { title: STR.noCoinsTitle, text: STR.coinsLeft(coins()), buttons });
+    openCoinPacks(this, () => this.refreshUndo());
   }
 
   // «+1 банка»: пустая банка до конца уровня; банки расступаются (масштаб не меняется — см. layoutBowls).

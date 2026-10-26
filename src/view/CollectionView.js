@@ -10,6 +10,7 @@ import {
   ultrasOwned, selectedUltra, selectUltra, buyUltra, ultraPrice, breedSkin, catLook,
 } from '../core/save.js';
 import { ULTRAS, ULTS_READY } from '../theme/cats/ultras.js';
+import { openCoinPacks } from './ShopView.js';
 import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
 
@@ -269,8 +270,9 @@ ${u.gift ? STR.ultraGiftAt(u.gift) : STR.ultraSoon}`,
       text: `${question}\n${STR.coinsLeft(coins())}`,
       buttons: [
         {
-          label: STR.buy, color: PAL.buyGreen, disabled: coins() < price,
+          label: STR.buy, color: PAL.buyGreen,
           onTap: () => {
+            if (coins() < price) return openCoinPacks(scene); // монет не хватает — окно покупки монет
             if (!buy()) return;
             sfx(scene, 'sfx_coins', CONFIG.audio.coins);
             onChange?.();

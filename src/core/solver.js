@@ -37,16 +37,18 @@ export const isSolved = (st, cap) => st.every((b) => !b.length || isComplete(b, 
 export const isNearComplete = (b, cap) =>
   (b.length === cap - 1 || b.length === cap) && b.slice(0, cap - 1).every((c) => c === b[0]);
 
-// Канонический ключ: порядок мисок не важен — кроме замороженных (у них своя метка).
-export const keyOf = (st, ice) => st.map((b, i) => b.join(',') + (ice?.[i] ? `#${ice[i]}` : '')).sort().join('|');
+// Канонический ключ: порядок мисок не важен — кроме замороженных (у них своя метка) и банок другой вместимости (caps).
+export const keyOf = (st, ice, caps) =>
+  st.map((b, i) => b.join(',') + (ice?.[i] ? `#${ice[i]}` : '') + (caps ? `@${caps[i]}` : '')).sort().join('|');
 
 export const completedCount = (st, cap) => st.reduce((n, b) => n + (isComplete(b, cap) ? 1 : 0), 0);
 // Заморожена ли сейчас банка i.
 const frozen = (ice, i, done) => !!ice && ice[i] > done;
 
 // Все разумные ходы [from, to, n]. Отсекаем заведомо бесполезные:
-// переливание целой однотонной миски в пустую и перебор нескольких пустых мисок.
-export function legalMoves(st, cap, ice) {
+// переливание целой однотонной миски в пустую и перебор нескольких пустых мисок (одинаковой вместимости).
+// cap — сколько порций в собранной банке; caps[i] — сколько влезает в банку i, если банки разные (+1 банка ультракота).
+export function legalMoves(st, cap, ice, caps) {
   const res = [];
   const done = ice ? completedCount(st, cap) : 0;
   for (let f = 0; f < st.length; f++) {
@@ -54,18 +56,19 @@ export function legalMoves(st, cap, ice) {
     if (!s.length || isComplete(s, cap) || frozen(ice, f, done)) continue;
     const c = s[s.length - 1];
     const run = topRun(s);
-    let emptyTried = false;
+    const emptyTried = new Set(); // вместимости пустых банок, куда уже пробовали
     for (let t = 0; t < st.length; t++) {
       if (t === f || frozen(ice, t, done)) continue;
       const d = st[t];
-      if (d.length >= cap) continue;
+      const room = caps ? caps[t] : cap;
+      if (d.length >= room) continue;
       if (d.length) {
         if (d[d.length - 1] !== c) continue;
       } else {
-        if (emptyTried || run === s.length) continue;
-        emptyTried = true;
+        if (emptyTried.has(room) || run === s.length) continue;
+        emptyTried.add(room);
       }
-      res.push([f, t, Math.min(run, cap - d.length)]);
+      res.push([f, t, Math.min(run, room - d.length)]);
     }
   }
   return res;
@@ -131,29 +134,31 @@ class Heap {
 }
 
 // Минимальное решение A*. Возвращает { moves: [[from,to],...], expanded }; false — решения нет (перебрано всё);
-// null — не уложились в maxExpanded.
-export function solve(start, cap, maxExpanded = 2_000_000, ice = null) {
-  const startKey = keyOf(start, ice);
+// null — не уложились в maxExpanded. caps — вместимость каждой банки, если разная (см. legalMoves);
+// weight > 1 — взвешенный A*: решение находится намного быстрее, но уже не обязательно самое короткое (подсказке хватит).
+export function solve(start, cap, maxExpanded = 2_000_000, ice = null, { caps = null, weight = 1 } = {}) {
+  const key = (st) => keyOf(st, ice, caps);
+  const startKey = key(start);
   const g = new Map([[startKey, 0]]);
   const heap = new Heap();
-  heap.push({ st: start, g: 0, f: heuristic(start), prev: null, move: null });
+  heap.push({ st: start, g: 0, f: weight * heuristic(start), prev: null, move: null });
   let expanded = 0;
   while (heap.size) {
     const node = heap.pop();
-    if (node.g > g.get(keyOf(node.st, ice))) continue;
+    if (node.g > g.get(key(node.st))) continue;
     if (isSolved(node.st, cap)) {
       const moves = [];
       for (let n = node; n.prev; n = n.prev) moves.push([n.move[0], n.move[1]]);
       return { moves: moves.reverse(), expanded };
     }
     if (++expanded > maxExpanded) return null;
-    for (const m of legalMoves(node.st, cap, ice)) {
+    for (const m of legalMoves(node.st, cap, ice, caps)) {
       const ns = applyMove(node.st, m, cap);
-      const k = keyOf(ns, ice);
+      const k = key(ns);
       const ng = node.g + 1;
       if (g.has(k) && g.get(k) <= ng) continue;
       g.set(k, ng);
-      heap.push({ st: ns, g: ng, f: ng + heuristic(ns), prev: node, move: m });
+      heap.push({ st: ns, g: ng, f: ng + weight * heuristic(ns), prev: node, move: m });
     }
   }
   return false;

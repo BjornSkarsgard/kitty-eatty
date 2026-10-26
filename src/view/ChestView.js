@@ -7,11 +7,13 @@ import { NAMES } from '../theme/cats/names.js';
 import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
 
-// Открытие сундука или подарка (kind: 'chest' | 'gift'), награды уже начислены — здесь только показ:
-// 1) коробка грохается сверху: сплющивается, из-под неё пыль, экран вздрагивает;
+// Открытие сундука или подарка (kind: 'chest' | 'gift'), награды уже начислены — здесь только показ.
+// Сундук: 1) грохается сверху: сплющивается, из-под него пыль, экран вздрагивает;
 // 2) подпрыгивает от нетерпения всё выше, из щели под крышкой бьёт свет и сыплются искры, звук всё выше;
-// 3) сжимается — и взрывается: вспышка, ударная волна, сундук открывается (chest_open), у подарка крышка улетает,
-//    фонтан монет и конфетти, лучи fx_godrays крутятся, экран трясёт;
+// 3) сжимается — и взрывается: вспышка, ударная волна, сундук открывается (chest_open),
+//    фонтан монет и конфетти, лучи fx_godrays крутятся, экран трясёт.
+// Подарок: 1) плавно опускается со звоном; 2) взлетает и крутится вокруг себя всё быстрее в вихре искр;
+// 3) на пике — хлопок: крышка с бантом улетает, конфетти и звёзды. Дальше у обоих:
 // 4) награды вылетают из коробки по дуге и приземляются с подскоком и искрами, за каждой — золотой ореол;
 // 5) «Забрать» — монеты летят в счётчик монет. Числа — CONFIG.chestAnim; «Эффекты: выкл» — меньше частиц, без тряски.
 // items: [{ icon, n }], [{ skin }] и т. д. (rewardItem). onDone — после «Забрать». title — надпись сверху.
@@ -34,7 +36,9 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
   const cy = H / 2 + 120;
   // закрыть: награды уже начислены, поэтому и закрытие вкладкой посреди анимации — как «Забрать»
   let closed = false;
-  const st = { sx: 1, sy: 1, lift: 0, angle: 0 }; // сплющивание, высота прыжка и наклон коробки (apply)
+  const gift = kind === 'gift';
+  // сплющивание, высота прыжка, наклон и поворот вокруг своей оси (turn, радианы — ширина по косинусу) коробки (apply)
+  const st = { sx: 1, sy: 1, lift: 0, angle: 0, turn: 0 };
   const untrack = trackWindow(scene, () => finish());
   const finish = () => {
     if (closed) return;
@@ -72,7 +76,7 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
   scene.children.bringToTop(add(box)); // создана раньше лучей и сияния — поднимаем над ними
   const leak = add(scene.add.image(cx, 0, 'fx_soft').setTint(PAL.rayCore).setBlendMode(ADD).setAlpha(0)); // свет из щели
   const apply = () => {
-    box.setScale(st.sx, st.sy).setAngle(st.angle);
+    box.setScale(st.sx * Math.cos(st.turn), st.sy).setAngle(st.angle);
     box.setPosition(cx, floorY - st.lift - (box.bodyH / 2) * st.sy);
     leak.setPosition(cx, box.y - (box.bodyH / 2) * st.sy).setScale((A.size * 1.1) / 128, 0.5);
     const far = Math.min(1, st.lift / 400); // высоко — тень меньше и бледнее
@@ -99,6 +103,10 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
     speed: { min: 450, max: 850 }, angle: { min: 240, max: 300 }, gravityY: 1300, lifespan: 1500,
     rotate: { min: -180, max: 180 }, scale: { min: coinK * 0.7, max: coinK }, alpha: { start: 1, end: 0, ease: 'Quad.easeIn' },
   });
+  const swirl = emit('fx_sparkle', { // вихрь вокруг крутящегося подарка
+    speed: { min: 10, max: 60 }, lifespan: 550, scale: { start: 0.9, end: 0 }, alpha: { start: 1, end: 0 },
+    tint: [PAL.ray, PAL.white, PAL.giftSpark], blendMode: ADD,
+  });
   const twinkle = emit('fx_sparkle', {
     x: { min: -A.size * 0.4, max: A.size * 0.4 }, speedY: { min: -90, max: -30 }, lifespan: 1600, frequency: 110,
     scale: { start: 0.7, end: 0 }, alpha: { start: 1, end: 0 }, tint: [PAL.ray, PAL.white], blendMode: ADD,
@@ -107,23 +115,74 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
   // шаг анимации коробки: меняем st за ms и сразу рисуем
   const step = (props, ms, ease = 'Quad.easeOut') => ({ ...props, duration: ms, ease, onUpdate: apply });
 
-  // 1. падает и грохается
+  // 1. сундук падает и грохается
+  const dropChest = () => {
+    scene.tweens.add({ targets: shadow, alpha: 1, duration: A.drop, ease: 'Quad.easeIn' });
+    scene.tweens.add({
+      targets: st, ...step({ lift: 0 }, A.drop, 'Quad.easeIn'),
+      onComplete: () => {
+        snd('sfx_chest_land', 'sfx_drop');
+        dust.explode(many(A.dust), cx, floorY);
+        shake(A.landShake);
+        scene.tweens.chain({
+          targets: st,
+          tweens: [step({ sx: 1.25, sy: 0.75 }, 70), step({ sx: 1, sy: 1 }, 320, 'Back.easeOut')],
+          onComplete: () => later(120, () => hop(0)),
+        });
+      },
+    });
+  };
+
+  // 1. подарок плавно опускается и мягко пружинит
+  const dropGift = () => {
+    scene.tweens.add({ targets: shadow, alpha: 1, duration: A.giftDrop, ease: 'Sine.easeOut' });
+    scene.tweens.add({
+      targets: st, ...step({ lift: 0 }, A.giftDrop, 'Cubic.easeOut'),
+      onComplete: () => {
+        snd('sfx_gift_land', 'sfx_popup');
+        sparks.explode(many(8), cx, floorY);
+        scene.tweens.chain({
+          targets: st,
+          tweens: [step({ sx: 1.12, sy: 0.88 }, 80), step({ sx: 1, sy: 1 }, 300, 'Back.easeOut')],
+          onComplete: () => later(150, spinGift),
+        });
+      },
+    });
+  };
+
+  // 2. взлетает и крутится вокруг себя: скорость растёт равномерно, вокруг — вихрь искр, сзади разгораются лучи
+  const spinGift = () => {
+    if (closed) return;
+    snd('sfx_gift_spin', 'sfx_whoosh');
+    scene.tweens.add({ targets: rays, alpha: 0.7, scale: raysK * 0.8, duration: A.giftSpin, ease: 'Quad.easeIn' });
+    let puffs = 0;
+    scene.tweens.addCounter({
+      from: 0, to: 1, duration: A.giftSpin, ease: 'Linear',
+      onUpdate: (tw) => {
+        const t = tw.getValue();
+        st.turn = A.giftTurns * Math.PI * 2 * t * t;
+        st.lift = A.giftLift * Math.min(1, t * 4);
+        st.angle = Math.sin(t * 40) * 3 * t; // к концу его потряхивает
+        apply();
+        if (closed) return;
+        // искры вихря — по кругу в такт повороту, к концу гуще
+        const r = A.size * 0.62;
+        for (const want = Math.floor(t * t * many(A.giftSwirl)); puffs < want; puffs++) {
+          const a = st.turn + puffs * 2.4;
+          swirl.emitParticleAt(cx + Math.cos(a) * r, box.y + Math.sin(a) * r * 0.35);
+        }
+      },
+      onComplete: () => {
+        st.turn = 0;
+        burst();
+      },
+    });
+  };
+
   st.lift = floorY + A.size;
   apply();
-  scene.tweens.add({ targets: shadow, alpha: 1, duration: A.drop, ease: 'Quad.easeIn' });
-  scene.tweens.add({
-    targets: st, ...step({ lift: 0 }, A.drop, 'Quad.easeIn'),
-    onComplete: () => {
-      snd('sfx_chest_land', 'sfx_drop');
-      dust.explode(many(A.dust), cx, floorY);
-      shake(A.landShake);
-      scene.tweens.chain({
-        targets: st,
-        tweens: [step({ sx: 1.25, sy: 0.75 }, 70), step({ sx: 1, sy: 1 }, 320, 'Back.easeOut')],
-        onComplete: () => later(120, () => hop(0)),
-      });
-    },
-  });
+  if (gift) dropGift();
+  else dropChest();
 
   // 2. подпрыгивает всё выше, свет из щели и искры всё сильнее
   const hop = (k) => {
@@ -159,7 +218,8 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
   // 3. взрыв: вспышка, волна, коробка открывается, монеты и конфетти
   const burst = () => {
     if (closed) return;
-    snd('sfx_chest_open', 'sfx_star');
+    if (gift) snd('sfx_gift_open', 'sfx_popup');
+    else snd('sfx_chest_open', 'sfx_star');
     later(120, () => sfx(scene, 'sfx_coins', CONFIG.audio.coins));
     shake(A.burstShake);
     const flash = add(scene.add.rectangle(W / 2, H / 2, W + bleed * 2, H + bleed * 2, PAL.white, 1).setAlpha(0));
@@ -169,8 +229,8 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
     leak.setAlpha(0);
     box.open();
     scene.tweens.chain({ targets: st, tweens: [step({ sx: 0.88, sy: 1.22 }, 90), step({ sx: 1, sy: 1 }, 420, 'Elastic.easeOut')] });
-    confetti.explode(many(A.confetti), cx, mouthY);
-    coins.explode(many(A.coins), cx, mouthY);
+    confetti.explode(many(gift ? A.confetti * 1.6 : A.confetti), cx, mouthY); // у подарка вместо монет — больше конфетти
+    if (!gift) coins.explode(many(A.coins), cx, mouthY);
     sparks.explode(many(A.sparks), cx, mouthY);
     // лучи: вспыхивают и крутятся в разные стороны, сзади — тёплое сияние
     scene.tweens.add({ targets: rays, alpha: 1, scale: raysK * 1.15, duration: 260, ease: 'Back.easeOut' });

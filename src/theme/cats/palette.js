@@ -49,6 +49,7 @@ export const PALETTE = {
   ray: 0xffd75a,
   rayCore: 0xfff2b0,
   dust: 0xf3e3c8,         // пыль из-под сундука
+  giftSpark: 0xff9de6,    // розовые искры вихря вокруг подарка
   pink: 0xff8fa3,        // полоски на иконке магазина (заглушка)
   chestStub: 0xa0602a,   // сундук и подарок, пока нет картинок
   giftStub: 0x7a3fe0,

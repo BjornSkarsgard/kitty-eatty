@@ -5,7 +5,7 @@ import { adHomeButton, openAdLadder } from '../view/RewardView.js';
 import { stockShelves, openPacks, openCoinPacks, openUltras, openGoods, offerUltra } from '../view/ShopView.js';
 import { MapView } from '../view/MapView.js';
 import { makeButton } from '../view/Button.js';
-import { counterPill, tabBar, iconButton, plate, infinityMark, closeWindows } from '../view/ui.js';
+import { counterPill, tabBar, iconButton, plate, infinityMark, closeWindows, makeIcon } from '../view/ui.js';
 import { addSettingsMenu } from '../view/settings.js';
 import { panDuration, panFx, hud } from '../view/transition.js';
 import { gameMusic, sfx } from '../audio.js';
@@ -455,7 +455,8 @@ export class RoomScene extends Phaser.Scene {
     const B = HC.boxes;
     const make = (kind, x, onTap) => {
       const c = this.add.container(x, B.y);
-      const box = closedBox(this, kind, B.size);
+      // «Ежедневно» — календарь icon_daily.png (нет картинки — коробка подарка)
+      const box = kind === 'gift' && this.textures.exists('icon_daily') ? makeIcon(this, 'daily', B.size * 1.05) : closedBox(this, kind, B.size);
       const badge = this.add.container(B.size * 0.42, -B.size * 0.42);
       const bg = this.add.graphics();
       bg.fillStyle(PAL.badgeShadow, 1).fillCircle(0, 3, 24).fillStyle(CONFIG.ui.badgeColor, 1).fillCircle(0, 0, 24);

@@ -172,7 +172,7 @@ export function makeIcon(scene, name, size) {
     const k = size / body.width;
     body.setScale(k).setY(size * 0.12);
     const lid = scene.add.image(0, body.y - body.displayHeight / 2, 'chest_lid').setOrigin(0.5, 1).setScale(k);
-    lid.y += lid.displayHeight * CONFIG.chestAnim.lidOverlap;
+    lid.y += lid.displayHeight * CONFIG.chestAnim.lidOverlap.chest;
     return scene.add.container(0, 0, [body, lid]);
   }
   const key = scene.textures.exists(`icon_${name}`) ? `icon_${name}` : ICON_ART[name];

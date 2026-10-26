@@ -12,8 +12,9 @@ import { PALETTE as PAL } from '../theme/cats/palette.js';
 // 2) подпрыгивает от нетерпения всё выше, из щели под крышкой бьёт свет и сыплются искры, звук всё выше;
 // 3) сжимается — и взрывается: вспышка, ударная волна, сундук открывается (chest_open),
 //    фонтан монет и конфетти, лучи fx_godrays крутятся, экран трясёт.
-// Подарок: 1) плавно опускается со звоном; 2) взлетает и крутится вокруг себя всё быстрее в вихре искр;
-// 3) на пике — хлопок: крышка с бантом улетает, конфетти и звёзды. Дальше у обоих:
+// Подарок: 1) плавно опускается со звоном; 2) пульсирует, как сердце: с каждым толчком раздувается сильнее
+// и дрожит, как желе, толчки всё чаще, из-под крышки свет и искры; 3) лопается: крышка с бантом улетает,
+// конфетти и звёзды. Дальше у обоих:
 // 4) награды вылетают из коробки по дуге и приземляются с подскоком и искрами, за каждой — золотой ореол;
 // 5) «Забрать» — монеты летят в счётчик монет. Числа — CONFIG.chestAnim; «Эффекты: выкл» — меньше частиц, без тряски.
 // items: [{ icon, n }], [{ skin }] и т. д. (rewardItem). onDone — после «Забрать». title — надпись сверху.
@@ -37,8 +38,7 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
   // закрыть: награды уже начислены, поэтому и закрытие вкладкой посреди анимации — как «Забрать»
   let closed = false;
   const gift = kind === 'gift';
-  // сплющивание, высота прыжка, наклон и поворот вокруг своей оси (turn, радианы — ширина по косинусу) коробки (apply)
-  const st = { sx: 1, sy: 1, lift: 0, angle: 0, turn: 0 };
+  const st = { sx: 1, sy: 1, lift: 0, angle: 0 }; // сплющивание, высота прыжка и наклон коробки (apply)
   const untrack = trackWindow(scene, () => finish());
   const finish = () => {
     if (closed) return;
@@ -76,7 +76,7 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
   scene.children.bringToTop(add(box)); // создана раньше лучей и сияния — поднимаем над ними
   const leak = add(scene.add.image(cx, 0, 'fx_soft').setTint(PAL.rayCore).setBlendMode(ADD).setAlpha(0)); // свет из щели
   const apply = () => {
-    box.setScale(st.sx * Math.cos(st.turn), st.sy).setAngle(st.angle);
+    box.setScale(st.sx, st.sy).setAngle(st.angle);
     box.setPosition(cx, floorY - st.lift - (box.bodyH / 2) * st.sy);
     leak.setPosition(cx, box.y - (box.bodyH / 2) * st.sy).setScale((A.size * 1.1) / 128, 0.5);
     const far = Math.min(1, st.lift / 400); // высоко — тень меньше и бледнее
@@ -102,10 +102,6 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
   const coins = emit('icon_coin', {
     speed: { min: 450, max: 850 }, angle: { min: 240, max: 300 }, gravityY: 1300, lifespan: 1500,
     rotate: { min: -180, max: 180 }, scale: { min: coinK * 0.7, max: coinK }, alpha: { start: 1, end: 0, ease: 'Quad.easeIn' },
-  });
-  const swirl = emit('fx_sparkle', { // вихрь вокруг крутящегося подарка
-    speed: { min: 10, max: 60 }, lifespan: 550, scale: { start: 0.9, end: 0 }, alpha: { start: 1, end: 0 },
-    tint: [PAL.ray, PAL.white, PAL.giftSpark], blendMode: ADD,
   });
   const twinkle = emit('fx_sparkle', {
     x: { min: -A.size * 0.4, max: A.size * 0.4 }, speedY: { min: -90, max: -30 }, lifespan: 1600, frequency: 110,
@@ -144,38 +140,31 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
         scene.tweens.chain({
           targets: st,
           tweens: [step({ sx: 1.12, sy: 0.88 }, 80), step({ sx: 1, sy: 1 }, 300, 'Back.easeOut')],
-          onComplete: () => later(150, spinGift),
+          onComplete: () => later(150, () => pulse(0)),
         });
       },
     });
   };
 
-  // 2. взлетает и крутится вокруг себя: скорость растёт равномерно, вокруг — вихрь искр, сзади разгораются лучи
-  const spinGift = () => {
+  // 2. пульсирует: раздувается всё сильнее (желейно — вширь, потом ввысь), толчки всё чаще, свет из-под крышки ярче
+  const pulse = (k) => {
     if (closed) return;
-    snd('sfx_gift_spin', 'sfx_whoosh');
-    scene.tweens.add({ targets: rays, alpha: 0.7, scale: raysK * 0.8, duration: A.giftSpin, ease: 'Quad.easeIn' });
-    let puffs = 0;
-    scene.tweens.addCounter({
-      from: 0, to: 1, duration: A.giftSpin, ease: 'Linear',
-      onUpdate: (tw) => {
-        const t = tw.getValue();
-        st.turn = A.giftTurns * Math.PI * 2 * t * t;
-        st.lift = A.giftLift * Math.min(1, t * 4);
-        st.angle = Math.sin(t * 40) * 3 * t; // к концу его потряхивает
-        apply();
-        if (closed) return;
-        // искры вихря — по кругу в такт повороту, к концу гуще
-        const r = A.size * 0.62;
-        for (const want = Math.floor(t * t * many(A.giftSwirl)); puffs < want; puffs++) {
-          const a = st.turn + puffs * 2.4;
-          swirl.emitParticleAt(cx + Math.cos(a) * r, box.y + Math.sin(a) * r * 0.35);
-        }
-      },
-      onComplete: () => {
-        st.turn = 0;
-        burst();
-      },
+    if (k >= A.giftPulses) return burst();
+    const g = 1 + A.giftGrow * (k + 1);
+    const ms = A.giftPulseMs * (1 - k * 0.14);
+    snd('sfx_gift_pulse', 'sfx_pick', 1, 1 + k * 0.12);
+    sparks.explode(many(3 + k * 4), cx, leak.y);
+    scene.tweens.add({ targets: leak, alpha: 0.3 + k * 0.17, duration: ms * 0.3 });
+    scene.tweens.add({ targets: rays, alpha: 0.12 + k * 0.1, scale: raysK * (0.4 + k * 0.1), duration: ms * 0.5 });
+    shake([60, 0.001 + k * 0.0015]);
+    scene.tweens.chain({
+      targets: st,
+      tweens: [
+        step({ sx: g * 1.08, sy: g * 0.93 }, ms * 0.3, 'Back.easeOut'),
+        step({ sx: g * 0.96, sy: g * 1.05 }, ms * 0.25, 'Sine.easeInOut'),
+        step({ sx: g, sy: g }, ms * 0.45, 'Sine.easeOut'),
+      ],
+      onComplete: () => pulse(k + 1),
     });
   };
 
@@ -333,7 +322,7 @@ export function closedBox(scene, kind, size) {
   const k = size / body.width;
   body.setScale(k);
   const lid = scene.add.image(0, 0, lidKey).setOrigin(0.5, 1).setScale(k);
-  lid.y = -body.displayHeight / 2 + lid.displayHeight * CONFIG.chestAnim.lidOverlap;
+  lid.y = -body.displayHeight / 2 + lid.displayHeight * CONFIG.chestAnim.lidOverlap[kind];
   c.add([body, lid]);
   c.lid = lid;
   c.bodyH = body.displayHeight;

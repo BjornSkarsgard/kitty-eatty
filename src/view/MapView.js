@@ -217,7 +217,13 @@ export class MapView {
     g.fillStyle(PAL.black, 0.2).fillRoundedRect(-w / 2 + 2, -17 + 3, w, 34, 17);
     g.fillStyle(PAL.cream, 1).fillRoundedRect(-w / 2, -17, w, 34, 17);
     g.lineStyle(3, PAL.brownRim, 1).strokeRoundedRect(-w / 2, -17, w, 34, 17);
-    const ic = makeIcon(scene, icon === 'chest' ? 'heart' : icon, 28).setPosition(-w / 2 + 18, 0);
+    const name = icon === 'chest' ? 'heart' : icon;
+    const ic = makeIcon(scene, name, 28).setPosition(-w / 2 + 18, 0);
+    // белые иконки (отмена) на светлой плашке не видны — на фиолетовом кружке, как на кнопках
+    if (name !== 'coin' && name !== 'heart') {
+      g.fillStyle(PAL.button, 1).fillCircle(-w / 2 + 18, 0, 17);
+      ic.setScale(ic.scale * 0.8);
+    }
     chip.add([g, ic, t]);
     top.add(chip);
     parts.push(chip);

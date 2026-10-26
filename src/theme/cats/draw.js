@@ -78,12 +78,20 @@ export function makePortion(scene, colorIndex, w, h) {
   return p;
 }
 
-// Скрытый корм «?»: серая подложка той же формы поверх порции и знак вопроса. Своего арта пока нет — подложка
-// порции, подкрашенная (для слоя порции tint можно, CLAUDE.md). Кладётся в контейнер порции (p.cover).
+// Скрытый корм «?»: серая подложка той же формы поверх порции и значок food_hidden.png (нет картинки — знак вопроса текстом)
+// подложка — слой порции, подкрашенный (для слоя порции tint можно, CLAUDE.md). Кладётся в контейнер порции (p.cover).
 export function makePortionCover(scene, p) {
   const B = CONFIG.blockers;
   const g = scene.add.graphics();
   const parts = [...makeLayer(scene, p.layerW, p.layerH, B.hiddenFill, g), g];
+  if (scene.textures.exists('food_hidden')) { // значок «?» — как корм на подложке
+    const img = scene.add.image(0, 0, 'food_hidden');
+    img.setScale(Math.min((p.layerH * CONFIG.portion.iconHeight) / img.height, (p.layerW * CONFIG.portion.iconWidth) / img.width));
+    const c = scene.add.container(0, 0, [...parts, img]);
+    p.add(c);
+    p.cover = c;
+    return c;
+  }
   parts.push(scene.add.text(0, 1, '?', {
     fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: `${Math.round(p.layerH * 0.7)}px`,
     color: '#ffffff', stroke: B.hiddenStroke, strokeThickness: Math.max(3, Math.round(p.layerH * 0.08)),
@@ -98,6 +106,7 @@ export function makePortionCover(scene, p) {
 // снежинка и число — сколько ещё собрать банок. Пока без арта. r, dim — как у createJar. setCount(n) — число.
 export function makeIceCover(scene, r, dim) {
   const B = CONFIG.blockers;
+  if (scene.textures.exists('ice_cover')) return makeIceArt(scene, r, dim);
   const top = r.top - dim.neck * 0.6;
   const h = r.bottom - top;
   const w = dim.bw * 0.96;
@@ -116,6 +125,39 @@ export function makeIceCover(scene, r, dim) {
     fontFamily: font, fontStyle: 'bold', fontSize: `${Math.round(w * 0.42)}px`, color: '#ffffff', stroke: B.iceStroke, strokeThickness: Math.max(4, w * 0.07),
   }).setOrigin(0.5);
   const c = scene.add.container(r.x, 0, [g, flake, num]);
+  c.setCount = (n) => { num.setText(String(n)); return c; };
+  c.centerY = cy;
+  return c;
+}
+
+// Лёд картинкой ice_cover.png: три куска, как у банки — горлышко над верхом стенок, стенки растянуты, донышко.
+// Сверху — число, сколько ещё собрать банок.
+function makeIceArt(scene, r, dim) {
+  const B = CONFIG.blockers;
+  const A = B.iceArt;
+  const tex = scene.textures.get('ice_cover');
+  const src = tex.getSourceImage();
+  if (!tex.has('ice_top')) {
+    tex.add('ice_top', 0, 0, 0, src.width, A.top);
+    tex.add('ice_mid', 0, 0, A.top, src.width, A.bottom - A.top);
+    tex.add('ice_bot', 0, 0, A.bottom, src.width, src.height - A.bottom);
+  }
+  const w = dim.bw * A.widen;
+  const top = r.top - dim.neck;
+  const midTop = r.top;
+  const midBottom = r.bottom - dim.base;
+  const parts = [
+    scene.add.image(0, top, 'ice_cover', 'ice_top').setOrigin(0.5, 0).setDisplaySize(w, dim.neck),
+    scene.add.image(0, midTop, 'ice_cover', 'ice_mid').setOrigin(0.5, 0).setDisplaySize(w, midBottom - midTop),
+    scene.add.image(0, midBottom, 'ice_cover', 'ice_bot').setOrigin(0.5, 0).setDisplaySize(w, dim.base),
+  ];
+  parts.forEach((p) => p.setAlpha(A.alpha));
+  const cy = (top + r.bottom) / 2;
+  const num = scene.add.text(0, cy, '', {
+    fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: `${Math.round(w * 0.5)}px`, color: '#ffffff',
+    stroke: B.iceStroke, strokeThickness: Math.max(5, w * 0.08),
+  }).setOrigin(0.5);
+  const c = scene.add.container(r.x, 0, [...parts, num]);
   c.setCount = (n) => { num.setText(String(n)); return c; };
   c.centerY = cy;
   return c;

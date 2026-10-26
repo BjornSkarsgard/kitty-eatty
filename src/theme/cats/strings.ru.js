@@ -10,6 +10,36 @@ const plural = (n, one, few, many) => {
 };
 
 export const STR = {
+  shop: {
+    packs: 'Наборы',
+    coins: 'Монеты',
+    starter: 'Стартовый набор',
+    ultras: 'Ультракоты',
+    more: 'Другие',
+    owned: 'Есть',
+    ownedText: 'Этот ультракот уже твой — выбрать его можно в коллекции.',
+    goods: { hint: 'Подсказка', addjar: '+Банка', undo: 'Отмена', heart: 'Жизни' },
+    packName: { starter: 'Стартовый', pack1: 'Котёнок', pack2: 'Охотник', pack3: 'Гурман', pack4: 'Вожак', pack5: 'Король котов' },
+    tag: { sale: '−90%', popular: 'Популярное', best: 'Лучшее' },
+    packCoins: (n) => `${n.toLocaleString('ru-RU')} монет`,
+    packInfinite: (h) => `∞ ${h} ч`,
+    packBoosters: (n) => `умения ×${n}`,
+    noAds: 'без рекламы',
+    rub: (n) => `${n.toLocaleString('ru-RU')} ₽`,
+    short: (n) => (n >= 1000 ? `${n / 1000}к` : String(n)), // цена на полке: 17000 → «17к»
+    soonTitle: 'Скоро',
+    soonText: 'Покупки за рубли появятся в одном из следующих обновлений.',
+    noCoinsTitle: 'Не хватает монет',
+    noCoinsText: 'Монеты дают за уровни, сундуки и награды за вход.',
+    // подпись варианта: «×5», «1 жизнь», «∞ 30 мин», «∞ навсегда»
+    amount: (icon, o) => {
+      if (o.forever) return '∞ навсегда';
+      if (o.minutes) return o.minutes < 60 ? `∞ ${o.minutes} мин` : o.minutes < 1440 ? `∞ ${o.minutes / 60} ч`
+        : o.minutes < 10080 ? `∞ ${o.minutes / 1440} ${plural(o.minutes / 1440, 'день', 'дня', 'дней')}` : '∞ неделя';
+      if (icon === 'heart') return `${o.n} ${plural(o.n, 'жизнь', 'жизни', 'жизней')}`;
+      return `×${o.n}`;
+    },
+  },
   musicTitle: 'Музыка',
   musicOff: 'Без музыки',
   tracks: { music_lofi: 'Кошачий сон', music_game: 'Мяу-песенка' }, // названия треков CONFIG.audio.tracks

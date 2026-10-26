@@ -3,8 +3,63 @@
 export const BALANCE = {
   // Реклама (этап 6). Пока выключена: кнопки «за рекламу» не показываются.
   ads: { enabled: false },
-  // Магазин (этап 8, после ИП). Выключен: вкладка бледная, «+» у монет скрыт.
-  shop: { enabled: false },
+  // Магазин (src/view/ShopView.js): вкладка открыта, товары за монеты работают. Рубли — после ИП (payments,
+  // RuStore Pay SDK): до тех пор на кнопках «Скоро». Цены в рублях здесь — только витрина: настоящие приходят из
+  // RuStore (CLAUDE.md: цены и состав — на сервере, начислять только после проверки). Бесплатное за ролик — ads.enabled.
+  shop: {
+    enabled: true,
+    payments: false,
+    // наборы (как в Magic Sort, docs/magic-sort.md): монеты, бесконечные жизни (ч), каждого умения — подсказок,
+    // банок, отмен — по boosters, «Без рекламы» (noAds); art — картинка coins_<art>; tag — ленточка
+    packs: [
+      { id: 'starter', price: 119, coins: 1000, infiniteH: 1, boosters: 1, art: 3, tag: 'sale' },
+      { id: 'pack1', price: 499, coins: 2000, infiniteH: 3, boosters: 1, noAds: true, art: 3 },
+      { id: 'pack2', price: 1190, coins: 4000, infiniteH: 6, boosters: 3, noAds: true, art: 4 },
+      { id: 'pack3', price: 2299, coins: 8000, infiniteH: 12, boosters: 8, noAds: true, art: 5, tag: 'popular' },
+      { id: 'pack4', price: 5199, coins: 20000, infiniteH: 36, boosters: 18, noAds: true, art: 5 },
+      { id: 'pack5', price: 11590, coins: 60000, infiniteH: 72, boosters: 36, noAds: true, art: 6, tag: 'best' },
+    ],
+    // монеты отдельно
+    coinPacks: [
+      { coins: 1000, price: 229 }, { coins: 5000, price: 890 }, { coins: 10000, price: 1699 },
+      { coins: 25000, price: 2890 }, { coins: 50000, price: 5790 }, { coins: 100000, price: 11590 },
+    ],
+    // нижняя полка: умение или жизни и варианты количества. Вариант: n — сколько (у жизней — штук или minutes —
+    // минут бесконечных; forever — навсегда), coins — цена в монетах (нет — только за рубли), rub — в рублях,
+    // give — что начислить (src/core/save.js buyGoods). Цены — черновик, утрясём.
+    goods: [
+      { icon: 'hint', options: [
+        { n: 1, coins: 50, rub: 29, give: { hints: 1 } },
+        { n: 5, coins: 220, rub: 59, give: { hints: 5 } },
+        { n: 15, coins: 600, rub: 149, give: { hints: 15 } },
+        { n: 30, coins: 1100, rub: 249, give: { hints: 30 } },
+      ] },
+      { icon: 'addjar', options: [
+        { n: 1, coins: 100, rub: 29, give: { jars: 1 } },
+        { n: 5, coins: 450, rub: 99, give: { jars: 5 } },
+        { n: 15, coins: 1250, rub: 279, give: { jars: 15 } },
+        { n: 30, coins: 2300, rub: 499, give: { jars: 30 } },
+      ] },
+      { icon: 'undo', options: [
+        { n: 5, coins: 130, rub: 29, give: { undos: 5 } },
+        { n: 15, coins: 360, rub: 79, give: { undos: 15 } },
+        { n: 30, coins: 650, rub: 149, give: { undos: 30 } },
+        { n: 45, coins: 900, rub: 199, give: { undos: 45 } },
+      ] },
+      { icon: 'heart', options: [
+        { n: 1, coins: 100, rub: 29, give: { lives: 1 } },
+        { n: 5, coins: 450, rub: 99, give: { lives: 5 } },
+        { icon: 'infinite', minutes: 30, coins: 250, rub: 59, give: { infiniteMin: 30 } },
+        { icon: 'infinite', minutes: 60, coins: 400, rub: 99, give: { infiniteMin: 60 } },
+        { icon: 'infinite', minutes: 720, coins: 2500, rub: 449, give: { infiniteMin: 720 } },
+        { icon: 'infinite', minutes: 1440, coins: 4000, rub: 699, give: { infiniteMin: 1440 } },
+        { icon: 'infinite', minutes: 4320, coins: 10000, rub: 1490, give: { infiniteMin: 4320 } },
+        { icon: 'infinite', minutes: 10080, coins: 20000, rub: 2990, give: { infiniteMin: 10080 } },
+        { icon: 'infinite', forever: true, rub: 4990 },
+      ] },
+    ],
+    free: { coins: 50, perDay: 3 }, // за ролик: монет за просмотр, сколько раз в день
+  },
 
   // Экономика: монеты и общий запас отмен хода (src/core/save.js).
   economy: {

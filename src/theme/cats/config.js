@@ -7,7 +7,7 @@ export const CATS = {
   nameList: NAMES, // клички (src/theme/cats/names.js) — для core/save.js
   ultras: ULTRAS,  // ультракоты (src/theme/cats/ultras.js) — для core/save.js
 
-  // Блокеры на уровне (пока без арта): скрытый корм «?» и лёд.
+  // Блокеры на уровне: скрытый корм «?» (значок food_hidden.png на серой подложке) и лёд (ice_cover.png).
   blockers: {
     hiddenFill: 0x8f8aa3,     // подложка скрытой порции
     hiddenStroke: '#4a3f6b',  // обводка «?»
@@ -16,6 +16,8 @@ export const CATS = {
     iceAlpha: 0.62,
     iceStroke: '#3a7fb8',     // обводка числа на льду
     thawMs: 450,              // лёд тает: расползается и бледнеет
+    // ice_cover.png режется как банка: до top — горлышко, от bottom — донышко, между ними тянется по высоте стенок
+    iceArt: { top: 85, bottom: 575, widen: 1.04, alpha: 0.7 }, // alpha — корм подо льдом проглядывает
   },
   // Цвет корма = цвет кота. Форма дублирует цвет для дальтоников. name — в именах файлов котов (cat_<name>_head.png).
   colors: [
@@ -268,5 +270,23 @@ export const CATS = {
     mapFrame: { left: 212, right: 505, bar: 26, barY: 230, barH: 170 },
     collection: { x: [255, 465], y: [221, 372, 518], head: 120 }, // середины рамок на стене bg_room_collection; голова кота в рамке
     profile: { y: 305, step: 90, w: 470, h: 76 },        // таблички статистики на стене bg_room_profile
+    // Магазин: полки на bg_room_shop (px картинки 720×1192). shelfY — верх доски каждой полки (на неё ставим товары),
+    // view — что показывает камера на вкладке «Магазин» (x, y — левый верх, w, h), zoomMs — наезд.
+    // Товары на полках: topX — стартовый набор, «Наборы», монеты; catX — ультракоты и табличка «Другие» последней;
+    // goodsX — подсказка, банка, отмена, жизнь. Размеры — px картинки фона; tagDy — ценник ниже доски.
+    shop: {
+      shelfY: [256, 356, 449],
+      view: { x: 236, y: 186, w: 248, h: 314 },
+      zoomMs: 600,
+      // shop_shelves.jpg — те же полки крупно (чётче при наезде): где её левый верх на фоне и масштаб к фону;
+      // проявляется, когда приближение больше sharpFrom
+      sharp: { x: 65.8, y: 185.6, k: 0.393, sharpFrom: 1.6 },
+      topX: [278, 360, 442], topSize: 62,
+      catX: [266, 303, 340, 377, 414, 458], catsOnShelf: 5, catScale: 0.34, catTapW: 40, catTapH: 64,
+      moreScale: 0.2, moreDy: 24,
+      catNameSize: 6.5, catNameDy: 9, catTagDy: 23, catTagSize: 9, catSlotW: 35, // порода под котом и ценник под ней
+      goodsX: [278, 332, 388, 442], goodsSize: 40,
+      tagDy: 14,
+    },
   },
 };

@@ -620,6 +620,25 @@ export function buyBooster(kind) {
   return true;
 }
 
+// ---------- магазин ----------
+
+// Товар за монеты (CONFIG.shop.goods): give — { hints, jars, undos, lives, infiniteMin }. false — не хватает монет
+// или это только жизнь, а жизни и так полные.
+export function buyGoods(price, give) {
+  const d = get();
+  refill(d);
+  if (d.coins < price) return false;
+  if (give.lives && d.lives >= LV.max) return false;
+  d.coins -= price;
+  d.hints += give.hints || 0;
+  d.jars += give.jars || 0;
+  d.undos += give.undos || 0;
+  if (give.lives) giveLives(d, give.lives);
+  if (give.infiniteMin) d.infiniteUntil = Math.max(Date.now(), d.infiniteUntil || 0) + give.infiniteMin * 60 * 1000;
+  write();
+  return true;
+}
+
 // Начислить отмены. Пока не вызывается — понадобится на этапе 6 (отмена за рекламу).
 export function addUndos(n) {
   get().undos += n;

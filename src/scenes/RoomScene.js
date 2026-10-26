@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { CatView } from '../theme/cats/CatView.js';
+import { stockShelves, openPacks, openCoinPacks, openUltras, openGoods, offerUltra } from '../view/ShopView.js';
 import { MapView } from '../view/MapView.js';
 import { makeButton } from '../view/Button.js';
 import { counterPill, tabBar, iconButton, plate, infinityMark, closeWindows } from '../view/ui.js';
@@ -69,6 +70,7 @@ const SLOTS = [
 const TABS = SLOTS.slice(1);
 const KITCHEN = 0;
 const MAP = SLOTS.findIndex((s) => s.key === 'map');
+const SHOP = SLOTS.findIndex((s) => s.key === 'shop');
 const HOME = SLOTS.findIndex((s) => s.key === 'home');
 const STEP = ARCH_W + WALL_W; // от арки до соседней на экране
 const RING = SLOTS.length * STEP; // длина круга в пикселях поворота
@@ -113,7 +115,7 @@ export class RoomScene extends Phaser.Scene {
     // Меню шестерёнки выпадает на его место — пока оно открыто, ключ спрятан.
     const dev = addDevButton(this, W - 62, U.topY + 110, () => this.scene.restart({ zone: 'home' }), () => this.refreshTop());
     if (dev) gear.onToggle = (open) => { dev.hidden = open; };
-    this.tabs = tabBar(this, TABS.map((z) => ({ ...z, enabled: z.enabled ? z.enabled() : true })), (i) => { closeWindows(this); this.goTo(i + 1); }); // вкладка — сначала закрыть открытые окна
+    this.tabs = tabBar(this, TABS.map((z) => ({ ...z, enabled: z.enabled ? z.enabled() : true })), (i) => { closeWindows(this); this.goTo(i + 1, i + 1 === SHOP ? { onDone: () => this.zoomShop() } : {}); }); // вкладка — сначала закрыть открытые окна
     this.mapBack = iconButton(this, 62, U.topY + 110, 'close', () => this.collapseMap(), {
       size: 84, shape: 'round', color: CONFIG.ui.exitColor, depth: 26,
     }).setScrollFactor(0).setVisible(false);
@@ -150,7 +152,9 @@ export class RoomScene extends Phaser.Scene {
     this.hudCam = this.cameras.add(0, 0, W, H);
     this.hudCam.ignore(this.children.list.filter((o) => !hud.includes(o)));
     this.cameras.main.ignore(hud);
-    const onAdded = (o) => this.hudCam.ignore(o);
+    // пока камера наехала на полки магазина, окна (всё новое) — на камере интерфейса: основная приближена;
+    // полки магазина перерисовываются на основной (onMain)
+    const onAdded = (o) => (this.shopOpen && !this.toMain ? this.cameras.main : this.hudCam).ignore(o);
     this.events.on(Phaser.Scenes.Events.ADDED_TO_SCENE, onAdded);
     // события сцены переживают перезапуск — без этого старая подписка прятала бы новый интерфейс
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.ADDED_TO_SCENE, onAdded));
@@ -259,6 +263,7 @@ export class RoomScene extends Phaser.Scene {
   // ring — по кругу кратчайшим путём (к двери кухни и обратно; dir — куда ехать, если пути равны).
   goTo(slot, { ring = false, dir = 1, ms = R.panDuration, ease = 'Cubic.easeInOut', onDone } = {}) {
     if (this.mapOpen && slot !== MAP) return this.collapseMap(() => this.goTo(slot, { ring, dir, ms, ease, onDone }));
+    if (this.shopOpen && slot !== SHOP) return this.collapseShop(() => this.goTo(slot, { ring, dir, ms, ease, onDone }));
     this.pan.p = ((this.pan.p % RING) + RING) % RING;
     let delta = ring ? wrap(slot * STEP - this.pan.p) : slot * STEP - this.pan.p;
     if (ring && Math.abs(Math.abs(delta) - RING / 2) < 1) delta = (dir * RING) / 2;
@@ -598,8 +603,103 @@ export class RoomScene extends Phaser.Scene {
     return { x: room.x + R.posterX * room.scale, y: room.y + R.posterY * room.scale, scale: R.posterScale * room.scale };
   }
 
+  // Магазин: товары на полках комнаты магазина (src/view/ShopView.js), видны и из холла.
   createShop(room) {
-    room.add(this.add.text(W / 2, 940, STR.soon, this.noteStyle()).setOrigin(0.5));
+    this.shopOpen = false;
+    const bg = this.slots[SHOP].bg;
+    if (!bg) return;
+    const place = (x, y) => ({ x: bg.x + (x - bg.width / 2) * bg.scale, y: bg.y + (y - bg.height / 2) * bg.scale });
+    // чёткие полки крупно — поверх фона, под товарами; видны, когда камера наехала
+    if (this.textures.exists('shop_shelves')) {
+      const Sh = R.shop.sharp;
+      const p = place(Sh.x, Sh.y);
+      this.shopSharp = this.add.image(p.x, p.y, 'shop_shelves').setOrigin(0).setScale(Sh.k * bg.scale).setAlpha(0);
+      room.addAt(this.shopSharp, room.getIndex(bg) + 1);
+    }
+    this.shelves = stockShelves(this, room, place, bg.scale, (what, data) => this.shopTap(what, data));
+  }
+
+  // Точка картинки комнаты магазина (px bg_room_shop) → мир.
+  shopPoint(x, y) {
+    const s = this.slots[SHOP];
+    const bg = s.bg;
+    return {
+      x: s.room.x + (bg.x + (x - bg.width / 2) * bg.scale) * s.room.scale,
+      y: s.room.y + (bg.y + (y - bg.height / 2) * bg.scale) * s.room.scale,
+    };
+  }
+
+  // Создать объекты на основной камере, даже когда магазин открыт (перерисовка полок).
+  onMain(fn) {
+    this.toMain = true;
+    try { fn(); } finally { this.toMain = false; }
+  }
+
+  // Камера наезжает на полки (R.shop.view) — они занимают экран между верхней полосой и вкладками.
+  zoomShop() {
+    if (this.shopOpen || !this.shelves) return;
+    this.shopOpen = true;
+    this.mapBusy = true;
+    const V = R.shop.view;
+    const a = this.shopPoint(V.x, V.y);
+    const b = this.shopPoint(V.x + V.w, V.y + V.h);
+    const top = CONFIG.ui.topY + 60;
+    const bottom = H - CONFIG.ui.tabBarHeight - 10;
+    const zoom = Math.min(W / (b.x - a.x), (bottom - top) / (b.y - a.y));
+    this.shopZoom = zoom;
+    const cx = (a.x + b.x) / 2;
+    const cy = (a.y + b.y) / 2 - ((top + bottom) / 2 - H / 2) / zoom; // полки — посередине между полосой и вкладками
+    sfx(this, 'sfx_swipe', CONFIG.audio.swipe, 1.15);
+    this.tweens.add({
+      targets: this.cameras.main, zoom, scrollX: cx - W / 2, scrollY: cy - H / 2, duration: R.shop.zoomMs, ease: 'Cubic.easeInOut',
+      onUpdate: () => this.sharpenShelves(zoom),
+      onComplete: () => { this.mapBusy = false; },
+    });
+  }
+
+  // Чёткие полки проявляются по мере наезда: от R.shop.sharp.sharpFrom до полного приближения full.
+  sharpenShelves(full) {
+    if (!this.shopSharp) return;
+    const from = R.shop.sharp.sharpFrom;
+    this.shopSharp.setAlpha(Phaser.Math.Clamp((this.cameras.main.zoom - from) / (full - from), 0, 1));
+  }
+
+  // Отъехать от полок; onDone — когда холл снова как был.
+  collapseShop(onDone) {
+    if (!this.shopOpen) return onDone?.();
+    if (this.mapBusy) return;
+    this.mapBusy = true;
+    sfx(this, 'sfx_swipe', CONFIG.audio.swipe, 0.85);
+    this.tweens.add({
+      targets: this.cameras.main, zoom: 1, scrollX: 0, scrollY: 0, duration: R.shop.zoomMs * 0.8, ease: 'Cubic.easeInOut',
+      onUpdate: () => this.sharpenShelves(this.shopZoom),
+      onComplete: () => {
+        this.shopOpen = false;
+        this.mapBusy = false;
+        if (this.homeDirty) { // купили ультракота — он теперь на главной
+          this.homeDirty = false;
+          this.makeHomeCat();
+          this.afterBox();
+        }
+        onDone?.();
+      },
+    });
+  }
+
+  // Тап по товару на полке.
+  shopTap(what, data) {
+    if (!this.shopOpen) return this.goTo(SHOP, { onDone: () => this.zoomShop() }); // из холла — сначала к полкам
+    const bought = () => {
+      this.refreshTop();
+      this.onMain(() => this.shelves.refresh());
+      this.homeDirty = true;
+    };
+    if (what === 'starter') openPacks(this, { only: true });
+    else if (what === 'packs') openPacks(this);
+    else if (what === 'coins') openCoinPacks(this);
+    else if (what === 'ultra') offerUltra(this, data, bought);
+    else if (what === 'ultras') openUltras(this, (u, again) => offerUltra(this, u, () => { bought(); again(); }));
+    else if (what === 'goods') openGoods(this, data, bought);
   }
 
   // Неоткрытые породы — «?» в пустых рамках на стене. Сами породы — позже.

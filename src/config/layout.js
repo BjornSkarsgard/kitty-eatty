@@ -36,6 +36,9 @@ export const LAYOUT = {
   // клички: по 2 в ряд, namesPerPage на странице, листалка на pagerY (от середины панели)
   collection: { width: 660, height: 950, offsetY: -12, cols: 4, cellW: 150, cellH: 160, gridTop: 130, head: 98,
     nameW: 290, nameH: 74, namesPerPage: 18, pagerY: 330 },
+  // Окна магазина (src/view/ShopView.js): ширина, высота строки товара, клетки ультракота
+  shopWindow: { width: 640, offsetY: -10, depth: 40, rowH: 120, goodsRowH: 96, ultraCellH: 160 },
+
   // Анимация сундука и подарка (src/view/ChestView.js): время — мс, размеры — пиксели экрана
   chestAnim: {
     size: 330,           // ширина коробки на экране

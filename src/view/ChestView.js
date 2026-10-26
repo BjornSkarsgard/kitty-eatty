@@ -150,13 +150,14 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
   const pulse = (k) => {
     if (closed) return;
     if (k >= A.giftPulses) return burst();
+    const f = k / (A.giftPulses - 1); // 0 — первый толчок, 1 — последний
     const g = 1 + A.giftGrow * (k + 1);
-    const ms = A.giftPulseMs * (1 - k * 0.14);
-    snd('sfx_gift_pulse', 'sfx_pick', 1, 1 + k * 0.12);
-    sparks.explode(many(3 + k * 4), cx, leak.y);
-    scene.tweens.add({ targets: leak, alpha: 0.3 + k * 0.17, duration: ms * 0.3 });
-    scene.tweens.add({ targets: rays, alpha: 0.12 + k * 0.1, scale: raysK * (0.4 + k * 0.1), duration: ms * 0.5 });
-    shake([60, 0.001 + k * 0.0015]);
+    const ms = A.giftPulseMs * Math.pow(A.giftAccel, k); // каждый следующий короче — к концу частят
+    snd('sfx_gift_pulse', 'sfx_pick', 1, 1 + f * 0.6);
+    sparks.explode(many(3 + f * 16), cx, leak.y);
+    scene.tweens.add({ targets: leak, alpha: 0.3 + f * 0.7, duration: ms * 0.3 });
+    scene.tweens.add({ targets: rays, alpha: 0.12 + f * 0.4, scale: raysK * (0.4 + f * 0.4), duration: ms * 0.5 });
+    shake([60, 0.001 + f * 0.006]);
     scene.tweens.chain({
       targets: st,
       tweens: [

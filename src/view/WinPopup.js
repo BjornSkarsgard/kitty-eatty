@@ -65,7 +65,7 @@ export function showWinPopup(scene, { level, reward, isLast, fxStars, onNext, on
     if (icon === 'coin') coinText = t;
     box.add(t);
   });
-  if (reward.coins && level.id >= CONFIG.economy.winBoost.from && rewardedReady()) winBoost(scene, box, reward.coins, coinText, (items.length + 1 - items.length / 2) * 170 - 85, fxStars, onTake);
+  if (reward.coins && level.id >= CONFIG.economy.winBoost.from && rewardedReady()) winBoost(scene, box, reward.coins, coinText, fxStars, onTake);
   if (!items.length) {
     box.add(scene.add.text(0, WC.rewardsY, STR.alreadyPassed, {
       fontFamily: font, fontStyle: 'bold', fontSize: '32px', color: PAL.textDim,
@@ -98,8 +98,7 @@ export function showWinPopup(scene, { level, reward, isLast, fxStars, onNext, on
 // стрелкой. Нажал — стрелка встаёт насовсем, ролик; досмотрел — монеты ×k (сверху начисляется coins × (k − 1)) или
 // сундук, не досмотрел — шкала исчезает, остаются обычные монеты. Ролик не загрузился заранее (rewardedReady) — шкалы нет.
 // onTake — обновить счётчики.
-// chestX — куда в ряду наград встанет выигранный сундук (следующее место справа).
-function winBoost(scene, box, coins, coinText, chestX, fxStars, onTake) {
+function winBoost(scene, box, coins, coinText, fxStars, onTake) {
   const WC = CONFIG.win;
   const Z = CONFIG.economy.winBoost.zones;
   const total = Z.reduce((s, [, w]) => s + w, 0);
@@ -179,27 +178,22 @@ function winBoost(scene, box, coins, coinText, chestX, fxStars, onTake) {
   box.add(parts);
 
   // Что выиграл — крупно там, где была шкала: «×N» выпрыгивает с искрами, монеты в наградах отсчитываются до нового
-  // числа; сундук выпрыгивает и улетает в ряд наград рядом с монетами.
+  // числа; сундук выпрыгивает и остаётся по центру над «Продолжить».
   const celebrate = (k) => {
     const cy = (WC.boostY + WC.boostBtnY) / 2;
     const stars = (x, yy, n) => fxStars.setDepth(23).explode(n, box.x + x * box.scaleX, box.y + yy * box.scaleY);
     sfx(scene, 'sfx_star', CONFIG.audio.star, CONFIG.audio.starPitch[2]);
     if (k === 'chest') {
-      const ch = makeIcon(scene, 'chest', 170).setPosition(0, cy).setScale(0);
+      const ch = makeIcon(scene, 'chest', 130).setPosition(0, cy + 10).setScale(0);
       box.add(ch);
-      const s1 = ch.scale;
+      // сундук остаётся по центру, где была шкала (над «Продолжить»), и слегка покачивается
       scene.tweens.chain({
         targets: ch,
         tweens: [
           { scale: 1.25, duration: 260, ease: 'Back.easeOut', onStart: () => stars(0, cy, 24) },
           { scale: 1, duration: 160 },
-          { x: chestX, y: WC.rewardsY, scale: 0.62, duration: 520, delay: 450, ease: 'Cubic.easeInOut' },
         ],
-        onComplete: () => {
-          sfx(scene, 'sfx_coins', CONFIG.audio.coins);
-          stars(chestX, WC.rewardsY, 12);
-          box.add(text(scene, chestX + 40, WC.rewardsY + 38, '1', 50));
-        },
+        onComplete: () => scene.tweens.add({ targets: ch, angle: { from: -4, to: 4 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }),
       });
       return;
     }

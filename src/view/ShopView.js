@@ -139,7 +139,8 @@ export function stockShelves(scene, room, place, k, onTap) {
 // ---------- окна ----------
 
 // Окно-витрина: заголовок, крестик, строки (rows) или сетка; поверх всего. Возвращает close().
-function shopWindow(scene, title, height, build) {
+// depth — слой (окно монет — выше обычных окон: оно открывается и поверх окна покупки).
+function shopWindow(scene, title, height, build, depth = CONFIG.shopWindow.depth) {
   const W = CONFIG.width;
   const H = CONFIG.height;
   const V = CONFIG.shopWindow;
@@ -153,10 +154,10 @@ function shopWindow(scene, title, height, build) {
   };
   untrack = trackWindow(scene, close);
   sfx(scene, 'sfx_popup', CONFIG.audio.popup);
-  const shade = scene.add.rectangle(W / 2, H / 2, W, H, PAL.black, 0.6).setDepth(V.depth).setScrollFactor(0).setInteractive();
+  const shade = scene.add.rectangle(W / 2, H / 2, W, H, PAL.black, 0.6).setDepth(depth).setScrollFactor(0).setInteractive();
   shade.on('pointerdown', close);
   parts.push(shade);
-  const box = scene.add.container(W / 2, H / 2 + V.offsetY).setDepth(V.depth).setScrollFactor(0);
+  const box = scene.add.container(W / 2, H / 2 + V.offsetY).setDepth(depth).setScrollFactor(0);
   parts.push(box);
   box.add(panel(scene, V.width + 20, height + 20));
   box.add(scene.add.zone(0, 0, V.width, height).setInteractive()); // тапы по панели не закрывают окно
@@ -291,7 +292,7 @@ export function openCoinPacks(scene, onChange = () => { scene.refreshTop?.(); sc
       row(scene, box, y, V.width - 40, rh, { icon: artIcon(scene, `coins_${i + 1}`, rh * 0.8), title: STR.shop.packCoins(p.coins) },
         [priceButton(scene, 0, 0, 170, { rub: p.price })]);
     });
-  });
+  }, V.coinsDepth);
 }
 
 // Товар нижней полки: варианты количества, у каждого цена в монетах и в рублях. onBought — после покупки.
@@ -397,15 +398,19 @@ export function offerUltra(scene, u, onBought) {
   }
   const price = ultraPrice(u);
   const ready = !u.soon && ULTS_READY.has(u.ult);
-  showPopup(scene, {
+  // «Купить» окно не закрывает: монет не хватило — поверх окно монет, а описание кота остаётся
+  const close = showPopup(scene, {
     title: u.name,
     text: `${STR.ultraInfo(u.ultName, u.ultText, u.boostText)}\n\n${ready ? STR.buyUltraQ(price) : STR.ultraSoon}`,
     buttons: ready ? [
       {
-        label: STR.buy, color: PAL.buyGreen,
+        label: STR.buy, color: PAL.buyGreen, keep: true,
         onTap: () => {
           if (coins() < price) return notEnough(scene);
-          if (buyUltra(u.id)) { sfx(scene, 'sfx_coins', CONFIG.audio.coins); onBought?.(); }
+          if (!buyUltra(u.id)) return;
+          close();
+          sfx(scene, 'sfx_coins', CONFIG.audio.coins);
+          onBought?.();
         },
       },
       { label: STR.no },

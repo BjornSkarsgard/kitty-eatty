@@ -31,6 +31,7 @@ export function showRewardedAd(scene, onReward, onFail) {
     // тест: «Досмотрел» — как досмотренный ролик, «Не досмотрел» (и тап мимо окна) — как оборванный
     let done = false;
     return showPopup(scene, {
+      depth: 70, // поверх окна монет (оттуда тоже смотрят ролик)
       title: STR.ads.testTitle,
       text: STR.ads.testText,
       buttons: [
@@ -40,6 +41,6 @@ export function showRewardedAd(scene, onReward, onFail) {
       onClose: () => queueMicrotask(() => { if (!done) onFail?.(); }), // кнопка вызывается после закрытия окна
     });
   }
-  showPopup(scene, { title: STR.ads.soonTitle, text: STR.ads.soonText, buttons: [{ label: STR.ok }] });
+  showPopup(scene, { title: STR.ads.soonTitle, text: STR.ads.soonText, buttons: [{ label: STR.ok }], depth: 70 });
   onFail?.();
 }

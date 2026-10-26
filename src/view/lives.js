@@ -38,10 +38,13 @@ export function showNoLives(scene, onGot) {
   if (CONFIG.ads.enabled) buttons.push({ label: STR.adLives(L.adGives), color: PAL.adOrange, onTap: () => {} }); // этап 6
   else {
     buttons.push({
-      label: STR.buyLife(L.price), color: PAL.buyGreen,
+      label: STR.buyLife(L.price), color: PAL.buyGreen, keep: true,
       onTap: () => {
-        if (coins() < L.price) return openCoinPacks(scene); // монет не хватает — окно покупки монет
-        if (buyLife()) { sfx(scene, 'sfx_coins', CONFIG.audio.coins); onGot?.(); }
+        if (coins() < L.price) return openCoinPacks(scene); // монет не хватает — окно монет поверх, это остаётся
+        if (!buyLife()) return;
+        popup();
+        sfx(scene, 'sfx_coins', CONFIG.audio.coins);
+        onGot?.();
       },
     });
   }

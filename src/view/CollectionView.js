@@ -264,16 +264,18 @@ ${u.gift ? STR.ultraGiftAt(u.gift) : STR.ultraSoon}`,
   };
 
   // ---------- общее ----------
+  // «Купить» окно не закрывает: монет не хватило — поверх окно монет, вопрос о покупке остаётся
   const offerBuy = (title, question, price, buy) => {
-    showPopup(scene, {
+    const close = showPopup(scene, {
       title,
       text: `${question}\n${STR.coinsLeft(coins())}`,
       buttons: [
         {
-          label: STR.buy, color: PAL.buyGreen,
+          label: STR.buy, color: PAL.buyGreen, keep: true,
           onTap: () => {
             if (coins() < price) return openCoinPacks(scene); // монет не хватает — окно покупки монет
             if (!buy()) return;
+            close();
             sfx(scene, 'sfx_coins', CONFIG.audio.coins);
             onChange?.();
             draw();

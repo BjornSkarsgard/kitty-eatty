@@ -54,8 +54,9 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
   // затемнение и вспышка — с запасом за края: экран трясётся, и край не должен открываться
   const bleed = 120;
   add(scene.add.rectangle(W / 2, H / 2, W + bleed * 2, H + bleed * 2, PAL.dim, 0.82).setInteractive()); // тапы не проходят вниз
+  let titleText = null;
   if (title) {
-    add(scene.add.text(W / 2, 230, title, {
+    titleText = add(scene.add.text(W / 2, 230, title, {
       fontFamily: font, fontStyle: 'bold', fontSize: '54px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 10,
       align: 'center', wordWrap: { width: W - 80 },
     }).setOrigin(0.5));
@@ -245,6 +246,8 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
   const showRewards = () => {
     const made = items.map((it) => add(rewardItem(scene, it, font)).setVisible(false));
     const spots = rewardSpots(made.map((o) => Math.max(A.rewardMinW, o.getBounds().width + A.rewardPad)));
+    // наград два ряда — верхний встаёт на место заголовка: заголовок уходит
+    if (titleText && new Set(spots.map((sp) => sp.y)).size > 1) scene.tweens.add({ targets: titleText, alpha: 0, y: titleText.y - 30, duration: 300 });
     items.forEach((it, i) => later(i * A.rewardsDelay, () => {
       const { x, y } = spots[i];
       const halo = add(scene.add.image(x, y, 'fx_soft').setTint(PAL.ray).setBlendMode(ADD).setAlpha(0).setScale(A.haloSize / 128));

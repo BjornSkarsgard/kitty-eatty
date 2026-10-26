@@ -87,6 +87,17 @@ const wrap = (x) => ((((x + RING / 2) % RING) + RING) % RING) - RING / 2;
 // «Играть» — быстрый проезд с размытием и ветром к двери кухни, створки распахиваются, камера въезжает в проём
 // и включается уровень. Из уровня — наоборот: из открытой двери отъезжаем, дверь закрывается, едем на главную.
 // Кнопки и кот — внутри своих комнат и едут с ними; карта — отдельно (у неё своя маска), но держится за свою комнату.
+// Сложить награды: одинаковые иконки (монеты, отмены…) — в одну с суммой, остальное (окрас, кличка) — как есть.
+function mergeItems(a, b) {
+  const out = a.map((it) => ({ ...it }));
+  for (const it of b) {
+    const same = it.icon && out.find((x) => x.icon === it.icon);
+    if (same) same.n += it.n;
+    else out.push({ ...it });
+  }
+  return out;
+}
+
 export class RoomScene extends Phaser.Scene {
   constructor() {
     super('Room');
@@ -137,7 +148,12 @@ export class RoomScene extends Phaser.Scene {
     const got = claimMilestones();
     if (got) {
       this.map.redraw();
-      return openBox(this, got.items.some((it) => it.icon === 'chest') ? 'chest' : 'gift', got.items, () => { this.afterBox(); this.showMilestones(); }, { title: STR.journeyTitle });
+      // сундук рубежа открывается сразу: показываем не «сундук», а то, что в нём, вместе с остальной наградой рубежа
+      let items = got.items.filter((it) => it.icon !== 'chest');
+      const chests = got.items.find((it) => it.icon === 'chest')?.n ?? 0;
+      for (let k = 0; k < chests; k++) items = mergeItems(items, openChest() ?? []);
+      const title = got.chapter ? STR.chapterDone(got.id / CONFIG.levelGen.chapter) : STR.levelGift(got.id);
+      return openBox(this, chests ? 'chest' : 'gift', items, () => { this.afterBox(); this.showMilestones(); }, { title });
     }
     const ultra = claimUltraGift();
     if (ultra) {

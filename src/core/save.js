@@ -574,7 +574,8 @@ export function claimMilestones() {
   write();
   const items = [['coin', sum.coins], ['undo', sum.undos], ['hint', sum.hints], ['heart', sum.lives], ['chest', sum.chests], ['infinite', sum.infiniteMin]]
     .filter(([, n]) => n > 0).map(([icon, n]) => ({ icon, n }));
-  return { chapter: list.some((m) => m.chapter), items };
+  const last = list[list.length - 1];
+  return { chapter: list.some((m) => m.chapter), id: last.id, items };
 }
 
 // ---------- монеты и отмены ----------

@@ -55,7 +55,7 @@ export class GameScene extends Phaser.Scene {
     this.won = false;
     this.moved = false; // был ли ход — тогда «Заново» и выход сжигают жизнь
     this.extraJars = 0; // сколько банок добавлено умением «+1 банка»
-    this.scaleCap = undefined; // масштаб банок с запасом под «+1 банка» — считается заново на каждом уровне
+    this.plan = undefined; // ряды и масштаб банок с запасом под «+1 банка» — считаются заново на каждом уровне
     // ультракот: ульта восстанавливается за CONFIG.ultRecharge уровней (save.ultLeft); ultPick — ждём тап по порции,
     // ultFirst — первая выбранная порция [банка, место]
     this.ultra = selectedUltra();
@@ -156,30 +156,43 @@ export class GameScene extends Phaser.Scene {
     const neck = (bw) => (art.top * bw) / tex.width;
     const base = (bw) => ((tex.height - art.bottom) * bw) / tex.width;
     const floor = (bw) => ((tex.height - art.floor) * bw) / tex.width;
+    // банки по рядам поровну, верхние ряды — на одну больше (10 в три ряда — 4, 3, 3)
+    const split = (count, rows) => Array.from({ length: rows }, (_, r) => Math.floor(count / rows) + (r < count % rows ? 1 : 0));
     // высота ряда (в порциях) — по самой высокой банке ряда, но не ниже обычной с запасом
     const slotsMin = this.board.capacity + this.reserveSlots;
     const caps = this.board.caps;
-    const rowSlots = (count, perRow, r) => Math.max(slotsMin, ...caps.slice(r * perRow, Math.min(count, (r + 1) * perRow)).slice(0, perRow));
+    const rowSlots = (from, count) => Math.max(slotsMin, ...caps.slice(from, from + count));
     const availW = CONFIG.width - L.sideMargin * 2;
     const availH = L.bowlsBottom - L.bowlsTop - neck(L.bowlWidth);
-    const fit = (count) => {
-      let best = null;
-      for (let rows = 1; rows <= 4; rows++) {
-        const perRow = Math.ceil(count / rows);
-        const w = perRow * L.bowlWidth + (perRow - 1) * L.bowlGapX;
-        let h = (rows - 1) * L.bowlGapY;
-        for (let r = 0; r < rows; r++) h += (count > n ? slotsMin : rowSlots(count, perRow, r)) * L.portionHeight + L.bowlPadding + floor(L.bowlWidth);
-        const scale = Math.min(1, availW / w, availH / h);
-        if (perRow <= L.maxPerRow && (!best || scale > best.scale + 0.001)) best = { rows, perRow, scale };
+    const measure = (count, rows) => {
+      const per = split(count, rows);
+      const w = per[0] * L.bowlWidth + (per[0] - 1) * L.bowlGapX;
+      let h = (rows - 1) * L.bowlGapY;
+      let from = 0;
+      for (const k of per) {
+        h += (from >= n ? slotsMin : rowSlots(from, k)) * L.portionHeight + L.bowlPadding + floor(L.bowlWidth);
+        from += k;
       }
-      return best;
+      return Math.min(1, availW / w, availH / h);
     };
-    if (this.scaleCap === undefined) {
+    // Самые крупные банки; если они уже уменьшены, а больше рядов дают почти тот же размер (L.rowsTolerance), —
+    // больше рядов, чтобы поле заполняло экран, а не оставляло пустоту над банками.
+    const fit = (count) => {
+      const opts = [];
+      for (let rows = 1; rows <= 4; rows++) if (Math.ceil(count / rows) <= L.maxPerRow) opts.push({ rows, scale: measure(count, rows) });
+      const top = Math.max(...opts.map((o) => o.scale));
+      if (top >= 1) return opts.find((o) => o.scale >= 1);
+      return opts.filter((o) => o.scale >= top * (1 - L.rowsTolerance)).pop();
+    };
+    // Ряды и масштаб — сразу под банки с запасом (+1 банка, Карман), чтобы новая банка встала в готовую сетку
+    if (this.plan === undefined) {
       const extra = (boosterUnlocked('jar') ? CONFIG.boosters.jar.perLevel : 0) + (this.ultra?.ult === 'pocket' ? 1 : 0);
-      this.scaleCap = fit(n + extra).scale;
+      this.plan = { count: n + extra, ...fit(n + extra) };
     }
-    const { rows, perRow } = fit(n);
-    const scale = Math.min(fit(n).scale, this.scaleCap); // выросшая банка («Тесно, но влезет») — всё мельче
+    // запас уменьшил банки — ряды из плана (иначе над мелкими банками пустота); не уменьшил — как удобнее сейчас
+    const now = fit(n);
+    const rows = n > this.plan.count || now.scale <= this.plan.scale + 0.001 ? now.rows : this.plan.rows;
+    const scale = Math.min(measure(n, rows), this.plan.scale); // выросшая банка («Тесно, но влезет») — всё мельче
     const bw = L.bowlWidth * scale;
     const d = (this.dim = {
       bw,
@@ -193,15 +206,16 @@ export class GameScene extends Phaser.Scene {
       k: bw / tex.width, // пикселей экрана на пиксель картинки банки
       scale,
     });
+    const per = split(n, rows);
     const rowH = [];
-    for (let r = 0; r < rows; r++) rowH.push(rowSlots(n, perRow, r) * d.ph + d.pad + d.floor);
+    per.reduce((from, k) => (rowH.push(rowSlots(from, k) * d.ph + d.pad + d.floor), from + k), 0);
     const totalH = rowH.reduce((a, b) => a + b, 0) + (rows - 1) * d.gy;
     const top0 = L.bowlsBottom - totalH; // нижний ряд стоит на столе
 
     this.bowlRects = [];
     let top = top0;
     for (let r = 0; r < rows; r++) {
-      const count = Math.min(perRow, n - r * perRow);
+      const count = per[r];
       const rowW = count * d.bw + (count - 1) * d.gx;
       const x0 = (CONFIG.width - rowW) / 2 + d.bw / 2;
       const bh = rowH[r];

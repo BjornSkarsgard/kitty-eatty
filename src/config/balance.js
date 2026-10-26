@@ -22,7 +22,7 @@ export const BALANCE = {
   // нового игрока, price — монет за заряд, когда запас кончился (позже — и ролик). jar.perLevel — сколько банок
   // можно добавить на одном уровне.
   boosters: {
-    hint: { from: 4, start: 1, price: 50 },
+    hint: { from: 4, start: 1, price: 50, search: 40000 }, // search — сколько позиций подсказка перебирает с поля игрока
     jar: { from: 8, start: 1, price: 100, perLevel: 1 },
     hintShowMs: 2200,    // сколько подсвечен подсказанный ход
   },

@@ -410,7 +410,8 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: layers, y: dy, duration: A.liftDuration, ease });
     this.portions[i].forEach((p, slot) => {
       const pos = this.slotPos(i, slot);
-      this.tweens.killTweensOf(p);
+      this.tweens.killTweensOf(p); // и полёт (fly), если порция ещё летела сюда, —
+      p.setDepth(0); // тогда она осталась бы над стеклом
       this.stopPulse(p);
       this.tweens.add({ targets: p, x: pos.x, y: pos.y + dy, duration: A.liftDuration, ease });
     });
@@ -594,6 +595,7 @@ export class GameScene extends Phaser.Scene {
         list.forEach((p, slot) => {
           const pos = this.slotPos(i, slot);
           this.tweens.killTweensOf(p);
+          p.setDepth(0); // полёт оборван — порция снова под стеклом
           this.stopPulse(p);
           this.tweens.add({ targets: p, x: pos.x, y: pos.y, duration: A.liftDuration * 2, ease: 'Cubic.easeOut' });
         });
@@ -862,8 +864,8 @@ export class GameScene extends Phaser.Scene {
     if (!h) return;
     if (h.move) return this.useBooster('hint', () => this.showHint(h.move));
     showPopup(this, {
-      title: STR.offTrackTitle,
-      text: STR.offTrackText(h.back),
+      title: h.stuck ? STR.stuckTitle : STR.offTrackTitle,
+      text: h.stuck ? STR.stuckText(h.back) : STR.offTrackText(h.back),
       buttons: [
         {
           label: STR.yes, color: PAL.buyGreen, onTap: () => this.useBooster('hint', () => {

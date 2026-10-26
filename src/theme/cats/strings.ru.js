@@ -134,7 +134,7 @@ export const STR = {
   noLivesTitle: 'Жизни кончились',
   livesBackIn: (time, coins) => `Следующая жизнь через ${time}\nМонет: ${coins}`,
   buyLife: (price) => `Купить жизнь за ${price}`,
-  adLives: (n) => `Ролик: +${n} жизни`,
+  adLife: 'Ролик: +1 жизнь',
   wait: 'Подождать',
 
   // коллекция

@@ -14,7 +14,7 @@ import { CatView } from '../theme/cats/CatView.js';
 import { ULTRAS, ULTS_READY } from '../theme/cats/ultras.js';
 import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
-import { coins, buyGoods, buyUltra, ultrasOwned, ultraPrice, breedSkin, adsState, adCoins, adGoods, adLife } from '../core/save.js';
+import { lives, coins, buyGoods, buyUltra, ultrasOwned, ultraPrice, breedSkin, adsState, adCoins, adGoods, adLife } from '../core/save.js';
 import { showRewardedAd } from '../rewarded.js';
 import { formatLeft } from './lives.js';
 
@@ -341,11 +341,12 @@ export function openGoods(scene, g, onBought) {
 }
 
 // Вариант товара за ролик: { wait — мс до следующего (0 — можно, Infinity — завтра), take() — начислить }, или null.
-// Умения: только первый (самый дешёвый) вариант, раз в CONFIG.ads.goodsEveryMin; жизни: одна жизнь, CONFIG.ads.life.
+// Умения: только первый (самый дешёвый) вариант, раз в CONFIG.ads.goodsEveryMin; жизни: одна жизнь, CONFIG.ads.life,
+// и только когда жизни кончились.
 function adOffer(g, o, i) {
   const st = adsState();
   if (g.icon === 'heart') {
-    if (o.n !== 1 || o.minutes || o.forever) return null;
+    if (o.n !== 1 || o.minutes || o.forever || lives() > 0) return null; // жизнь за ролик — только когда жизни кончились
     return { wait: st.lifeWait, take: () => adLife() };
   }
   if (i !== 0) return null;

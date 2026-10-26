@@ -710,12 +710,14 @@ export function adGoods(kind, give) {
   return true;
 }
 
-// Жизнь за ролик: не больше CONFIG.ads.life.perDay в день и не чаще раза в everyMin; false — нельзя.
+// Жизнь за ролик — только когда жизни кончились (и не идут бесконечные); не больше CONFIG.ads.life.perDay в день
+// и не чаще раза в everyMin; false — нельзя.
 export function adLife() {
   const d = get();
   const A = CONFIG.ads.life;
   const a = adsToday(d);
   refill(d);
+  if (d.lives > 0 || infiniteLeft() > 0) return false;
   if (a.lives >= A.perDay || (a.lifeAt || 0) + A.everyMin * 60000 > Date.now()) return false;
   a.lives += 1;
   a.lifeAt = Date.now();

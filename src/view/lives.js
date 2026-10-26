@@ -1,7 +1,8 @@
 import { CONFIG } from '../config.js';
 import { showPopup } from './Popup.js';
-import { lives, livesRefillLeft, buyLife, coins } from '../core/save.js';
+import { lives, livesRefillLeft, buyLife, coins, adsState, adLife } from '../core/save.js';
 import { sfx } from '../audio.js';
+import { showRewardedAd, rewardedReady } from '../rewarded.js';
 import { openCoinPacks } from './ShopView.js';
 import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
@@ -30,13 +31,19 @@ export function confirmLife(scene, title, onYes) {
   });
 }
 
-// Жизней нет: ролик (этап 6), подождать (onGot — жизнь появилась). За монеты — только запасной путь,
-// когда ролик показать нельзя: пока реклама выключена, кнопка есть всегда; на этапе 6 — при ошибке ролика.
+// Жизней нет: жизнь за ролик (если ролик готов и лимит CONFIG.ads.life не исчерпан), купить за монеты,
+// подождать (onGot — жизнь появилась).
 export function showNoLives(scene, onGot) {
   const L = CONFIG.lives;
   const buttons = [];
-  if (CONFIG.ads.enabled) buttons.push({ label: STR.adLives(L.adGives), color: PAL.adOrange, onTap: () => {} }); // этап 6
-  else {
+  const st = adsState();
+  if (rewardedReady() && st.livesLeft > 0 && !st.lifeWait) {
+    buttons.push({
+      label: STR.adLife, color: PAL.adOrange,
+      onTap: () => showRewardedAd(scene, () => { if (adLife()) { sfx(scene, 'sfx_coins', CONFIG.audio.coins); onGot?.(); } }),
+    });
+  }
+  {
     buttons.push({
       label: STR.buyLife(L.price), color: PAL.buyGreen, keep: true,
       onTap: () => {

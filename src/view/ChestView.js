@@ -32,7 +32,8 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
   const add = (o) => { parts.push(o); return o.setDepth(depth).setScrollFactor(0); };
   // свой звук, а пока файла нет — запасной из уже имеющихся
   const snd = (key, fallback, volume = 1, rate = 1) => sfx(scene, scene.cache.audio.exists(key) ? key : fallback, volume, rate);
-  const shake = ([ms, power]) => fx && scene.cameras.main.shake(ms, power);
+  // трясётся и основная камера, и камера интерфейса (окно сундука может быть на ней — RoomScene)
+  const shake = ([ms, power]) => fx && [scene.cameras.main, scene.hudCam].forEach((c) => c?.shake(ms, power));
   const cx = W / 2;
   const cy = H / 2 + 120;
   // закрыть: награды уже начислены, поэтому и закрытие вкладкой посреди анимации — как «Забрать»

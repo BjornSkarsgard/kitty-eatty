@@ -514,23 +514,24 @@ export function loseLife() {
   refill(d);
   if (infiniteLeft() > 0) return true; // бесконечные — ничего не сгорает
   if (d.lives <= 0) return false;
-  if (d.lives >= LV.max) d.refillAt = Date.now() + LIFE_MS;
   d.lives -= 1;
+  if (d.lives < LV.max && d.refillAt === null) d.refillAt = Date.now() + LIFE_MS; // сверх максимума таймер не идёт
   write();
   return true;
 }
 
-// Начислить жизни (покупка, ролик), не больше максимума; стали полными — таймер не нужен.
+// Начислить жизни (покупка, ролик, подарки) — можно и сверх максимума (10/5); стали полными — таймер не нужен.
+// Сами по себе (refill) жизни восстанавливаются только до максимума.
 function giveLives(d, n) {
-  d.lives = Math.min(LV.max, d.lives + n);
+  d.lives += n;
   if (d.lives >= LV.max) d.refillAt = null;
 }
 
-// Купить жизнь за монеты; false — не хватает монет или жизни и так полные.
+// Купить жизнь за монеты; false — не хватает монет.
 export function buyLife() {
   const d = get();
   refill(d);
-  if (d.coins < LV.price || d.lives >= LV.max) return false;
+  if (d.coins < LV.price) return false;
   d.coins -= LV.price;
   giveLives(d, 1);
   write();
@@ -628,13 +629,11 @@ export function buyBooster(kind) {
 
 // ---------- магазин ----------
 
-// Товар за монеты (CONFIG.shop.goods): give — { hints, jars, undos, lives, infiniteMin }. false — не хватает монет
-// или это только жизнь, а жизни и так полные.
+// Товар за монеты (CONFIG.shop.goods): give — { hints, jars, undos, lives, infiniteMin }. false — не хватает монет.
 export function buyGoods(price, give) {
   const d = get();
   refill(d);
   if (d.coins < price) return false;
-  if (give.lives && d.lives >= LV.max) return false;
   d.coins -= price;
   d.hints += give.hints || 0;
   d.jars += give.jars || 0;
@@ -711,13 +710,13 @@ export function adGoods(kind, give) {
   return true;
 }
 
-// Жизнь за ролик: не больше CONFIG.ads.life.perDay в день и не чаще раза в everyMin; false — нельзя (или жизни полные).
+// Жизнь за ролик: не больше CONFIG.ads.life.perDay в день и не чаще раза в everyMin; false — нельзя.
 export function adLife() {
   const d = get();
   const A = CONFIG.ads.life;
   const a = adsToday(d);
   refill(d);
-  if (a.lives >= A.perDay || (a.lifeAt || 0) + A.everyMin * 60000 > Date.now() || d.lives >= LV.max) return false;
+  if (a.lives >= A.perDay || (a.lifeAt || 0) + A.everyMin * 60000 > Date.now()) return false;
   a.lives += 1;
   a.lifeAt = Date.now();
   giveLives(d, 1);

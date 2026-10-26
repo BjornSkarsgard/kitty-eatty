@@ -110,6 +110,7 @@ export class RoomScene extends Phaser.Scene {
 
     const U = CONFIG.ui;
     this.coinPill = counterPill(this, 30 + U.pillWidth / 2, U.topY, 'coin', coins(), { depth: 25 }).setScrollFactor(0);
+    this.tapPill(this.coinPill, U.pillWidth, () => openCoinPacks(this, () => this.refreshTop()));
     this.createLives();
     const gear = addSettingsMenu(this);
     // тесты: ключ под шестерёнкой — панель разработчика; закрыли — холл заново (всё перечитывается из сохранения).
@@ -153,9 +154,11 @@ export class RoomScene extends Phaser.Scene {
     this.hudCam = this.cameras.add(0, 0, W, H);
     this.hudCam.ignore(this.children.list.filter((o) => !hud.includes(o)));
     this.cameras.main.ignore(hud);
-    // пока камера наехала на полки магазина, окна (всё новое) — на камере интерфейса: основная приближена;
-    // полки магазина перерисовываются на основной (onMain)
-    const onAdded = (o) => (this.shopOpen && !this.toMain ? this.cameras.main : this.hudCam).ignore(o);
+    // окна (всё, что создаётся, пока открыто окно — trackWindow записывает его первым) — на камере интерфейса, поверх
+    // счётчиков сверху и без приближения основной камеры; пока камера на полках магазина — тоже. Полки магазина
+    // перерисовываются на основной (onMain)
+    const onHud = () => (this.windows?.size || this.shopOpen) && !this.toMain;
+    const onAdded = (o) => (onHud() ? this.cameras.main : this.hudCam).ignore(o);
     this.events.on(Phaser.Scenes.Events.ADDED_TO_SCENE, onAdded);
     // события сцены переживают перезапуск — без этого старая подписка прятала бы новый интерфейс
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.ADDED_TO_SCENE, onAdded));
@@ -166,6 +169,18 @@ export class RoomScene extends Phaser.Scene {
     return this.cameras.main.getWorldPoint(p.x, p.y);
   }
 
+  // Тап по счётчику вверху — окно покупки (монеты — пачки монет, жизни — жизни). С развёрнутой карты — сначала свернуть
+  // (окна рисуются без приближения камеры).
+  tapPill(pill, w, open) {
+    pill.setSize(w, 64).setInteractive();
+    pill.on('pointerdown', () => {
+      if (this.mapBusy || this.windows?.size) return; // окно уже открыто — второе не открываем
+      sfx(this, 'sfx_button');
+      if (this.mapOpen) return this.collapseMap(open);
+      open();
+    });
+  }
+
   // Жизни в верхней полосе рядом с монетами; не полные — под ними таймер до следующей. Бесконечные — на сердечке
   // белый ∞, в плашке — сколько они ещё идут. Обновляются раз в секунду.
   createLives() {
@@ -173,6 +188,7 @@ export class RoomScene extends Phaser.Scene {
     const w = 150;
     const x = 30 + U.pillWidth + 20 + w / 2;
     this.livesPill = counterPill(this, x, U.topY, 'heart', '', { w, depth: 25 }).setScrollFactor(0);
+    this.tapPill(this.livesPill, w, () => openGoods(this, CONFIG.shop.goods.find((g) => g.icon === 'heart'), () => this.refreshTop()));
     const ic = this.livesPill.icon;
     this.livesInf = infinityMark(this, ic.x, ic.y, 72).setVisible(false);
     this.livesPill.add(this.livesInf);
@@ -494,11 +510,14 @@ export class RoomScene extends Phaser.Scene {
   }
 
   // После сундука или подарка: монеты, коллекция, кнопки.
+  // Комната после наград: может вызываться, пока открыто окно (ролик на главной), — рисуем на основной камере.
   afterBox() {
-    this.refreshTop();
-    this.refreshName();
-    this.refreshBoxes();
-    this.refreshCollectionWall();
+    this.onMain(() => {
+      this.refreshTop();
+      this.refreshName();
+      this.refreshBoxes();
+      this.refreshCollectionWall();
+    });
   }
 
   tapChest() {
@@ -735,7 +754,8 @@ export class RoomScene extends Phaser.Scene {
   showCollection(tab) {
     openCollection(this, {
       tab,
-      onChange: () => { this.makeHomeCat(); this.refreshName(); this.refreshCollectionWall(); this.refreshTop(); },
+      // окно коллекции ещё открыто — комнату перерисовываем на основной камере
+      onChange: () => this.onMain(() => { this.makeHomeCat(); this.refreshName(); this.refreshCollectionWall(); this.refreshTop(); }),
     });
   }
 

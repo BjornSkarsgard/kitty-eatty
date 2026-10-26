@@ -6,6 +6,7 @@ import { CatView } from '../theme/cats/CatView.js';
 import { beatPulse } from '../beat.js';
 import { sfx, gameMusic } from '../audio.js';
 import { preloadRewarded } from '../rewarded.js';
+import { openCoinPacks } from '../view/ShopView.js';
 import { haptic } from '../haptics.js';
 import {
   currentLevel, setCurrentLevel, recordWin, undos, coins, spendUndo, buyUndo, lives, loseLife, infiniteLeft,
@@ -79,6 +80,12 @@ export class GameScene extends Phaser.Scene {
     // верхняя полоса: монеты, табличка уровня (у головоломки — сиреневая), настройки
     const U = CONFIG.ui;
     this.coinPill = counterPill(this, 30 + U.pillWidth / 2, U.topY, 'coin', coins());
+    // тап по монетам — окно пачек монет (и монеты за ролик)
+    this.coinPill.setSize(U.pillWidth, 64).setInteractive().on('pointerdown', () => {
+      if (this.won || this.windows?.size) return;
+      sfx(this, 'sfx_button');
+      openCoinPacks(this, () => this.refreshUndo());
+    });
     plate(this, CONFIG.width / 2, U.topY, STR.level(level.id), { color: level.puzzle ? PAL.platePuzzle : undefined });
     if (level.kind) kindBadge(this, CONFIG.width / 2, U.topY + U.kindBadgeY, level.kind, STR.kindShort[level.kind]).setDepth(15);
     addSettingsMenu(this, { onExit: () => this.leave() });

@@ -269,7 +269,7 @@ function adButton(scene, w, wait, onWatched, onReady) {
 export function openCoinPacks(scene, onChange) {
   const V = CONFIG.shopWindow;
   const list = CONFIG.shop.coinPacks;
-  const rh = V.rowH;
+  const rh = V.coinRowH; // строк семь — пониже, чтобы окно не уходило под счётчики сверху
   const h = 150 + (list.length + 1) * (rh + 14);
   shopWindow(scene, STR.shop.coins, h, (box, close) => {
     const A = CONFIG.ads.shopCoins;

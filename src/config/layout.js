@@ -198,5 +198,11 @@ export const LAYOUT = {
     dragThreshold: 14,   // px: сдвиг пальца меньше — это тап, больше — прокрутка
     friction: 0.92,      // инерция прокрутки: доля скорости, что остаётся каждый кадр
     homeFromLevel: 5,    // с этого уровня после загрузки открывается комната, до него — сразу уровень
+    // главы: фон на стыке перетекает в следующий на blend px (полосами по blendSteps), указатель главы — ширина signW,
+    // надпись signFont px; украшения у тропинки — decorSize px, на decorX от края; частицы — fxEvery мс, fxSize px
+    chapterBlend: 360, blendSteps: 12, signW: 560, signFont: 30,
+    decorSize: 96, decorX: 92, decorEvery: 0, chapterPawSize: 40, // украшение — у каждого decorEvery-го уровня (0 — без украшений: много шума)
+    fxEvery: 260, fxSize: 22,
+    chapterLabelY: 150,  // счётчик «Глава N · X/20» на развёрнутой карте — под верхней полосой
   },
 };

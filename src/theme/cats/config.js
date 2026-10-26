@@ -7,6 +7,29 @@ export const CATS = {
   nameList: NAMES, // клички (src/theme/cats/names.js) — для core/save.js
   ultras: ULTRAS,  // ультракоты (src/theme/cats/ultras.js) — для core/save.js
 
+  // Главы на карте уровней (по levelGen.chapter уровней): название и частицы над картой. Арт главы N (с 1):
+  // map_bg_N.jpg — фон (бесшовный по вертикали, tools/seamless-v.mjs), mapN_d1…d6 — украшения у тропинки,
+  // mapN_paw — след на тропинке, mapN_fx — частица. Чего нет — однотонный фон, лапки, без украшений, искорки.
+  // fx — как летят частицы: fall — падают (снег, лепестки, листья, мука, конфетти), rise — поднимаются (пузырьки,
+  // светлячки, искры), drift — плавают (пылинки); tint — цвет частицы, если своей картинки нет.
+  chapters: [
+    { name: 'Уютная кухня', fx: 'rise', tint: 0xffd75a },
+    { name: 'Сад во дворе', fx: 'fall', tint: 0xff9de6 },
+    { name: 'Рыбный рынок', fx: 'rise', tint: 0xbfe9ff },
+    { name: 'Пекарня', fx: 'fall', tint: 0xffffff },
+    { name: 'Осенний парк', fx: 'fall', tint: 0xf0a020 },
+    { name: 'Пляж', fx: 'rise', tint: 0xbfe9ff },
+    { name: 'Крыши ночного города', fx: 'drift', tint: 0xfff2b0 },
+    { name: 'Чердак', fx: 'drift', tint: 0xf3e3c8 },
+    { name: 'Библиотека', fx: 'drift', tint: 0xf3e3c8 },
+    { name: 'Зимний двор', fx: 'fall', tint: 0xffffff },
+    { name: 'Ярмарка', fx: 'fall', tint: 0xff6b6b },
+    { name: 'Порт', fx: 'rise', tint: 0xbfe9ff },
+    { name: 'Сад сакуры', fx: 'fall', tint: 0xffc0dc },
+    { name: 'Аквариум', fx: 'rise', tint: 0xbfe9ff },
+    { name: 'Замок кошачьего короля', fx: 'rise', tint: 0xffd75a },
+  ],
+
   // Блокеры на уровне: скрытый корм «?» (значок food_hidden.png на серой подложке) и лёд (ice_cover.png).
   blockers: {
     hiddenFill: 0x8f8aa3,     // подложка скрытой порции

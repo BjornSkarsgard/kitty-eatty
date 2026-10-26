@@ -24,7 +24,7 @@ const label = (scene, x, y, s, size, color = PAL.text) => scene.add.text(x, y, s
 }).setOrigin(0.5).setResolution(SHARP);
 
 // Ценник под товаром: плашка с текстом и (для монет) монеткой.
-function priceTag(scene, x, y, text, { coin = false, size = 11 } = {}) {
+function priceTag(scene, x, y, text, { coin = false, size = CONFIG.room.shop.tagSize } = {}) {
   const c = scene.add.container(x, y);
   const t = label(scene, coin ? size * 0.55 : 0, 0, text, size);
   const w = t.width + size * (coin ? 2.4 : 1.4);
@@ -116,7 +116,7 @@ export function stockShelves(scene, room, place, k, onTap) {
       put(tappable(zone, S.catTapW * k, S.catTapH * k, () => onTap('ultra', u)), x, y2 - S.catTapH / 2);
       const have = owned.includes(u.id);
       put(names[i].setScale(fit), x, y2 + S.catNameDy); // порода — на доске под котом
-      put(priceTag(scene, 0, 0, have ? STR.shop.owned : STR.shop.short(ultraPrice(u)), { coin: !have, size: S.catTagSize }), x, y2 + S.catTagDy);
+      put(priceTag(scene, 0, 0, have ? STR.shop.owned : STR.shop.short(ultraPrice(u)), { coin: !have }), x, y2 + S.catTagDy);
     });
     const more = plate(scene, 0, 0, STR.shop.more, { depth: 0 }).setScale(S.moreScale * k);
     more.list.forEach((o) => o.setResolution?.(SHARP));

@@ -284,9 +284,10 @@ export const CATS = {
       topX: [278, 360, 442], topSize: 62, chestScale: 0.72, // сундук «Наборы» — доля topSize (выше — наезжает на навес)
       catX: [266, 303, 340, 377, 414, 458], catsOnShelf: 5, catScale: 0.34, catTapW: 40, catTapH: 64,
       moreScale: 0.2, moreDy: 24,
-      catNameSize: 6.5, catNameDy: 9, catTagDy: 23, catTagSize: 9, catSlotW: 35, // порода под котом и ценник под ней
+      catNameSize: 6.5, catNameDy: 9, catTagDy: 23, catSlotW: 35, // порода под котом и ценник под ней
       goodsX: [278, 332, 388, 442], goodsSize: 40,
       tagDy: 14,
+      tagSize: 8.5,        // шрифт ценников — один на всех полках (кроме пород котов и «Другие»)
     },
   },
 };

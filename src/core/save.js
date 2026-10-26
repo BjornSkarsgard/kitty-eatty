@@ -15,8 +15,8 @@
 //   skins, skin — открытые окрасы (id из CONFIG.skins) и окрас обычного кота («Найдёныш»);
 //   breedSkins — { id ультракота: окрас } — у каждой породы свой (нет — окрас породы по умолчанию, look);
 //   chests   — неоткрытые сундуки;
-//   daily — награды за вход: { last: 'ГГГГ-ММ-ДД' последней, streak: сколько дней серии забрано, shield: откат при пропуске
-//     пока «на неделю» (false — на 1-й день), clean: дней подряд без пропуска, penalized: за какой last пропуск уже учтён,
+//   daily — награды за вход: { last: 'ГГГГ-ММ-ДД' последней, streak: сколько дней серии забрано,
+//     penalized: за какой last пропуск уже учтён,
 //     miss: { from, to } — последний откат серии (показать в окне), extra: дополнительные (чит разработки) };
 //   names, name — открытые клички (id из src/theme/cats/names.js) и выбранная ('#custom' — своя); custom — своя кличка (или null);
 //   nameTokens — неиспользованные «именные таблички» (можно придумать кличку самому);
@@ -42,7 +42,7 @@ const START_NAMES = NAMES.filter((n) => n.start).map((n) => n.id);
 export const CUSTOM = '#custom';
 
 const SETTINGS = { sound: true, music: true, fx: true, vibro: true };
-const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, hints: B.hint.start, jars: B.jar.start, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, daily: { last: null, streak: 0, shield: true, clean: 0 }, infiniteUntil: null, msDone: 0, ultras: [], ultra: null, ultraIntro: false, ultCharge: CONFIG.ultRecharge, breedSkins: {},
+const empty = () => ({ v: VERSION, current: 0, unlocked: 0, best: {}, coins: E.startCoins, undos: E.startUndos, hints: B.hint.start, jars: B.jar.start, undoProgress: 0, catLevel: 1, xp: 0, lives: LV.max, refillAt: null, skins: [...START_SKINS], skin: START_SKINS[0], chests: 0, daily: { last: null, streak: 0 }, infiniteUntil: null, msDone: 0, ultras: [], ultra: null, ultraIntro: false, ultCharge: CONFIG.ultRecharge, breedSkins: {},
   names: [...START_NAMES], name: START_NAMES[0], custom: null, nameTokens: 0, settings: { ...SETTINGS } });
 
 // Старые версии сохранения дополняем до текущей, прогресс не теряется.
@@ -371,14 +371,12 @@ const yesterday = () => {
   return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
 };
 
-// Пропущен день (последний вход раньше вчера) — откат серии, один раз на каждый такой пропуск (CONFIG.dailyLogin).
+// Пропущен день (последний вход раньше вчера) — серия сбрасывается на 1-й день, один раз на каждый такой пропуск.
 function checkMiss(d) {
   const g = d.daily;
   if (!g.last || g.last === today() || g.last === yesterday() || g.penalized === g.last) return;
   const from = g.streak;
-  g.streak = g.shield ? Math.floor(g.streak / 7) * 7 : 0; // «на неделю» — к началу своей семёрки
-  g.shield = false;
-  g.clean = 0;
+  g.streak = 0;
   g.penalized = g.last;
   g.miss = { from, to: g.streak };
   write();
@@ -387,15 +385,15 @@ function checkMiss(d) {
 // extra — подарки сверх «раз в день» (выдаются читом разработки devGive)
 export const dailyAvailable = () => get().daily.last !== today() || (get().daily.extra || 0) > 0;
 
-// Что показать в окне: { day — день серии, который забрать сегодня (или уже забранный сегодня), canClaim, shield,
-// clean, miss — откат, если был (показать один раз) }.
+// Что показать в окне: { day — день серии, который забрать сегодня (или уже забранный сегодня), canClaim,
+// miss — сброс, если был (показать один раз) }.
 export function dailyState() {
   const d = get();
   checkMiss(d);
   const g = d.daily;
   const canClaim = dailyAvailable();
   const miss = g.miss ?? null;
-  return { day: canClaim ? g.streak + 1 : g.streak, canClaim, shield: g.shield, clean: g.clean, miss };
+  return { day: canClaim ? g.streak + 1 : g.streak, canClaim, miss };
 }
 
 // Откат показали — больше не показывать.
@@ -422,8 +420,6 @@ export function claimDaily() {
   d.chests += r.chests;
   if (r.infiniteMin) d.infiniteUntil = Math.max(Date.now(), d.infiniteUntil || 0) + r.infiniteMin * 60 * 1000;
   g.streak = day;
-  g.clean += 1;
-  if (g.clean >= CONFIG.dailyLogin.shieldDays) g.shield = true; // неделя без пропусков — откат снова «на неделю»
   if (g.last === today()) g.extra = extra - 1; // сегодняшняя уже забрана — тратится дополнительная
   g.last = today();
   write();

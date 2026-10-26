@@ -85,13 +85,13 @@ export function openDaily(scene, onDone) {
     fontFamily: font, fontStyle: 'bold', fontSize: '25px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 6,
     align: 'center', wordWrap: { width: pw - 70 }, lineSpacing: 6,
   }).setOrigin(0.5, 0);
-  const showInfo = (streak, shield, clean, miss) => {
+  const showInfo = (streak, miss) => {
     const lines = [STR.dailyStreak(streak)];
-    if (miss) lines.push(STR.dailyMissed(miss.to + 1));
-    lines.push(shield ? STR.dailyShieldOn : STR.dailyShieldOff(CONFIG.dailyLogin.shieldDays - clean));
+    if (miss) lines.push(STR.dailyMissed);
+    lines.push(STR.dailyWarn);
     info.setText(lines.join('\n'));
   };
-  showInfo(st.canClaim ? st.day - 1 : st.day, st.shield, st.clean, st.miss);
+  showInfo(st.canClaim ? st.day - 1 : st.day, st.miss);
   box.add(info);
   if (st.miss) dailyMissSeen();
 
@@ -103,7 +103,7 @@ export function openDaily(scene, onDone) {
       if (got) {
         sfx(scene, 'sfx_coins', CONFIG.audio.coins);
         const now = dailyState();
-        showInfo(now.day, now.shield, now.clean, st.miss);
+        showInfo(now.day, st.miss);
         const card = cards.find((x) => x.day === got.day)?.c;
         if (card) {
           scene.tweens.killTweensOf(card);

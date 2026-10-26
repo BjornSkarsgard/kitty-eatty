@@ -238,16 +238,17 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
     later(A.flash, showRewards);
   };
 
-  // 4. награды вылетают по дуге в ряд над коробкой
+  // 4. награды вылетают по дуге и встают рядами над коробкой
   items = items.filter((it) => it.icon !== 'hint' || scene.textures.exists('icon_hint')); // подсказка — когда будет иконка
   const placed = [];
   const showRewards = () => {
-    const gap = items.length > 3 ? 150 : 180; // четыре награды — теснее, чтобы подписи не уходили за край
-    const y = cy - A.size * A.rewardsY;
+    const made = items.map((it) => add(rewardItem(scene, it, font)).setVisible(false));
+    const spots = rewardSpots(made.map((o) => Math.max(A.rewardMinW, o.getBounds().width + A.rewardPad)));
     items.forEach((it, i) => later(i * A.rewardsDelay, () => {
-      const x = cx + (i - (items.length - 1) / 2) * gap;
+      const { x, y } = spots[i];
       const halo = add(scene.add.image(x, y, 'fx_soft').setTint(PAL.ray).setBlendMode(ADD).setAlpha(0).setScale(A.haloSize / 128));
-      const item = add(rewardItem(scene, it, font)).setPosition(cx, mouthY).setScale(0.2);
+      scene.children.bringToTop(made[i]); // ореол — под наградой
+      const item = made[i].setVisible(true).setPosition(cx, mouthY).setScale(0.2);
       placed.push({ it, item });
       snd('sfx_reward_pop', 'sfx_star', 1, 1 + i * 0.12);
       scene.tweens.addCounter({
@@ -273,6 +274,33 @@ export function openBox(scene, kind, items, onDone, { title } = {}) {
       btn.setScale(0);
       scene.tweens.add({ targets: btn, scale: 1, duration: 260, ease: 'Back.easeOut' });
     });
+  };
+
+  // Места наград: по рядам, пока ряд влезает в ширину экрана; нижний ряд — над коробкой, остальные выше.
+  // widths — ширина каждой награды с отступом.
+  const rewardSpots = (widths) => {
+    const fits = (row) => row.reduce((s, i) => s + widths[i], 0) <= W - A.rewardMargin * 2;
+    let rows = [[]];
+    widths.forEach((_, i) => {
+      if (rows[rows.length - 1].length && !fits([...rows[rows.length - 1], i])) rows.push([]);
+      rows[rows.length - 1].push(i);
+    });
+    // столько же рядов, но поровну (6 наград — 3 и 3, а не 4 и 2), если так тоже влезает; нижние — на одну больше
+    const n = widths.length;
+    const even = rows.map((_, r) => Math.floor(n / rows.length) + (rows.length - 1 - r < n % rows.length ? 1 : 0));
+    const balanced = even.map((k, r) => Array.from({ length: k }, (__, j) => even.slice(0, r).reduce((s, x) => s + x, 0) + j));
+    if (balanced.every(fits)) rows = balanced;
+    const spots = [];
+    const bottomY = cy - A.size * A.rewardsY;
+    rows.forEach((row, r) => {
+      const y = bottomY - (rows.length - 1 - r) * A.rewardRowGap;
+      let x = cx - row.reduce((s, i) => s + widths[i], 0) / 2;
+      row.forEach((i) => {
+        spots[i] = { x: x + widths[i] / 2, y };
+        x += widths[i];
+      });
+    });
+    return spots;
   };
 
   // 5. «Забрать»: монеты летят в счётчик монет (если он есть на экране), остальное тает. Второй тап — сразу закрыть.

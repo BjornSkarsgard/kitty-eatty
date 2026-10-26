@@ -8,7 +8,18 @@
 export const HID = 1000;
 export const colorOf = (x) => x % HID;
 // Состояние с маской скрытых (mask[i][s] = 1 — скрыта).
-export const withHidden = (st, mask) => st.map((b, i) => b.map((c, s) => (mask?.[i]?.[s] ? c + HID : c)));
+export const withHidden = (st, mask) => revealLone(st.map((b, i) => b.map((c, s) => (mask?.[i]?.[s] ? c + HID : c))));
+
+// Все оставшиеся скрытые порции одного цвета — угадывать нечего, открываем все (как Board.reveal в игре).
+export function revealLone(st) {
+  let color = -1;
+  for (const b of st) for (const x of b) {
+    if (x < HID) continue;
+    if (color < 0) color = x - HID;
+    else if (x - HID !== color) return st;
+  }
+  return color < 0 ? st : st.map((b) => (b.some((x) => x >= HID) ? b.map(colorOf) : b));
+}
 
 export function topRun(b) {
   if (!b.length) return 0;
@@ -60,13 +71,15 @@ export function legalMoves(st, cap, ice) {
   return res;
 }
 
-export function applyMove(st, [f, t, n]) {
+// cap — для скрытого корма: в собранной банке открывается всё (как Board.reveal).
+export function applyMove(st, [f, t, n], cap) {
   const ns = st.slice();
   ns[f] = st[f].slice(0, st[f].length - n);
   const top = ns[f].length - 1;
   if (top >= 0 && ns[f][top] >= HID) { ns[f] = ns[f].slice(); ns[f][top] -= HID; } // открылась порция под ушедшими
   ns[t] = st[t].concat(st[f].slice(st[f].length - n));
-  return ns;
+  if (cap && isComplete(ns[t], cap)) ns[t] = ns[t].map(colorOf);
+  return revealLone(ns);
 }
 
 // Допустимая эвристика для A*: каждый ход уменьшает её не больше чем на 1.
@@ -134,7 +147,7 @@ export function solve(start, cap, maxExpanded = 2_000_000, ice = null) {
     }
     if (++expanded > maxExpanded) return null;
     for (const m of legalMoves(node.st, cap, ice)) {
-      const ns = applyMove(node.st, m);
+      const ns = applyMove(node.st, m, cap);
       const k = keyOf(ns, ice);
       const ng = node.g + 1;
       if (g.has(k) && g.get(k) <= ng) continue;
@@ -205,7 +218,7 @@ export function deadEndRate(start, cap, rand, playouts = 120, maxSteps = 400, ic
     let ok = false;
     for (let step = 0; step < maxSteps; step++) {
       if (isSolved(st, cap)) { ok = true; break; }
-      const opts = legalMoves(st, cap, ice).map((m) => applyMove(st, m)).filter((ns) => !seen.has(keyOf(ns, ice)));
+      const opts = legalMoves(st, cap, ice).map((m) => applyMove(st, m, cap)).filter((ns) => !seen.has(keyOf(ns, ice)));
       if (!opts.length) break;
       st = opts[Math.floor(rand() * opts.length)];
       seen.add(keyOf(st, ice));

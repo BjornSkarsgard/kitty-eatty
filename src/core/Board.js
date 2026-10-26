@@ -99,16 +99,26 @@ export class Board {
   }
 
   // Открыть верхние порции, а в собранной банке — всё (под «?» мог лежать тот же корм).
+  // Остались скрытыми порции одного цвета — угадывать нечего, открываем все (tools/lib.mjs revealLone — то же).
   // Возвращает [[банка, место], …] открывшихся сейчас.
   reveal() {
     const now = [];
-    this.bowls.forEach((b, i) => {
-      const all = this.isComplete(i);
+    const open = (pick) => this.bowls.forEach((b, i) => {
+      const all = pick(i);
       b.forEach((_, s) => {
         if ((all || s === b.length - 1) && this.hid[i][s]) { this.hid[i][s] = false; now.push([i, s]); }
       });
     });
+    open((i) => this.isComplete(i));
+    if (this.loneHidden()) open(() => true);
     return now;
+  }
+
+  // Все скрытые порции одного цвета (и они есть).
+  loneHidden() {
+    const colors = new Set();
+    this.bowls.forEach((b, i) => b.forEach((c, s) => { if (this.hid[i][s]) colors.add(c); }));
+    return colors.size === 1;
   }
 
   isHidden(i, s) {

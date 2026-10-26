@@ -51,6 +51,7 @@ export class GameScene extends Phaser.Scene {
     const level = LEVELS[this.levelIndex];
     this.board = new Board(level);
     this.selected = null;
+    this.hintTo = null; // банка, которая подпрыгивает по подсказке («Нюх»)
     this.won = false;
     this.moved = false; // был ли ход — тогда «Заново» и выход сжигают жизнь
     this.extraJars = 0; // сколько банок добавлено умением «+1 банка»
@@ -357,6 +358,7 @@ export class GameScene extends Phaser.Scene {
 
   onBowlTap(i, pointer) {
     if (this.won) return;
+    this.stopHint();
     if (this.ultPick) return this.pickForUlt(i, pointer);
     if (this.selected === null) {
       if (this.board.canPick(i)) this.select(i);
@@ -449,6 +451,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   deselect() {
+    this.stopHint();
     if (this.selected === null) return;
     const i = this.selected;
     this.selected = null;
@@ -838,6 +841,7 @@ export class GameScene extends Phaser.Scene {
   // «Нюх»: подсказать ход из решения уровня; игрок ушёл с пути — сначала предложить откатиться.
   hint() {
     if (this.won || !this.boosterReady('hint')) return;
+    if (this.hintTo !== null) return; // подсказка уже показана — второй заряд не тратим
     this.deselect();
     const level = LEVELS[this.levelIndex];
     const h = hintFor(level, this.board);
@@ -860,21 +864,34 @@ export class GameScene extends Phaser.Scene {
   }
 
   // Подсказанный ход: банка, откуда брать, выбрана (тапни, куда класть), банка, куда класть, подпрыгивает.
+  // Подпрыгивает от своего места (не '+='), чтобы повторные нажатия не поднимали банку всё выше.
   showHint([from, to]) {
     sfx(this, 'sfx_star', CONFIG.audio.star);
     this.select(from);
-    const layers = [this.jarBack[to], this.jarFront[to], ...this.theme.jarExtras(to)];
-    const portions = this.portions[to];
+    this.hintTo = to;
     const dy = -A.liftY * this.dim.scale * 0.6;
     const repeat = Math.max(1, Math.round(CONFIG.boosters.hintShowMs / 500) - 1);
-    this.tweens.add({ targets: [...layers, ...portions], y: '+=' + dy, duration: 250, yoyo: true, repeat, ease: 'Sine.easeInOut' });
+    const jump = { duration: 250, yoyo: true, repeat, ease: 'Sine.easeInOut', onComplete: () => this.stopHint() };
+    this.tweens.add({ targets: [this.jarBack[to], this.jarFront[to], ...this.theme.jarExtras(to)], y: dy, ...jump });
+    this.portions[to].forEach((p, slot) => this.tweens.add({ targets: p, y: this.slotPos(to, slot).y + dy, ...jump }));
+  }
+
+  // Убрать прыжок подсказанной банки: ставим её на место, пока в неё не полетел корм.
+  stopHint() {
+    if (this.hintTo === null) return;
+    const to = this.hintTo;
+    this.hintTo = null;
+    if (to !== this.selected) this.liftJar(to, 0);
   }
 
   // Кнопка лотка «нельзя»: звук и дрожь.
+  // Дрожит от своего места (homeX), иначе частые нажатия сдвигают кнопку.
   shakeButton(btn) {
     sfx(this, 'sfx_invalid');
-    const x = btn.x;
-    this.tweens.add({ targets: btn, x: x + 8, duration: 50, yoyo: true, repeat: 2, onComplete: () => { btn.x = x; } });
+    btn.homeX ??= btn.x;
+    btn.shakeTween?.stop();
+    btn.x = btn.homeX;
+    btn.shakeTween = this.tweens.add({ targets: btn, x: btn.homeX + 8, duration: 50, yoyo: true, repeat: 2, onComplete: () => { btn.x = btn.homeX; } });
   }
 
   // Отмена тратит общий запас; запас кончился — предлагаем купить за монеты (позже — за рекламу).

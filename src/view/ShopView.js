@@ -16,6 +16,7 @@ import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
 import { coins, buyGoods, buyUltra, ultrasOwned, ultraPrice, breedSkin, adsState, adCoins, adGoods, adLife } from '../core/save.js';
 import { showRewardedAd } from '../rewarded.js';
+import { formatLeft } from './lives.js';
 
 const font = () => `"${CONFIG.font}", sans-serif`;
 // подписи на полках смотрят через камеру с сильным приближением — текст рисуем с запасом по чёткости
@@ -243,15 +244,26 @@ export function openPacks(scene, { only } = {}) {
 }
 
 // Кнопка «за ролик»: оранжевая с иконкой ролика; можно — тап показывает ролик, нельзя — бледная с подписью why.
-function adButton(scene, w, why, onWatched) {
-  const b = makeButton(scene, 0, 0, why || '', () => { if (!why) showRewardedAd(scene, onWatched); },
-    { w, h: 64, size: 22, color: why ? PAL.buttonDisabled : PAL.adOrange });
-  if (!why) b.add(makeIcon(scene, 'video', 46));
+// wait — сколько ждать, мс (0 — можно смотреть, Infinity — «завтра»): тогда на кнопке таймер, дошёл до нуля — onReady.
+function adButton(scene, w, wait, onWatched, onReady) {
+  const label = () => (wait === Infinity ? STR.ads.tomorrow : wait ? formatLeft(wait) : '');
+  const b = makeButton(scene, 0, 0, label(), () => { if (!wait) showRewardedAd(scene, onWatched); },
+    { w, h: 64, size: 26, color: wait ? PAL.buttonDisabled : PAL.adOrange });
+  if (!wait) b.add(makeIcon(scene, 'video', 46));
+  else if (wait !== Infinity) {
+    const until = Date.now() + wait;
+    const timer = scene.time.addEvent({
+      delay: 1000, loop: true,
+      callback: () => {
+        wait = Math.max(0, until - Date.now());
+        if (wait) b.setLabel(label());
+        else { timer.remove(); onReady?.(); }
+      },
+    });
+    b.once('destroy', () => timer.remove());
+  }
   return b;
 }
-
-// Сколько ждать: мс → «через N мин» / «завтра».
-const waitText = (ms) => (ms === Infinity ? STR.ads.tomorrow : STR.ads.wait(Math.ceil(ms / 60000)));
 
 // Пачки монет за рубли; первая строка — монеты за ролик (CONFIG.ads.shopCoins). onChange — монеты начислены.
 export function openCoinPacks(scene, onChange) {
@@ -265,7 +277,7 @@ export function openCoinPacks(scene, onChange) {
     const y0 = -h / 2 + 120 + rh / 2;
     row(scene, box, y0, V.width - 40, rh, {
       icon: artIcon(scene, 'coins_2', rh * 0.8), title: STR.ads.coinsRow(A.coins), lines: [STR.ads.left(left, A.perDay)],
-    }, [adButton(scene, 170, left ? null : STR.ads.tomorrow, () => {
+    }, [adButton(scene, 170, left ? 0 : Infinity, () => {
       if (!adCoins()) return;
       sfx(scene, 'sfx_coins', CONFIG.audio.coins);
       onChange?.();
@@ -292,13 +304,13 @@ export function openGoods(scene, g, onBought) {
       // за ролик: самый дешёвый вариант умения — раз в час; одна жизнь — CONFIG.ads.life
       const ad = adOffer(g, o, i);
       if (ad) {
-        buttons.push(adButton(scene, 120, ad.why, () => {
+        buttons.push(adButton(scene, 120, ad.wait, () => {
           if (!ad.take()) return;
           sfx(scene, 'sfx_coins', CONFIG.audio.coins);
           close();
           onBought?.();
           openGoods(scene, g, onBought);
-        }));
+        }, () => { close(); openGoods(scene, g, onBought); })); // время вышло — окно заново, кнопка ролика активна
       }
       if (o.coins != null) {
         buttons.push(priceButton(scene, 0, 0, ad ? 120 : 150, { coinsPrice: o.coins }, () => {
@@ -325,17 +337,17 @@ export function openGoods(scene, g, onBought) {
   });
 }
 
-// Вариант товара за ролик: { why — почему нельзя сейчас (null — можно), take() — начислить }, или null — не за ролик.
+// Вариант товара за ролик: { wait — мс до следующего (0 — можно, Infinity — завтра), take() — начислить }, или null.
 // Умения: только первый (самый дешёвый) вариант, раз в CONFIG.ads.goodsEveryMin; жизни: одна жизнь, CONFIG.ads.life.
 function adOffer(g, o, i) {
   const st = adsState();
   if (g.icon === 'heart') {
     if (o.n !== 1 || o.minutes || o.forever) return null;
-    return { why: st.lifeWait ? waitText(st.lifeWait) : null, take: () => adLife() };
+    return { wait: st.lifeWait, take: () => adLife() };
   }
   if (i !== 0) return null;
   const wait = st.goodsWait(g.icon);
-  return { why: wait ? waitText(wait) : null, take: () => adGoods(g.icon, o.give) };
+  return { wait, take: () => adGoods(g.icon, o.give) };
 }
 
 // Все ультракоты: голова, порода, цена (или «Есть»). onPick(u, again) — тап по коту: окно с пояснением открывается

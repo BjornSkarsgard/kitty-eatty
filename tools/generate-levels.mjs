@@ -84,15 +84,17 @@ function mechanicsFor(n, kind) {
 }
 
 // Лёд: выбираем банки и сколько собрать до таяния; солвер проверяет, что уровень так решается.
+// Морозим только банки с кормом: пустая во льду выглядит как ошибка («корм не показан»).
 // Возвращает { ice: [[банка, k], …], sol } или null.
 function placeIce(bowls, cap, n) {
+  const full = bowls.map((_, i) => i).filter((i) => bowls[i].length);
   const count = n >= MX.ice.jars2From && mrand() < 0.5 ? 2 : 1;
   for (let attempt = 0; attempt < 30; attempt++) {
     const ice = bowls.map(() => 0);
     const list = [];
     for (let j = 0; j < count; j++) {
       let i;
-      do i = Math.floor(mrand() * bowls.length); while (ice[i]);
+      do i = full[Math.floor(mrand() * full.length)]; while (ice[i]);
       const k = MX.ice.thaw[0] + Math.floor(mrand() * (MX.ice.thaw[1] - MX.ice.thaw[0] + 1));
       ice[i] = k;
       list.push([i, k]);

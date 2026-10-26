@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { CONFIG } from '../src/config.js';
 import { Board } from '../src/core/Board.js';
-import { solve, keyOf, isComplete, isNearComplete } from './lib.mjs';
+import { solve, keyOf, isComplete, isNearComplete, withHidden } from './lib.mjs';
 
 const levels = JSON.parse(readFileSync(new URL('../src/levels/levels.json', import.meta.url), 'utf8'));
 const errors = [];
@@ -33,7 +33,7 @@ for (const l of levels) {
   }
   if (l.hidden && (l.hidden.length !== l.bowls.length || l.hidden.some((h, i) => h.length !== l.bowls[i].length || h[h.length - 1])))
     err('маска скрытого корма не совпадает с банками или скрыта верхняя порция');
-  const sol = solve(l.bowls, l.capacity, 2_000_000, ice);
+  const sol = solve(l.hidden ? withHidden(l.bowls, l.hidden) : l.bowls, l.capacity, 2_000_000, ice); // «?» не переезжает с верхней
   if (!sol) err('солвер не нашёл решения');
   else if (sol.moves.length !== l.minMoves) err(`минимум ходов ${sol.moves.length}, записано ${l.minMoves}`);
 

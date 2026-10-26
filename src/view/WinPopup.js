@@ -149,13 +149,12 @@ function winBoost(scene, box, coins, coinText, fxStars, onTake) {
       showK(kAt(arrow.x));
     },
   });
-  // на кнопке — «Смотреть ×N» или «Смотреть» и сундучок
+  // на кнопке «Смотреть» стоит на месте, справа — своё место: «×N» или сундучок (надпись не скачет)
   const showK = (k) => {
-    btn.setLabel(STR.boostWatch(k));
-    const t = btn.list.find((o) => o.type === 'Text');
-    btnChest.setVisible(k === 'chest').setX(t.width / 2 + 34);
+    btnMult.setText(k === 'chest' ? '' : `×${k}`);
+    btnChest.setVisible(k === 'chest');
   };
-  const btn = makeButton(scene, 0, WC.boostBtnY, STR.boostWatch(2), () => {
+  const btn = makeButton(scene, 0, WC.boostBtnY, STR.boostWatch, () => {
     if (!run.isPlaying()) return;
     run.pause();
     const k = kAt(arrow.x);
@@ -172,8 +171,11 @@ function winBoost(scene, box, coins, coinText, fxStars, onTake) {
     }, () => { run.remove(); gone(); });
   }, { w: 380, h: 84, size: 34, color: PAL.adOrange });
   btn.add(makeIcon(scene, 'video', 50).setPosition(-160, 0));
-  const btnChest = makeIcon(scene, 'chest', 52).setVisible(false);
-  btn.add(btnChest);
+  btn.list.find((o) => o.type === 'Text').setX(-25);
+  const slotX = 125;
+  const btnMult = text(scene, slotX, -2, '×2', 38);
+  const btnChest = makeIcon(scene, 'chest', 54).setPosition(slotX, -2).setVisible(false);
+  btn.add([btnMult, btnChest]);
   parts.push(btn);
   box.add(parts);
 

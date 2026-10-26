@@ -2,7 +2,6 @@ import { CONFIG } from '../config.js';
 import { makeButton } from './Button.js';
 import { iconButton, plate, makeIcon, panel, kindBadge } from './ui.js';
 import { showRewardedAd, rewardedReady } from '../rewarded.js';
-import { showPopup } from './Popup.js';
 import { addWinBoost } from '../core/save.js';
 import { sfx } from '../audio.js';
 import { catNeed } from '../core/save.js';
@@ -66,7 +65,7 @@ export function showWinPopup(scene, { level, reward, isLast, fxStars, onNext, on
     if (icon === 'coin') coinText = t;
     box.add(t);
   });
-  if (reward.coins && level.id >= CONFIG.economy.winBoost.from && rewardedReady()) winBoost(scene, box, reward.coins, coinText, onTake);
+  if (reward.coins && level.id >= CONFIG.economy.winBoost.from && rewardedReady()) winBoost(scene, box, reward.coins, coinText, (items.length + 1 - items.length / 2) * 170 - 85, fxStars, onTake);
   if (!items.length) {
     box.add(scene.add.text(0, WC.rewardsY, STR.alreadyPassed, {
       fontFamily: font, fontStyle: 'bold', fontSize: '32px', color: PAL.textDim,
@@ -99,7 +98,8 @@ export function showWinPopup(scene, { level, reward, isLast, fxStars, onNext, on
 // стрелкой. Нажал — стрелка встаёт насовсем, ролик; досмотрел — монеты ×k (сверху начисляется coins × (k − 1)) или
 // сундук, не досмотрел — шкала исчезает, остаются обычные монеты. Ролик не загрузился заранее (rewardedReady) — шкалы нет.
 // onTake — обновить счётчики.
-function winBoost(scene, box, coins, coinText, onTake) {
+// chestX — куда в ряду наград встанет выигранный сундук (следующее место справа).
+function winBoost(scene, box, coins, coinText, chestX, fxStars, onTake) {
   const WC = CONFIG.win;
   const Z = CONFIG.economy.winBoost.zones;
   const total = Z.reduce((s, [, w]) => s + w, 0);
@@ -117,8 +117,12 @@ function winBoost(scene, box, coins, coinText, onTake) {
     x += zw;
     return z;
   });
-  // зоны — цветные полосы; крайние скруглены вместе со шкалой (маска — скруглённый прямоугольник)
-  zones.forEach((z) => g.fillStyle(colors[z.k], 1).fillRect(z.from, y - bh / 2, z.to - z.from, bh));
+  // зоны — цветные полосы; у крайних скруглены внешние углы, как у рамки шкалы
+  const r = bh / 2;
+  zones.forEach((z, i) => {
+    const radius = { tl: i === 0 ? r : 0, bl: i === 0 ? r : 0, tr: i === zones.length - 1 ? r : 0, br: i === zones.length - 1 ? r : 0 };
+    g.fillStyle(colors[z.k], 1).fillRoundedRect(z.from, y - bh / 2, z.to - z.from, bh, radius);
+  });
   g.lineStyle(5, PAL.white, 0.9).strokeRoundedRect(-bw / 2, y - bh / 2, bw, bh, bh / 2);
   parts.push(g);
   // подписи ×N; сундук — маленький сундук над своей узкой зоной; соседние одинаковые зоны (×2 по бокам сундука) — без подписи
@@ -143,33 +147,94 @@ function winBoost(scene, box, coins, coinText, onTake) {
     targets: pos, t: 1, duration: CONFIG.economy.winBoost.sweepMs, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
     onUpdate: () => {
       arrow.x = -bw / 2 + pos.t * bw;
-      btn.setLabel(STR.boostWatch(kAt(arrow.x)));
+      showK(kAt(arrow.x));
     },
   });
+  // на кнопке — «Смотреть ×N» или «Смотреть» и сундучок
+  const showK = (k) => {
+    btn.setLabel(STR.boostWatch(k));
+    const t = btn.list.find((o) => o.type === 'Text');
+    btnChest.setVisible(k === 'chest').setX(t.width / 2 + 34);
+  };
   const btn = makeButton(scene, 0, WC.boostBtnY, STR.boostWatch(2), () => {
     if (!run.isPlaying()) return;
     run.pause();
     const k = kAt(arrow.x);
-    btn.setLabel(STR.boostWatch(k));
+    showK(k);
     const gone = () => [...parts, btn].forEach((o) => scene.tweens.add({ targets: o, alpha: 0, duration: 250, onComplete: () => o.destroy() }));
     // попытка одна: досмотрел — награда ×k (или сундук), не досмотрел — шкала исчезает, остаются обычные монеты
     showRewardedAd(scene, () => {
       const chest = k === 'chest';
       addWinBoost(chest ? 0 : coins * (k - 1), chest ? 1 : 0);
-      sfx(scene, 'sfx_coins', CONFIG.audio.coins);
-      if (chest) showPopup(scene, { title: STR.ads.gotTitle, text: STR.boostChest, buttons: [{ label: STR.ok }] });
-      else {
-        coinText?.setText(String(coins * k));
-        scene.tweens.add({ targets: coinText, scale: 1.4, duration: 160, yoyo: true, ease: 'Quad.easeOut' });
-      }
       gone();
+      celebrate(k);
       run.remove();
       onTake?.();
     }, () => { run.remove(); gone(); });
   }, { w: 380, h: 84, size: 34, color: PAL.adOrange });
   btn.add(makeIcon(scene, 'video', 50).setPosition(-160, 0));
+  const btnChest = makeIcon(scene, 'chest', 52).setVisible(false);
+  btn.add(btnChest);
   parts.push(btn);
   box.add(parts);
+
+  // Что выиграл — крупно там, где была шкала: «×N» выпрыгивает с искрами, монеты в наградах отсчитываются до нового
+  // числа; сундук выпрыгивает и улетает в ряд наград рядом с монетами.
+  const celebrate = (k) => {
+    const cy = (WC.boostY + WC.boostBtnY) / 2;
+    const stars = (x, yy, n) => fxStars.setDepth(23).explode(n, box.x + x * box.scaleX, box.y + yy * box.scaleY);
+    sfx(scene, 'sfx_star', CONFIG.audio.star, CONFIG.audio.starPitch[2]);
+    if (k === 'chest') {
+      const ch = makeIcon(scene, 'chest', 170).setPosition(0, cy).setScale(0);
+      box.add(ch);
+      const s1 = ch.scale;
+      scene.tweens.chain({
+        targets: ch,
+        tweens: [
+          { scale: 1.25, duration: 260, ease: 'Back.easeOut', onStart: () => stars(0, cy, 24) },
+          { scale: 1, duration: 160 },
+          { x: chestX, y: WC.rewardsY, scale: 0.62, duration: 520, delay: 450, ease: 'Cubic.easeInOut' },
+        ],
+        onComplete: () => {
+          sfx(scene, 'sfx_coins', CONFIG.audio.coins);
+          stars(chestX, WC.rewardsY, 12);
+          box.add(text(scene, chestX + 40, WC.rewardsY + 38, '1', 50));
+        },
+      });
+      return;
+    }
+    const big = text(scene, 0, cy, `×${k}`, 120, PAL.textGold).setScale(0);
+    box.add(big);
+    scene.tweens.chain({
+      targets: big,
+      tweens: [
+        { scale: 1.3, duration: 260, ease: 'Back.easeOut', onStart: () => stars(0, cy, 24) },
+        { scale: 1, duration: 160 },
+        { alpha: 0, y: cy - 40, duration: 400, delay: 700 },
+      ],
+    });
+    // монеты отсчитываются от обычных до умноженных, со звоном
+    const n = { v: coins };
+    scene.time.delayedCall(350, () => {
+      sfx(scene, 'sfx_coins', CONFIG.audio.coins);
+      scene.tweens.add({
+        targets: n, v: coins * k, duration: 700, ease: 'Quad.easeOut',
+        onUpdate: () => coinText?.setText(String(Math.round(n.v))),
+        onComplete: () => {
+          stars(40, WC.rewardsY, 14);
+          scene.tweens.add({ targets: coinText, scale: 1.35, duration: 150, yoyo: true, ease: 'Quad.easeOut' });
+        },
+      });
+    });
+  };
+}
+
+// Текст окна победы: жирный, с обводкой.
+function text(scene, x, y, s, size, color = PAL.text) {
+  return scene.add.text(x, y, s, {
+    fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: `${size}px`, color, stroke: PAL.textStroke,
+    strokeThickness: Math.round(size / 5.5),
+  }).setOrigin(0.5);
 }
 
 // Полоска опыта в окне победы: слева кружок с уровнем кота, в полоске «опыт / нужно», справа сверху «+N опыта».

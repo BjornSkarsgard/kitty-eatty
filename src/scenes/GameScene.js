@@ -113,7 +113,7 @@ export class GameScene extends Phaser.Scene {
     if (!kind) return novelty();
     showPopup(this, {
       title: STR.kind[kind],
-      text: STR.kindText[kind](CONFIG.economy.kindCoins[kind]),
+      text: STR.kindText[kind](CONFIG.economy.winCoins[kind]),
       buttons: [{ label: STR.letsGo, color: kind === 'nightmare' ? PAL.plateNightmare : PAL.plateHard, onTap: novelty }],
     });
   }

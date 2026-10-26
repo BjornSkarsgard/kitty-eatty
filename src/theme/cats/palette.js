@@ -16,6 +16,9 @@ export const PALETTE = {
   buyGreen: 0x4caf50,
   okGreen: 0x43c43a,
   adOrange: 0xf0a020,    // кнопка «Смотреть рекламу»
+  boost2: 0x4caf50,      // бегунок в окне победы: зоны ×2, ×3, ×4
+  boost3: 0x2f7fd6,
+  boost4: 0xe0397a,
 
   // фиолетовые: панели, таблички, кнопки, лоток
   panel: 0x5b3fd6,

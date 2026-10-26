@@ -133,10 +133,11 @@ export function setCurrentLevel(index) {
 
 // Победа: запоминаем лучший результат, открываем следующий уровень и запускаться будем с него
 // (даже если игру закрыли, не нажав «Дальше»). Награда — CONFIG.economy, только за первое прохождение
-// (фармить старые уровни нельзя): монеты (на сложном и кошмарном — ×kindCoins), опыт кота, шаг к бесплатной отмене.
+// (фармить старые уровни нельзя): монеты (по виду уровня, winCoins), опыт кота, шаг к бесплатной отмене,
+// сундук за каждый CONFIG.chest.everyLevels-й уровень.
 // Возвращает, что показать в окне победы: { coins, undos, xp, cat: { level, xp } — каким кот был до победы,
 // levelUps: [{ level, coins, undos, skin, chest }] — новые уровни кота и их награды (уже начислены),
-// chests — сколько сундуков добавилось (за уровни кота) }.
+// chests — сколько сундуков добавилось (за каждый 10-й уровень) }.
 export function recordWin(level, index, moves, count) {
   const d = get();
   const first = !levelPassed(level);
@@ -144,7 +145,8 @@ export function recordWin(level, index, moves, count) {
   const reward = { coins: 0, undos: 0, xp: 0, cat: { level: d.catLevel, xp: d.xp }, levelUps: [], chests: 0 };
   d.ultCharge = Math.min(CONFIG.ultRecharge, d.ultCharge + 1); // ульта заряжается за любую победу, и за переигровку
   if (first) {
-    reward.coins = (E.winCoins + E.coinsPer25Levels * Math.floor(index / 25)) * (E.kindCoins[level.kind] ?? 1);
+    reward.coins = E.winCoins[level.kind ?? 'normal'];
+    if (level.id % CONFIG.chest.everyLevels === 0) reward.chests += 1;
     reward.xp = C.winXp + C.xpPer10Levels * Math.floor(index / 10);
     d.undoProgress += 1;
     if (d.undoProgress >= E.undoEveryLevels) {
@@ -165,7 +167,6 @@ export function recordWin(level, index, moves, count) {
     d.jars += up.jars;
     if (up.skin && !d.skins.includes(up.skin)) d.skins.push(up.skin);
     if (up.name && !d.names.includes(up.name)) d.names.push(up.name);
-    if (up.chest) reward.chests += 1;
     reward.levelUps.push(up);
   }
   d.chests += reward.chests;
@@ -193,7 +194,6 @@ function catReward(level) {
     hints: level % C.hintEvery === 0 ? 1 : 0,
     jars: level % C.jarEvery === 0 ? 1 : 0,
     skin: CONFIG.skins.find((k) => k.catLevel === level)?.id ?? null, // рескин за этот уровень кота
-    chest: level % CONFIG.chest.everyCatLevels === 0,
     name: NAMES.find((n) => n.catLevel === level)?.id ?? null, // кличка за этот уровень кота
   };
 }
@@ -722,6 +722,12 @@ export function adLife() {
   giveLives(d, 1);
   write();
   return true;
+}
+
+// Бегунок в окне победы: монеты за уровень ещё ×(k − 1) сверху (за досмотренный ролик).
+export function addWinBoost(n) {
+  get().coins += n;
+  write();
 }
 
 // Начислить отмены. Пока не вызывается — понадобится на этапе 6 (отмена за рекламу).

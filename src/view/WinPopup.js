@@ -1,6 +1,8 @@
 import { CONFIG } from '../config.js';
 import { makeButton } from './Button.js';
 import { iconButton, plate, makeIcon, panel, kindBadge } from './ui.js';
+import { showRewardedAd } from '../rewarded.js';
+import { addWinBoost } from '../core/save.js';
 import { sfx } from '../audio.js';
 import { catNeed } from '../core/save.js';
 import { showCatLevelUps } from './CatLevelUpPopup.js';
@@ -44,22 +46,26 @@ export function showWinPopup(scene, { level, reward, isLast, fxStars, onNext, on
   box.add(praise);
 
   // сложный / кошмарный — табличкой своего цвета
-  if (level.kind) box.add(kindBadge(scene, 0, WC.kindY, level.kind, STR.kindWin[level.kind](CONFIG.economy.kindCoins[level.kind]), 32));
+  if (level.kind) box.add(kindBadge(scene, 0, WC.kindY, level.kind, STR.kindWin[level.kind](), 32));
 
   box.add(scene.add.text(0, WC.rewardsY - 92, STR.rewards, {
     fontFamily: font, fontStyle: 'bold', fontSize: '36px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 7,
   }).setOrigin(0.5));
   const items = [['coin', reward.coins], ['undo', reward.undos], ['chest', reward.chests]].filter(([, n]) => n > 0);
+  let coinText = null; // число монет — бегунок его умножит
   items.forEach(([icon, n], i) => {
     const x = (i - (items.length - 1) / 2) * 170;
     const plain = icon === 'coin' || icon === 'chest'; // свои картинки — без кружка под иконкой
     const ic = makeIcon(scene, icon, icon === 'chest' ? 118 : 104).setPosition(x, WC.rewardsY);
     if (!plain) ic.setScale(ic.scale * 0.8);
     box.add(plain ? ic : [scene.add.circle(x, WC.rewardsY, 48, PAL.button), ic]);
-    box.add(scene.add.text(x + 40, WC.rewardsY + 38, String(n), {
+    const t = scene.add.text(x + 40, WC.rewardsY + 38, String(n), {
       fontFamily: font, fontStyle: 'bold', fontSize: '50px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 9,
-    }).setOrigin(0.5));
+    }).setOrigin(0.5);
+    if (icon === 'coin') coinText = t;
+    box.add(t);
   });
+  if (reward.coins && level.id >= CONFIG.economy.winBoost.from) winBoost(scene, box, reward.coins, coinText, onTake);
   if (!items.length) {
     box.add(scene.add.text(0, WC.rewardsY, STR.alreadyPassed, {
       fontFamily: font, fontStyle: 'bold', fontSize: '32px', color: PAL.textDim,
@@ -86,6 +92,78 @@ export function showWinPopup(scene, { level, reward, isLast, fxStars, onNext, on
       fxStars.setDepth(23).explode(16, box.x, box.y + WC.praiseY);
     },
   });
+}
+
+// Бегунок: шкала ×2 ×3 ×4 ×3 ×2 (CONFIG.economy.winBoost), стрелка ездит туда-обратно; на кнопке — множитель под
+// стрелкой. Нажал — стрелка встаёт, ролик; досмотрел — монеты ×k (сверху начисляется coins × (k − 1)), не досмотрел —
+// стрелка едет дальше. onTake — обновить счётчики.
+function winBoost(scene, box, coins, coinText, onTake) {
+  const WC = CONFIG.win;
+  const Z = CONFIG.economy.winBoost.zones;
+  const total = Z.reduce((s, [, w]) => s + w, 0);
+  const bw = WC.boostW;
+  const bh = WC.boostH;
+  const y = WC.boostY;
+  const parts = [];
+  const g = scene.add.graphics();
+  const colors = { 2: PAL.boost2, 3: PAL.boost3, 4: PAL.boost4 };
+  g.fillStyle(PAL.black, 0.3).fillRoundedRect(-bw / 2 + 3, y - bh / 2 + 5, bw, bh, bh / 2);
+  let x = -bw / 2;
+  const zones = Z.map(([k, w]) => {
+    const zw = (w / total) * bw;
+    const z = { k, from: x, to: x + zw };
+    x += zw;
+    return z;
+  });
+  // зоны — цветные полосы; крайние скруглены вместе со шкалой (маска — скруглённый прямоугольник)
+  zones.forEach((z) => g.fillStyle(colors[z.k], 1).fillRect(z.from, y - bh / 2, z.to - z.from, bh));
+  g.lineStyle(5, PAL.white, 0.9).strokeRoundedRect(-bw / 2, y - bh / 2, bw, bh, bh / 2);
+  parts.push(g);
+  zones.forEach((z) => parts.push(scene.add.text((z.from + z.to) / 2, y, `×${z.k}`, {
+    fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: z.k === 4 ? '22px' : '28px', color: PAL.text,
+    stroke: PAL.textStroke, strokeThickness: 6,
+  }).setOrigin(0.5)));
+  // стрелка-указатель над шкалой
+  const arrow = scene.add.graphics();
+  arrow.fillStyle(PAL.white, 1).fillTriangle(-16, -bh / 2 - 22, 16, -bh / 2 - 22, 0, -bh / 2 + 4);
+  arrow.lineStyle(3, PAL.textStrokeHex ?? 0x3a2a78, 1).strokeTriangle(-16, -bh / 2 - 22, 16, -bh / 2 - 22, 0, -bh / 2 + 4);
+  arrow.fillStyle(PAL.white, 1).fillRect(-3, -bh / 2, 6, bh);
+  arrow.y = y;
+  parts.push(arrow);
+  const kAt = (ax) => (zones.find((z) => ax >= z.from && ax <= z.to) ?? zones[0]).k;
+  const pos = { t: 0 };
+  const run = scene.tweens.add({
+    targets: pos, t: 1, duration: CONFIG.economy.winBoost.sweepMs, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    onUpdate: () => {
+      arrow.x = -bw / 2 + pos.t * bw;
+      btn.setLabel(STR.boostWatch(kAt(arrow.x)));
+    },
+  });
+  const btn = makeButton(scene, 0, WC.boostBtnY, STR.boostWatch(2), () => {
+    if (!run.isPlaying()) return;
+    run.pause();
+    const k = kAt(arrow.x);
+    btn.setLabel(STR.boostWatch(k));
+    showRewardedAd(scene, () => {
+      addWinBoost(coins * (k - 1));
+      sfx(scene, 'sfx_coins', CONFIG.audio.coins);
+      coinText?.setText(String(coins * k));
+      scene.tweens.add({ targets: coinText, scale: 1.4, duration: 160, yoyo: true, ease: 'Quad.easeOut' });
+      [...parts, btn].forEach((o) => scene.tweens.add({ targets: o, alpha: 0, duration: 250, onComplete: () => o.destroy() }));
+      run.remove();
+      onTake?.();
+    });
+    // ролик не досмотрели (окно закрыли) — стрелка едет дальше
+    scene.time.delayedCall(300, () => { if (run.isPaused() && !scene.windows?.size) run.resume(); });
+  }, { w: 380, h: 84, size: 34, color: PAL.adOrange });
+  btn.add(makeIcon(scene, 'video', 50).setPosition(-160, 0));
+  parts.push(btn);
+  box.add(parts);
+  // окно рекламы закрыли без просмотра — продолжить, когда окон снова нет
+  const watch = scene.time.addEvent({ delay: 250, loop: true, callback: () => {
+    if (!btn.active) return watch.remove();
+    if (run.isPaused() && !scene.windows?.size) run.resume();
+  } });
 }
 
 // Полоска опыта в окне победы: слева кружок с уровнем кота, в полоске «опыт / нужно», справа сверху «+N опыта».

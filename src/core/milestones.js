@@ -13,7 +13,7 @@ function build() {
     const reward = { coins: 0, undos: 0, chests: 0, infiniteMin: 0 };
     const chapter = id % CHAPTER === 0;
     if (chapter) {
-      reward.chests = M.chapter.chests;
+      reward.coins = M.chapter.coins;
       reward.infiniteMin = M.chapter.infiniteMin;
     } else {
       const kind = M.cycle[k++ % M.cycle.length];

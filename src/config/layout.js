@@ -79,8 +79,9 @@ export const LAYOUT = {
 
   // Окно победы: размеры панели и положения внутри неё (от центра панели); похвала — в theme/cats/strings.ru.js.
   win: {
-    width: 600, height: 860, offsetY: -10,
-    praiseY: -250, kindY: -120, xpY: 0, rewardsY: 150, buttonY: 320,
+    width: 600, height: 1000, offsetY: -10,
+    praiseY: -330, kindY: -200, xpY: -85, rewardsY: 65, buttonY: 425,
+    boostY: 205, boostW: 470, boostH: 54, boostBtnY: 300, // бегунок ×2…×4 и кнопка «за рекламу» под наградами
     revealMs: 700, // мс после появления окна: звенят монеты и доезжает полоска опыта
   },
 

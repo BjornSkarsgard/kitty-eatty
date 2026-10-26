@@ -21,7 +21,8 @@ import { PALETTE as PAL } from '../theme/cats/palette.js';
 // Клички — список страницами; цвет клетки — редкость. Своя кличка (именная табличка) — первой клеткой.
 // Тап по открытому — выбрать, по закрытому с ценой — купить, по остальным — подсказка, откуда он берётся.
 // onChange() — выбрано или куплено что-то (обновить кота на главной, кличку, монеты).
-export function openCollection(scene, { onChange } = {}) {
+// tab — с какой вкладки открыть ('breeds' — по умолчанию, 'names').
+export function openCollection(scene, { onChange, tab: startTab = 'breeds' } = {}) {
   const W = CONFIG.width;
   const H = CONFIG.height;
   const V = CONFIG.collection;
@@ -50,7 +51,7 @@ export function openCollection(scene, { onChange } = {}) {
   box.add(plate(scene, 0, -ph / 2 + 4, STR.collection, { depth: 0, color: PAL.plate }).setScale(1.2));
   box.add(iconButton(scene, pw / 2 - 26, -ph / 2 + 4, 'close', close, { size: 84, shape: 'round', color: CONFIG.ui.exitColor, depth: 0 }));
 
-  let tab = 'breeds'; // 'breeds' | 'names' | 'skins' (окрасы выбранной породы)
+  let tab = startTab; // 'breeds' | 'names' | 'skins' (окрасы выбранной породы)
   let page = 0;
   let grid = null;
   const text = (x, y, s, size, color = PAL.text) => scene.add.text(x, y, s, {

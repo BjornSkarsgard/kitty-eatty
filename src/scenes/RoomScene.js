@@ -528,6 +528,10 @@ export class RoomScene extends Phaser.Scene {
     this.profileName?.setText(catName());
     this.namePlate?.destroy();
     this.namePlate = plate(this, W / 2, HC.nameY, catName(), { depth: 0 });
+    // тап по кличке — коллекция сразу на вкладке кличек
+    const b = this.namePlate.getBounds();
+    this.namePlate.setSize(b.width, b.height).setInteractive();
+    this.namePlate.on('pointerdown', () => { sfx(this, 'sfx_button'); this.showCollection('names'); });
     this.homeRoom.add(this.namePlate);
   }
 
@@ -624,8 +628,9 @@ export class RoomScene extends Phaser.Scene {
     }));
   }
 
-  showCollection() {
+  showCollection(tab) {
     openCollection(this, {
+      tab,
       onChange: () => { this.makeHomeCat(); this.refreshName(); this.refreshCollectionWall(); this.refreshTop(); },
     });
   }

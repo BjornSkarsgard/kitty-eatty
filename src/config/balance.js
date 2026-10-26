@@ -64,7 +64,7 @@ export const BALANCE = {
         { icon: 'infinite', minutes: 1440, coins: 4000, rub: 449, give: { infiniteMin: 1440 } },
         { icon: 'infinite', minutes: 4320, coins: 10000, rub: 999, give: { infiniteMin: 4320 } },
         { icon: 'infinite', minutes: 10080, coins: 20000, rub: 1499, give: { infiniteMin: 10080 } },
-        { icon: 'infinite', forever: true, rub: 2990 },
+        { icon: 'infinite', forever: true, rub: 4999 },
       ] },
     ],
   },

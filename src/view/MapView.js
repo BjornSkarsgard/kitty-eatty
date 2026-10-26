@@ -14,20 +14,25 @@ const M = CONFIG.map;
 const W = CONFIG.width;
 const H = CONFIG.height;
 const N = LEVELS.length;
-const mapH = M.padBottom + M.padTop + (N - 1) * M.spacing;
+// между главами — пустое место на один уровень (там указатель главы): слот уровня i — i + номер его главы
+const CH = CONFIG.levelGen.chapter;
+const slot = (i) => i + Math.floor(i / CH);
+const mapH = M.padBottom + M.padTop + slot(N - 1) * M.spacing;
 
 // Где на карте уровень i (0 — первый, внизу), в координатах карты.
 function nodePos(i) {
-  return { x: W / 2 + Math.sin(i * M.wave) * M.amplitude, y: mapH - M.padBottom - i * M.spacing };
+  return { x: W / 2 + Math.sin(i * M.wave) * M.amplitude, y: mapH - M.padBottom - slot(i) * M.spacing };
 }
+// Уровень на высоте y (примерно — для отбора видимых).
+const levelAtY = (y) => { const s = (mapH - M.padBottom - y) / M.spacing; return s - Math.floor(s / (CH + 1)); };
 
 // Главы: по CHAPTER уровней, тема — CONFIG.chapters (по кругу, если глав больше). Глава k (с 0) занимает по высоте
 // карты от середины между её последним и следующим уровнем до середины между первым и предыдущим.
 const CHAPTER = CONFIG.levelGen.chapter;
 const CHAPTERS = Math.ceil(N / CHAPTER);
 const theme = (k) => CONFIG.chapters[k % CONFIG.chapters.length];
-const chapterTop = (k) => (k >= CHAPTERS - 1 ? 0 : nodePos((k + 1) * CHAPTER).y + M.spacing / 2);
-const chapterBottom = (k) => (k === 0 ? mapH : nodePos(k * CHAPTER).y + M.spacing / 2);
+const chapterTop = (k) => (k >= CHAPTERS - 1 ? 0 : nodePos((k + 1) * CHAPTER).y + M.spacing);
+const chapterBottom = (k) => (k === 0 ? mapH : nodePos(k * CHAPTER).y + M.spacing); // середина пустого места
 // глава под точкой карты y
 const chapterAtY = (y) => {
   for (let k = 0; k < CHAPTERS; k++) if (y >= chapterTop(k)) return k;
@@ -128,8 +133,8 @@ export class MapView {
     const half = Math.max(H, this.viewH) / 2;
     const top = this.scroll + H / 2 - half - M.spacing;
     const bottom = this.scroll + H / 2 + half + M.spacing;
-    const from = Math.max(0, Math.floor((mapH - M.padBottom - bottom) / M.spacing));
-    const to = Math.min(N - 1, Math.ceil((mapH - M.padBottom - top) / M.spacing));
+    const from = Math.max(0, Math.floor(levelAtY(bottom)) - 1);
+    const to = Math.min(N - 1, Math.ceil(levelAtY(top)) + 1);
     for (const [i, v] of this.views) {
       if (i < from || i > to) {
         v.parts.forEach((o) => o.destroy());

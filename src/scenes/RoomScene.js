@@ -927,24 +927,5 @@ export class RoomScene extends Phaser.Scene {
     const tab = this.tabLock ? this.tabLock.f : null;
     if (this.pan.p !== this.laidOut?.p || tab !== this.laidOut.tab) this.layout();
     this.map.update(this.gesture?.axis === 'y');
-    this.updateChapterLabel();
-  }
-
-  // Счётчик «Глава N · X/20» под верхней полосой — только на развёрнутой карте; табличка пересоздаётся, когда
-  // сменилась глава или прогресс.
-  updateChapterLabel() {
-    const show = this.mapOpen && !this.mapBusy;
-    const k = this.map.chapter();
-    const all = Math.min(CONFIG.levelGen.chapter, LEVELS.length - k * CONFIG.levelGen.chapter);
-    const text = show ? STR.chapterProgress(k + 1, this.map.chapterDone(k), all) : '';
-    if (text === this.chapterLabelText) return;
-    this.chapterLabelText = text;
-    this.chapterLabel?.destroy();
-    this.chapterLabel = null;
-    if (!text) return;
-    this.chapterLabel = plate(this, W / 2, CONFIG.ui.topY + CONFIG.map.chapterLabelY - 62, text, { depth: 26, color: PAL.plate }).setScrollFactor(0);
-    // только на камере интерфейса — без приближения карты (и у частей таблички тоже)
-    const hudOnly = (o) => { o.cameraFilter = this.cameras.main.id; o.list?.forEach(hudOnly); };
-    hudOnly(this.chapterLabel);
   }
 }

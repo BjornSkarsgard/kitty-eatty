@@ -203,6 +203,5 @@ export const LAYOUT = {
     chapterBlend: 360, blendSteps: 12, signW: 560, signFont: 30,
     decorSize: 96, decorX: 92, decorEvery: 0, chapterPawSize: 40, // украшение — у каждого decorEvery-го уровня (0 — без украшений: много шума)
     fxEvery: 260, fxSize: 22,
-    chapterLabelY: 205,  // счётчик «Глава N · X/20» на развёрнутой карте — под верхней полосой и таймером жизней
   },
 };

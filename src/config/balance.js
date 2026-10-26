@@ -81,7 +81,7 @@ export const BALANCE = {
     winBoost: {
       from: 5,
       zones: [[2, 13.5], ['chest', 3], [2, 13.5], [3, 17], [4, 8], [3, 17], [2, 13.5], ['chest', 3], [2, 13.5]],
-      sweepMs: 900,
+      sweepMs: 1200,
     },
     undoEveryLevels: 3,  // бесплатная отмена за каждые столько новых пройденных уровней
     undoPrice: 30,       // цена отмены в монетах

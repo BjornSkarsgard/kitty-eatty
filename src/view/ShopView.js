@@ -83,7 +83,7 @@ export function stockShelves(scene, room, place, k, onTap) {
     // «Наборы» — закрытый сундук (иконка chest: коробка и крышка), низом на полку
     const chestArt = (size) => {
       const c = scene.add.container(0, 0);
-      const ic = makeIcon(scene, 'chest', size * k * 0.95);
+      const ic = makeIcon(scene, 'chest', size * k * S.chestScale);
       const b = ic.getBounds();
       c.add(ic.setY(-(b.y + b.height))); // низ сундука — на доске
       return c;

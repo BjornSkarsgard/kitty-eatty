@@ -281,7 +281,7 @@ export const CATS = {
       // shop_shelves.webp — те же полки крупно (чётче при наезде): где её левый верх на фоне и масштаб к фону;
       // проявляется, когда приближение больше sharpFrom
       sharp: { x: 65.8, y: 203.3, k: 0.393, sharpFrom: 1.6 }, // картинка без своего навеса (обрезан верх 45 px), края мягкие
-      topX: [278, 360, 442], topSize: 62,
+      topX: [278, 360, 442], topSize: 62, chestScale: 0.72, // сундук «Наборы» — доля topSize (выше — наезжает на навес)
       catX: [266, 303, 340, 377, 414, 458], catsOnShelf: 5, catScale: 0.34, catTapW: 40, catTapH: 64,
       moreScale: 0.2, moreDy: 24,
       catNameSize: 6.5, catNameDy: 9, catTagDy: 23, catTagSize: 9, catSlotW: 35, // порода под котом и ценник под ней

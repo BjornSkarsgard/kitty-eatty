@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { CatView } from '../theme/cats/CatView.js';
-import { adHomeButton, openAdLadder } from '../view/AdsView.js';
+import { adHomeButton, openAdLadder } from '../view/RewardView.js';
 import { stockShelves, openPacks, openCoinPacks, openUltras, openGoods, offerUltra } from '../view/ShopView.js';
 import { MapView } from '../view/MapView.js';
 import { makeButton } from '../view/Button.js';

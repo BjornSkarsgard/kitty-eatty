@@ -15,7 +15,7 @@ import { ULTRAS, ULTS_READY } from '../theme/cats/ultras.js';
 import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
 import { coins, buyGoods, buyUltra, ultrasOwned, ultraPrice, breedSkin, adsState, adCoins, adGoods, adLife } from '../core/save.js';
-import { showRewardedAd } from '../ads.js';
+import { showRewardedAd } from '../rewarded.js';
 
 const font = () => `"${CONFIG.font}", sans-serif`;
 // подписи на полках смотрят через камеру с сильным приближением — текст рисуем с запасом по чёткости

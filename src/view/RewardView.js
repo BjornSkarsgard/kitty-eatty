@@ -5,7 +5,7 @@ import { makeButton } from './Button.js';
 import { showPopup } from './Popup.js';
 import { makeIcon, panel, plate, iconButton, trackWindow } from './ui.js';
 import { sfx } from '../audio.js';
-import { showRewardedAd } from '../ads.js';
+import { showRewardedAd } from '../rewarded.js';
 import { adsState, adLadder } from '../core/save.js';
 import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';

@@ -206,10 +206,10 @@ export class MapView {
     scene.tweens.add({ targets: box, y: by - 8, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     // что внутри — плашка под подарком
     const R = ms.reward;
-    const [icon, label] = R.chests ? ['chest', STR.infiniteMin(R.infiniteMin)] : R.coins ? ['coin', String(R.coins)]
-      : R.undos ? ['undo', `×${R.undos}`] : ['heart', STR.infiniteMin(R.infiniteMin)];
+    const [icon, label] = R.chests ? ['coin', `${R.coins} + ∞ ${STR.infiniteMin(R.infiniteMin)}`]
+      : R.undos ? ['undo', `×${R.undos}`] : R.hints ? ['hint', `×${R.hints}`] : ['heart', `×${R.lives}`];
     const chip = scene.add.container(bx, by + M.milestoneSize * 0.62);
-    const t = scene.add.text(14, 0, R.chests ? `+ ∞ ${label}` : icon === 'heart' ? `∞ ${label}` : label, {
+    const t = scene.add.text(14, 0, label, {
       fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '22px', color: PAL.textBrown,
     }).setOrigin(0.5);
     const w = t.width + 50;

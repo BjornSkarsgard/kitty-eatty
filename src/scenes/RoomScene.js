@@ -505,7 +505,7 @@ export class RoomScene extends Phaser.Scene {
     if (!items) {
       return this.denyBox(this.chestBtn, () => showPopup(this, {
         title: STR.chest,
-        text: STR.chestInfo(CONFIG.chest.everyLevels),
+        text: STR.chestInfo(),
         buttons: [{ label: STR.ok }],
       }));
     }

@@ -2,6 +2,7 @@ import { CONFIG } from '../config.js';
 import { makeButton } from './Button.js';
 import { iconButton, plate, makeIcon, panel, kindBadge } from './ui.js';
 import { showRewardedAd } from '../rewarded.js';
+import { showPopup } from './Popup.js';
 import { addWinBoost } from '../core/save.js';
 import { sfx } from '../audio.js';
 import { catNeed } from '../core/save.js';
@@ -106,7 +107,7 @@ function winBoost(scene, box, coins, coinText, onTake) {
   const y = WC.boostY;
   const parts = [];
   const g = scene.add.graphics();
-  const colors = { 2: PAL.boost2, 3: PAL.boost3, 4: PAL.boost4 };
+  const colors = { 2: PAL.boost2, 3: PAL.boost3, 4: PAL.boost4, chest: PAL.boostChest };
   g.fillStyle(PAL.black, 0.3).fillRoundedRect(-bw / 2 + 3, y - bh / 2 + 5, bw, bh, bh / 2);
   let x = -bw / 2;
   const zones = Z.map(([k, w]) => {
@@ -119,10 +120,15 @@ function winBoost(scene, box, coins, coinText, onTake) {
   zones.forEach((z) => g.fillStyle(colors[z.k], 1).fillRect(z.from, y - bh / 2, z.to - z.from, bh));
   g.lineStyle(5, PAL.white, 0.9).strokeRoundedRect(-bw / 2, y - bh / 2, bw, bh, bh / 2);
   parts.push(g);
-  zones.forEach((z) => parts.push(scene.add.text((z.from + z.to) / 2, y, `×${z.k}`, {
-    fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: z.k === 4 ? '22px' : '28px', color: PAL.text,
-    stroke: PAL.textStroke, strokeThickness: 6,
-  }).setOrigin(0.5)));
+  // подписи ×N; сундук — маленький сундук над своей узкой зоной; соседние одинаковые зоны (×2 по бокам сундука) — без подписи
+  zones.forEach((z) => {
+    const cx = (z.from + z.to) / 2;
+    if (z.k === 'chest') return parts.push(makeIcon(scene, 'chest', 30).setPosition(cx, y - WC.boostH * 0.62)); // сундучок над узкой зоной
+    parts.push(scene.add.text(cx, y, `×${z.k}`, {
+      fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: z.k === 4 ? '22px' : '26px', color: PAL.text,
+      stroke: PAL.textStroke, strokeThickness: 6,
+    }).setOrigin(0.5));
+  });
   // стрелка-указатель над шкалой
   const arrow = scene.add.graphics();
   arrow.fillStyle(PAL.white, 1).fillTriangle(-16, -bh / 2 - 22, 16, -bh / 2 - 22, 0, -bh / 2 + 4);
@@ -145,10 +151,14 @@ function winBoost(scene, box, coins, coinText, onTake) {
     const k = kAt(arrow.x);
     btn.setLabel(STR.boostWatch(k));
     showRewardedAd(scene, () => {
-      addWinBoost(coins * (k - 1));
+      const chest = k === 'chest';
+      addWinBoost(chest ? 0 : coins * (k - 1), chest ? 1 : 0);
       sfx(scene, 'sfx_coins', CONFIG.audio.coins);
-      coinText?.setText(String(coins * k));
-      scene.tweens.add({ targets: coinText, scale: 1.4, duration: 160, yoyo: true, ease: 'Quad.easeOut' });
+      if (chest) showPopup(scene, { title: STR.ads.gotTitle, text: STR.boostChest, buttons: [{ label: STR.ok }] });
+      else {
+        coinText?.setText(String(coins * k));
+        scene.tweens.add({ targets: coinText, scale: 1.4, duration: 160, yoyo: true, ease: 'Quad.easeOut' });
+      }
       [...parts, btn].forEach((o) => scene.tweens.add({ targets: o, alpha: 0, duration: 250, onComplete: () => o.destroy() }));
       run.remove();
       onTake?.();

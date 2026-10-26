@@ -134,10 +134,10 @@ export function setCurrentLevel(index) {
 // Победа: запоминаем лучший результат, открываем следующий уровень и запускаться будем с него
 // (даже если игру закрыли, не нажав «Дальше»). Награда — CONFIG.economy, только за первое прохождение
 // (фармить старые уровни нельзя): монеты (по виду уровня, winCoins), опыт кота, шаг к бесплатной отмене,
-// сундук за каждый CONFIG.chest.everyLevels-й уровень.
+// сундук — за конец главы (рубеж на карте, claimMilestones).
 // Возвращает, что показать в окне победы: { coins, undos, xp, cat: { level, xp } — каким кот был до победы,
 // levelUps: [{ level, coins, undos, skin, chest }] — новые уровни кота и их награды (уже начислены),
-// chests — сколько сундуков добавилось (за каждый 10-й уровень) }.
+// chests — 0 (сундуки — за рубежи на карте) }.
 export function recordWin(level, index, moves, count) {
   const d = get();
   const first = !levelPassed(level);
@@ -146,7 +146,6 @@ export function recordWin(level, index, moves, count) {
   d.ultCharge = Math.min(CONFIG.ultRecharge, d.ultCharge + 1); // ульта заряжается за любую победу, и за переигровку
   if (first) {
     reward.coins = E.winCoins[level.kind ?? 'normal'];
-    if (level.id % CONFIG.chest.everyLevels === 0) reward.chests += 1;
     reward.xp = C.winXp + C.xpPer10Levels * Math.floor(index / 10);
     d.undoProgress += 1;
     if (d.undoProgress >= E.undoEveryLevels) {
@@ -562,15 +561,17 @@ export function claimMilestones() {
   const d = get();
   const list = pendingMilestones();
   if (!list.length) return null;
-  const sum = { coins: 0, undos: 0, chests: 0, infiniteMin: 0 };
+  const sum = { coins: 0, undos: 0, hints: 0, lives: 0, chests: 0, infiniteMin: 0 };
   for (const m of list) for (const k in sum) sum[k] += m.reward[k];
   d.coins += sum.coins;
   d.undos += sum.undos;
+  d.hints += sum.hints;
+  if (sum.lives) { refill(d); giveLives(d, sum.lives); }
   d.chests += sum.chests;
   if (sum.infiniteMin) d.infiniteUntil = Math.max(Date.now(), d.infiniteUntil || 0) + sum.infiniteMin * 60 * 1000;
   d.msDone = list[list.length - 1].id;
   write();
-  const items = [['coin', sum.coins], ['undo', sum.undos], ['chest', sum.chests], ['infinite', sum.infiniteMin]]
+  const items = [['coin', sum.coins], ['undo', sum.undos], ['hint', sum.hints], ['heart', sum.lives], ['chest', sum.chests], ['infinite', sum.infiniteMin]]
     .filter(([, n]) => n > 0).map(([icon, n]) => ({ icon, n }));
   return { chapter: list.some((m) => m.chapter), items };
 }
@@ -725,8 +726,11 @@ export function adLife() {
 }
 
 // Бегунок в окне победы: монеты за уровень ещё ×(k − 1) сверху (за досмотренный ролик).
-export function addWinBoost(n) {
-  get().coins += n;
+// chests — сундук, если стрелка встала на сундук.
+export function addWinBoost(n, chests = 0) {
+  const d = get();
+  d.coins += n;
+  d.chests += chests;
   write();
 }
 

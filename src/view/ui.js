@@ -312,19 +312,24 @@ export function plate(scene, x, y, label, { depth = 15, color = PAL.plateDark } 
 }
 
 // Табличка-пилюля сложного или кошмарного уровня (level.kind) своего цвета: под кружком на карте,
-// под табличкой уровня, в окне победы. Пока без картинки — значок со злой мордой подставим, когда будет арт.
+// под табличкой уровня, в окне победы. Слева, чуть навыпуск, — злая морда кота badge_<kind>.png.
 export function kindBadge(scene, x, y, kind, label, size = 28) {
   const text = scene.add.text(0, 0, label, {
     fontFamily: font(), fontStyle: 'bold', fontSize: `${size}px`, color: PAL.text, stroke: PAL.textStroke, strokeThickness: Math.round(size / 5),
   }).setOrigin(0.5);
-  const w = text.width + size * 1.4;
   const h = size * 1.6;
+  const faceKey = `badge_${kind}`;
+  const face = scene.textures.exists(faceKey) ? scene.add.image(0, 0, faceKey) : null;
+  const room = face ? h * 0.75 : 0; // место под морду слева
+  const w = text.width + size * 1.4 + room;
+  text.x = room / 2;
+  if (face) face.setScale((h * 1.45) / Math.max(face.width, face.height)).setPosition(-w / 2 + h * 0.35, -h * 0.05);
   const g = scene.add.graphics();
   g.fillStyle(PAL.black, 0.25).fillRoundedRect(-w / 2 + 2, -h / 2 + 4, w, h, h / 2);
   g.fillStyle(kind === 'nightmare' ? PAL.plateNightmare : PAL.plateHard, 1).fillRoundedRect(-w / 2, -h / 2, w, h, h / 2);
   g.fillStyle(PAL.white, 0.2).fillRoundedRect(-w / 2 + h * 0.3, -h / 2 + 4, w - h * 0.6, h * 0.22, h * 0.11);
   g.lineStyle(3, PAL.white, 0.6).strokeRoundedRect(-w / 2, -h / 2, w, h, h / 2);
-  return scene.add.container(x, y, [g, text]);
+  return scene.add.container(x, y, face ? [g, text, face] : [g, text]);
 }
 
 // Открытые окна сцены: каждое окно при открытии записывается сюда своим close(), при закрытии — убирается.

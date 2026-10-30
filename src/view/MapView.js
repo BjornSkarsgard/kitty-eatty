@@ -58,8 +58,9 @@ export class MapView {
     this.content = scene.add.container(-W / 2, 0);
     // слои: фон глав, следы, кружки, всё над кружками (звёзды, кот)
     this.ground = scene.add.container(0, 0);
+    this.transitions = scene.add.container(0, 0);
     this.layers = [0, 1, 2].map(() => scene.add.container(0, 0));
-    this.content.add([this.ground, ...this.layers]);
+    this.content.add([this.ground, this.transitions, ...this.layers]);
     this.chapterViews = new Map();
     this.makeFx();
     this.root.add(this.content);
@@ -131,8 +132,9 @@ export class MapView {
   // Создаёт уровни, попавшие в окно (с запасом), и убирает ушедшие.
   refresh() {
     const half = Math.max(H, this.viewH) / 2;
-    const top = this.scroll + H / 2 - half - M.spacing;
-    const bottom = this.scroll + H / 2 + half + M.spacing;
+    const margin = Math.max(M.spacing, M.chapterTransition.height / 2);
+    const top = this.scroll + H / 2 - half - margin;
+    const bottom = this.scroll + H / 2 + half + margin;
     const from = Math.max(0, Math.floor(levelAtY(bottom)) - 1);
     const to = Math.min(N - 1, Math.ceil(levelAtY(top)) + 1);
     for (const [i, v] of this.views) {
@@ -173,6 +175,8 @@ export class MapView {
     const key = `map_bg_${k + 1}`;
     const top = chapterTop(k);
     const bottom = chapterBottom(k);
+    const transitionKey = `map_transition_${k + 1}`;
+    const hasTransition = k > 0 && scene.textures.exists(transitionKey);
     if (scene.textures.exists(key)) {
       const src = scene.textures.get(key).getSourceImage();
       const ts = W / src.width; // тайл — по ширине карты
@@ -183,26 +187,48 @@ export class MapView {
         parts.push(t);
       };
       tile(top, bottom - top, 1);
-      if (k > 0) { // заход на предыдущую главу: полосы всё прозрачнее вниз
+      if (k > 0 && !hasTransition) { // переход-картинка заменяет обычное смешивание
         const step = M.chapterBlend / M.blendSteps;
         for (let s = 0; s < M.blendSteps; s++) tile(bottom + s * step, step + 1, 1 - (s + 1) / (M.blendSteps + 1));
       }
     }
+    if (hasTransition) {
+      const T = M.chapterTransition;
+      const texture = scene.textures.get(transitionKey);
+      const src = texture.getSourceImage();
+      // Полосы с прозрачными краями соединяют картинку с обоими тайлами.
+      for (let i = 0; i < T.strips; i++) {
+        const sy = Math.round(i * src.height / T.strips);
+        const end = Math.round((i + 1) * src.height / T.strips);
+        const frame = `transition_${i}`;
+        if (!texture.has(frame)) texture.add(frame, 0, 0, sy, src.width, end - sy);
+        const y = sy / src.height * T.height;
+        const h = (end - sy) / src.height * T.height;
+        const alpha = Math.min(1, (y + h / 2) / T.fade, (T.height - y - h / 2) / T.fade);
+        const strip = scene.add.image(0, bottom - T.height / 2 + y, transitionKey, frame)
+          .setOrigin(0).setDisplaySize(W, h).setAlpha(alpha);
+        this.transitions.add(strip);
+        parts.push(strip);
+      }
+    }
     // указатель главы — между её первым уровнем и предыдущим (у первой главы — под первым уровнем)
     const y = k === 0 ? nodePos(0).y + M.spacing * 0.62 : bottom;
-    const sign = scene.add.container(W / 2, y);
+    const signW = hasTransition ? M.chapterTransition.signW : M.signW;
+    const sign = scene.add.container(hasTransition ? M.chapterTransition.signX : W / 2,
+      y + (hasTransition ? M.chapterTransition.signY : 0));
     if (scene.textures.exists('map_sign')) {
       const img = scene.add.image(0, 0, 'map_sign');
-      sign.add(img.setScale(M.signW / img.width));
+      sign.add(img.setScale(signW / img.width));
     }
-    const label = scene.add.text(0, M.signW * 0.06, STR.chapterSign(k + 1, theme(k).name), {
+    const label = scene.add.text(0, signW * 0.06, STR.chapterSign(k + 1, theme(k).name), {
       fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: `${M.signFont}px`, color: PAL.text,
       stroke: PAL.textBrown, strokeThickness: 7,
     }).setOrigin(0.5);
-    if (label.width > M.signW * 0.7) label.setScale((M.signW * 0.7) / label.width);
+    if (label.width > signW * 0.7) label.setScale((signW * 0.7) / label.width);
     sign.add(label);
     if (this.chapterDone(k) >= Math.min(CHAPTER, N - k * CHAPTER)) {
-      const stamp = scene.add.container(M.signW * 0.33, -M.signW * 0.07).setAngle(-12);
+      const stamp = scene.add.container(signW * 0.33, -signW * 0.07).setAngle(-12);
+      stamp.setScale(signW / M.signW);
       const st = scene.add.text(0, 0, STR.chapterPassed, {
         fontFamily: `"${CONFIG.font}", sans-serif`, fontStyle: 'bold', fontSize: '24px', color: PAL.text, stroke: PAL.okGreenDark, strokeThickness: 6,
       }).setOrigin(0.5);

@@ -201,6 +201,7 @@ export const LAYOUT = {
     // главы: фон на стыке перетекает в следующий на blend px (полосами по blendSteps), указатель главы — ширина signW,
     // надпись signFont px; украшения у тропинки — decorSize px, на decorX от края; частицы — fxEvery мс, fxSize px
     chapterBlend: 360, blendSteps: 12, signW: 560, signFont: 30,
+    chapterTransition: { height: 480, strips: 24, fade: 80, signW: 240, signX: 145, signY: 90 },
     decorSize: 96, decorX: 92, decorEvery: 0, chapterPawSize: 40, // украшение — у каждого decorEvery-го уровня (0 — без украшений: много шума)
     fxEvery: 260, fxSize: 22,
   },

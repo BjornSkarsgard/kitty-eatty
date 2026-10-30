@@ -1,5 +1,7 @@
 # Шрифты
 
+Состояние на 2026-10-30: используется **Balsamiq Sans Bold (700)** для интерфейса, локальные `balsamiq-sans-700-cyrillic.woff2` и `balsamiq-sans-700-latin.woff2` в `src/assets/fonts/`, лицензия `OFL.txt`. Загрузка — `src/fonts.js`, семейство — `CONFIG.font`. Ожидание загрузки до 3 секунд, затем системный fallback. Каталог ниже — исторические варианты, менять шрифт по нему автоматически не нужно.
+
 Все шрифты из списка есть на Google Fonts. Кириллица у каждого проверена через Google Fonts API 2026-10-23. Лицензии OFL, Apache или Ubuntu Font License: шрифты можно бесплатно вшивать в коммерческую игру и в APK.
 
 Ссылки открывают страницу шрифта. Свой текст для превью (например, «Накорми котиков! Уровень 12») вводится в поле «Type here to preview text».
@@ -65,7 +67,7 @@
 
 Популярные «игровые» шрифты, которые часто советуют, но русских букв в них нет: Fredoka, Baloo 2, Lilita One, Luckiest Guy, Chewy, Titan One, Bungee, Sniglet, Coiny, Grandstander, Gluten, Varela Round, Comic Neue, Cherry Bomb One, Potta One, Mochiy Pop One, RocknRoll One.
 
-## Как будем подключать (этап 5)
+## Подключение (реализовано для Balsamiq Sans)
 
 - Файл шрифта кладём в проект (`src/assets/fonts/*.woff2`), а не грузим с Google: в Cordova и при плохом интернете CDN может не загрузиться.
 - Берём только нужные начертания и наборы символов (кириллица и латиница). Один шрифт тогда весит 30–80 КБ.

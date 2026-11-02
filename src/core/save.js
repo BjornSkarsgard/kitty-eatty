@@ -464,11 +464,13 @@ export function buyName(id) {
   return true;
 }
 
-// Своя кличка (уже проверенная checkCustomName): тратит именную табличку и сразу выбирается.
+// Первая своя кличка требует табличку, дальнейшие переименования бесплатны.
 export function setCustomName(s) {
   const d = get();
-  if (d.nameTokens <= 0) return false;
-  d.nameTokens -= 1;
+  if (!d.custom) {
+    if (d.nameTokens <= 0) return false;
+    d.nameTokens -= 1;
+  }
   d.custom = s;
   d.name = CUSTOM;
   write();

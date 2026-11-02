@@ -5,7 +5,7 @@ import { makeButton } from './Button.js';
 import { showPopup } from './Popup.js';
 import { makeIcon, panel, plate, iconButton, trackWindow } from './ui.js';
 import { sfx } from '../audio.js';
-import { showRewardedAd } from '../rewarded.js';
+import { showRewardedAd, rewardedReady } from '../rewarded.js';
 import { adsState, adLadder } from '../core/save.js';
 import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
@@ -33,7 +33,23 @@ export function adHomeButton(scene, x, y, onTap) {
   L.forEach((r, i) => c.add(rewardIcon(scene, r, A.mini).setPosition((i - (L.length - 1) / 2) * A.mini * 1.15, A.size * 0.62)));
   c.setSize(A.size * 1.2, A.size * 1.4).setInteractive();
   c.on('pointerdown', () => { sfx(scene, 'sfx_button'); onTap(); });
-  scene.tweens.add({ targets: icon, scale: icon.scale * 1.06, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  const baseScale = icon.scale;
+  let breathing = null;
+  let available = null;
+  const refresh = () => {
+    const next = rewardedReady() && adsState().watched < L.at(-1).at;
+    if (next === available) return;
+    available = next;
+    breathing?.stop();
+    breathing = null;
+    icon.setScale(baseScale);
+    c.setAlpha(next ? 1 : 0.5);
+    if (next) breathing = scene.tweens.add({ targets: icon, scale: baseScale * 1.06,
+      duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  };
+  scene.events.on('update', refresh);
+  c.once('destroy', () => { scene.events.off('update', refresh); breathing?.stop(); });
+  refresh();
   return c;
 }
 

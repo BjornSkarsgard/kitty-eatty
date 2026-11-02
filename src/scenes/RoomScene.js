@@ -304,7 +304,8 @@ export class RoomScene extends Phaser.Scene {
     if (ring && Math.abs(Math.abs(delta) - RING / 2) < 1) delta = (dir * RING) / 2;
     if (Math.abs(delta) > 1 && !onDone) sfx(this, 'sfx_swipe', CONFIG.audio.swipe);
     this.tweens.killTweensOf(this.pan);
-    this.tweens.add({ targets: this.pan, p: this.pan.p + delta, duration: ms, ease, onComplete: onDone });
+    this.tweens.add({ targets: this.pan, p: this.pan.p + delta, duration: ms, ease,
+      onComplete: () => { this.layout(); onDone?.(); } });
     return delta;
   }
 
@@ -679,6 +680,7 @@ export class RoomScene extends Phaser.Scene {
   // Камера наезжает на полки (R.shop.view) — они занимают экран между верхней полосой и вкладками.
   zoomShop() {
     if (this.shopOpen || !this.shelves) return;
+    this.layout(); // координаты комнаты должны соответствовать последнему кадру поворота
     this.shopOpen = true;
     this.mapBusy = true;
     const V = R.shop.view;

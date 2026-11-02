@@ -153,7 +153,7 @@ export class Board {
 
   // Ульта «Ловкие лапы»: поменять местами две порции [банка, место снизу]. Собранные и замороженные не трогаем.
   canSwap([b1, s1], [b2, s2]) {
-    const ok = (b, s) => s >= 0 && s < this.bowls[b].length && !this.isComplete(b) && !this.isFrozen(b);
+    const ok = (b, s) => s >= 0 && s < this.bowls[b].length && !this.isComplete(b) && !this.isFrozen(b) && !this.isHidden(b, s);
     return ok(b1, s1) && ok(b2, s2) && !(b1 === b2 && s1 === s2);
   }
 

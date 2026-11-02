@@ -147,7 +147,7 @@ export function openCollection(scene, { onChange, tab: startTab = 'breeds' } = {
       const have = n.custom ? !!customName() : owned.includes(n.id);
       const color = CONFIG.names.colors[n.rarity];
       grid.add(cell(x, y, cw, ch, color, have || n.custom ? 1 : 0.4, n.id === cur));
-      if (have) grid.add(text(x, y, n.name, 26));
+      if (have) grid.add(text(x, n.custom ? y - 10 : y, n.name, 26));
       else if (n.custom) grid.add(text(x, y, `✎ ${n.name} (${nameTokens()})`, 24));
       else {
         grid.add(text(x, y - 13, n.name, 22, PAL.textLocked));
@@ -156,6 +156,7 @@ export function openCollection(scene, { onChange, tab: startTab = 'breeds' } = {
         else grid.add(text(x, y + 16, n.catLevel ? STR.catLevelShort(n.catLevel) : STR.chest, 18, PAL.textMuted));
       }
       if (n.id === cur) grid.add(check(x + cw / 2 - 20, y - ch / 2 + 16));
+      if (n.custom && have) grid.add(text(x, y + 17, STR.renameFree, 17));
       const zone = scene.add.zone(x, y, cw, ch).setInteractive();
       zone.on('pointerdown', () => tapName(n, have));
       grid.add(zone);
@@ -174,11 +175,13 @@ export function openCollection(scene, { onChange, tab: startTab = 'breeds' } = {
   };
 
   const tapName = (n, have) => {
+    if (n.custom && !customName() && nameTokens() <= 0) return showPopup(scene, {
+      title: STR.customNameTitle, text: STR.firstNameToken, buttons: [{ label: STR.ok }],
+    });
     if (n.custom && !customName()) return promptName(scene, (s) => { setCustomName(s); onChange?.(); draw(); });
     if (have) {
       if (n.id === selectedName()) {
-        // своя уже выбрана — можно переименовать, если есть ещё табличка
-        if (n.custom && nameTokens() > 0) promptName(scene, (s) => { setCustomName(s); onChange?.(); draw(); });
+        if (n.custom) promptName(scene, (s) => { setCustomName(s); onChange?.(); draw(); });
         return;
       }
       sfx(scene, 'sfx_toggle', CONFIG.audio.toggle);
@@ -326,6 +329,7 @@ function promptName(scene, onOk) {
   const input = document.createElement('input');
   input.maxLength = 16;
   input.placeholder = STR.nameLabel;
+  input.value = customName() || '';
   Object.assign(input.style, {
     position: 'fixed', left: `${rect.left + (W / 2 - 220) * k}px`, top: `${rect.top + (H / 2 - 125) * k}px`, // над строкой текста окна — туда пишется ошибка
     width: `${440 * k}px`, height: `${64 * k}px`, fontSize: `${30 * k}px`, textAlign: 'center',
@@ -336,7 +340,7 @@ function promptName(scene, onOk) {
   setTimeout(() => input.focus(), 50);
   const popup = showPopup(scene, {
     title: STR.customNameTitle,
-    text: '\n\n',
+    text: `\n\n${customName() ? STR.renameFree : STR.firstNameToken}`,
     buttons: [
       {
         label: STR.done, color: PAL.buyGreen, keep: true,

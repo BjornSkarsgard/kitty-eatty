@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
 import { Board } from '../core/Board.js';
+import { shakeObjects } from '../view/shake.js';
 import { CatsLevel } from '../theme/cats/kitchen.js';
 import { CatView } from '../theme/cats/CatView.js';
 import { beatPulse } from '../beat.js';
@@ -70,6 +71,7 @@ export class GameScene extends Phaser.Scene {
     const U2 = this.ultra;
     this.reserveSlots = U2?.boost?.jarCap ?? 0;
     this.pulsing = new Set(); // порции, которые пульсируют в такт музыке
+    this.jarShakes = [];
     this.glass = null;
     // всё про котиков — фон кухни, банки, корм, коты, кормление — в теме (src/theme/cats/kitchen.js)
     this.theme = new CatsLevel(this);
@@ -381,6 +383,7 @@ export class GameScene extends Phaser.Scene {
 
   onBowlTap(i, pointer) {
     if (this.won) return;
+    this.jarShakes[i]?.();
     this.stopHint();
     if (this.ultPick) return this.pickForUlt(i, pointer);
     if (this.selected === null) {
@@ -492,19 +495,18 @@ export class GameScene extends Phaser.Scene {
   shake(i) {
     sfx(this, 'sfx_invalid');
     haptic('invalid');
-    const layers = [this.jarBack[i], this.jarFront[i], ...this.theme.jarExtras(i)];
-    const x = this.bowlRects[i].x;
-    this.tweens.killTweensOf(layers);
-    layers.forEach((l) => { l.x = x; });
-    this.tweens.add({
-      targets: layers, x: x + A.shakeDistance, duration: A.shakeDuration, yoyo: true, repeat: 1,
-      onComplete: () => layers.forEach((l) => { l.x = x; }),
-    });
+    this.jarShakes ??= [];
+    this.jarShakes[i]?.();
+    const layers = [this.jarBack[i], this.jarFront[i], ...this.theme.jarExtras(i),
+      ...this.portions[i], this.iceViews[i]].filter(Boolean);
+    this.jarShakes[i] = shakeObjects(this.tweens, layers, A.shakeDistance, A.shakeDuration);
   }
 
   // ---------- ходы ----------
 
   doMove(from, to, opts) {
+    this.jarShakes[from]?.();
+    this.jarShakes[to]?.();
     this.moved = true;
     const startSlot = this.portions[to].length;
     const n = this.board.move(from, to, opts);
@@ -584,6 +586,8 @@ export class GameScene extends Phaser.Scene {
   // Банки заново на новых местах (добавили банку, банка выросла): старые банки, зоны тапа и обмотки — пересоздаём,
   // корм перелетает за своей банкой. Масштаб не меняется (см. layoutBowls).
   rebuildJars() {
+      this.jarShakes.forEach(stop => stop?.());
+      this.jarShakes = [];
       this.iceViews.forEach((v) => v?.destroy());
       const wrapped = this.board.bowls.map((_, i) => this.theme.jarExtras(i).length > 0);
       this.jarBack.forEach((j) => j.destroy());
@@ -729,7 +733,7 @@ export class GameScene extends Phaser.Scene {
     if (u !== 'swap') return this.pickTarget(u, i, pointer);
     const slot = pointer ? this.slotAt(i, pointer) : this.board.bowls[i].length - 1;
     const here = [i, slot];
-    if (slot < 0 || this.board.isComplete(i) || this.board.isFrozen(i)) return this.shake(i); // пусто, съедена, во льду
+    if (slot < 0 || this.board.isComplete(i) || this.board.isFrozen(i) || this.board.isHidden(i, slot)) return this.shake(i);
     if (!this.ultFirst) {
       this.ultFirst = here;
       sfx(this, 'sfx_pick');

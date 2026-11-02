@@ -190,6 +190,8 @@ ${boostText}.` : ''}
   inventName: 'Придумать кличку',
   customNameReward: '✎ Своя кличка',
   customNameTitle: 'Своя кличка',
+  renameFree: 'Изменить бесплатно',
+  firstNameToken: 'Первая кличка — 1 табличка. Менять её можно бесплатно.',
   nameTooShort: 'Слишком коротко',
   nameTooLong: 'Не длиннее 16 букв',
   nameBadChars: 'Только буквы, пробел и дефис',

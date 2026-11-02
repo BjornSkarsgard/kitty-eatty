@@ -273,12 +273,13 @@ export class Board {
     });
   }
 
-  // «Перекус»: кот съедает все порции цвета c (кроме собранных и замороженных банок) — цвет уходит с поля.
+  // «Перекус»: цвет уходит с поля целиком, включая лёд, иначе остаётся несобираемый остаток.
+  // Уже собранные банки не трогаем; сам лёд ульта не снимает.
   snack(c) {
     return this.ultOp(() => {
       let any = false;
       this.bowls.forEach((s, j) => {
-        if (!this.open(j)) return;
+        if (this.isComplete(j)) return;
         for (let k = s.length - 1; k >= 0; k--) {
           if (s[k] !== c) continue;
           s.splice(k, 1);

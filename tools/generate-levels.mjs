@@ -2,10 +2,11 @@
 // Для каждого уровня: перемешиваем решённое состояние обратными ходами, солвер A* находит минимальное
 // решение, оцениваем трудность и из нескольких кандидатов берём ближайшего к целевой трудности.
 // Результат: src/levels/levels.json (игра только читает его).
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { CONFIG } from '../src/config.js';
 import { Board } from '../src/core/Board.js';
-import { scramble, solve, deadEndRate, keyOf, isComplete, isNearComplete, rng, withHidden as hiddenState } from './lib.mjs';
+import { finalDifficulty, hasEasyOpening } from './level-quality.mjs';
+import { scramble, solve, keyOf, isComplete, isNearComplete, rng, withHidden as hiddenState } from './lib.mjs';
 
 const G = CONFIG.levelGen;
 const MX = G.mechanics;
@@ -32,17 +33,6 @@ function paramsFor(n) {
       dead: Math.min(0.95, p.dead + K.dead),
       tries: K.tries,
       kind,
-    };
-  }
-  const P = G.puzzle;
-  if (n >= P.from && n % P.every === P.offset) {
-    const t = (n - P.from) / (G.count - P.from);
-    return {
-      colors: Math.round(lerp(P.colors[0], P.colors[1], t)),
-      capacity: P.capacity,
-      empties: P.empties,
-      dead: lerp(P.dead[0], P.dead[1], t),
-      puzzle: true,
     };
   }
   return tierParams(n, true);
@@ -122,68 +112,68 @@ function verify(level) {
   return b.isSolved() && b.history.length === level.minMoves;
 }
 
+const repair = process.argv.includes('--repair');
+const original = repair ? JSON.parse(readFileSync(new URL('../src/levels/levels.json', import.meta.url), 'utf8')) : [];
+const replace = new Set(original.filter(l => l.puzzle || (l.id >= G.noNearCompleteFrom && hasEasyOpening(l))).map(l => l.id));
 const levels = [];
-const used = new Set();
+const used = new Set(original.filter(l => !replace.has(l.id)).map(l => keyOf(l.bowls)));
 const t0 = Date.now();
+if (repair) console.log('Замена ' + replace.size + ' уровней: ' + [...replace].join(', '));
 
 for (let n = 1; n <= G.count; n++) {
+  if (repair && !replace.has(n)) {
+    const level = original[n - 1];
+    level.difficulty = Math.round(finalDifficulty(level, G.difficulty.samples) * 100) / 100;
+    levels.push(level);
+    continue;
+  }
   const p = paramsFor(n);
+  const old = original[n - 1];
+  // Сохраняем набор механик и знакомства; размеры берём от обычной ступени.
+  const mech = old ? {
+    ice: !!old.ice,
+    hiddenFull: !!old.hidden && old.hidden.every(h => h.slice(0, -1).every(Boolean)),
+    hiddenPart: !!old.hidden,
+    intro: old.intro,
+  } : mechanicsFor(n, p.kind);
   let best = null;
   let attempts = 0;
   const tries = G.candidates * (p.tries ?? 1);
   while (attempts < tries * 20 && (best === null || attempts < tries)) {
     attempts++;
     const bowls = scramble(p.colors, p.capacity, p.empties, p.colors * p.capacity * 3, rand);
-    if (bowls.some((b) => isComplete(b, p.capacity))) continue;
-    if (n >= G.noNearCompleteFrom && bowls.some((b) => isNearComplete(b, p.capacity))) continue;
+    if (bowls.some(b => isComplete(b, p.capacity))) continue;
+    if (n >= G.noNearCompleteFrom && bowls.some(b => isNearComplete(b, p.capacity))) continue;
     const key = keyOf(bowls);
     if (used.has(key)) continue;
-    const sol = solve(bowls, p.capacity, 500_000);
-    if (!sol || sol.moves.length < p.colors * G.minMovesPerColor) continue;
-    const dead = deadEndRate(bowls, p.capacity, rand, 80);
-    const score = Math.abs(dead - p.dead);
-    if (!best || score < best.score) best = { bowls, sol, dead, score, key };
-  }
-  if (!best) throw new Error(`Не удалось сгенерировать уровень ${n} (${JSON.stringify(p)})`);
-
-  const mech = mechanicsFor(n, p.kind);
-  let sol = best.sol;
-  let dead = best.dead;
-  let ice = null;
-  let iceArr = null;
-  if (mech.ice) {
-    const placed = placeIce(best.bowls, p.capacity, n);
-    if (placed) {
-      ice = placed.ice;
+    const level = { id: n, capacity: p.capacity, bowls };
+    if (p.kind) level.kind = p.kind;
+    if (mech.intro) level.intro = mech.intro;
+    let iceArr = null;
+    if (mech.ice) {
+      const placed = placeIce(bowls, p.capacity, n);
+      if (!placed) continue;
+      level.ice = placed.ice;
       iceArr = placed.iceArr;
-      sol = placed.sol;
-      dead = deadEndRate(best.bowls, p.capacity, mrand, 80, 400, placed.iceArr);
-    } else if (mech.intro === 'ice') throw new Error(`Не удалось заморозить банку на уровне-знакомстве ${n}`);
+    }
+    if (n >= G.noNearCompleteFrom && hasEasyOpening(level)) continue;
+    if (mech.hiddenFull || mech.hiddenPart) level.hidden = hideMask(bowls, mech.hiddenFull);
+    const state = level.hidden ? hiddenState(bowls, level.hidden) : bowls;
+    const sol = solve(state, p.capacity, 500_000, iceArr);
+    if (!sol || sol.moves.length < p.colors * G.minMovesPerColor) continue;
+    level.solution = sol.moves;
+    level.minMoves = sol.moves.length;
+    // Отбор ПОСЛЕ добавления льда и скрытого корма.
+    const dead = finalDifficulty(level, G.difficulty.samples);
+    const score = Math.abs(dead - p.dead);
+    level.difficulty = Math.round(dead * 100) / 100;
+    if (!best || score < best.score) best = { level, score, key };
   }
-  const level = {
-    id: n,
-    capacity: p.capacity,
-    minMoves: sol.moves.length,
-    difficulty: Math.round(dead * 100) / 100,
-    bowls: best.bowls,
-    solution: sol.moves,
-  };
-  if (p.puzzle) level.puzzle = true;
-  if (p.kind) level.kind = p.kind;
-  if (ice) level.ice = ice;
-  if (mech.hiddenFull || mech.hiddenPart) {
-    level.hidden = hideMask(best.bowls, mech.hiddenFull);
-    // скрытая порция не переезжает вместе с верхней — решение и минимум ходов считаем заново с маской
-    const hs = solve(hiddenState(best.bowls, level.hidden), p.capacity, 2_000_000, iceArr);
-    if (!hs) throw new Error(`Уровень ${n} со скрытым кормом не решается`);
-    level.solution = hs.moves;
-    level.minMoves = hs.moves.length;
-  }
-  if (mech.intro) level.intro = mech.intro;
-  if (!verify(level)) throw new Error(`Решение уровня ${n} не прошло проверку игровой логикой`);
+  if (!best) throw new Error('Не удалось сгенерировать уровень ' + n);
+  if (!verify(best.level)) throw new Error('Решение уровня ' + n + ' не прошло игровую проверку');
   used.add(best.key);
-  levels.push(level);
-  if (n % 25 === 0) console.log(`  ${n}/${G.count}  ${((Date.now() - t0) / 1000).toFixed(1)} с`);
+  levels.push(best.level);
+  console.log('  ' + n + '/' + G.count + ': ' + best.level.bowls.length + ' банок, ' + best.level.minMoves + ' ходов, ' + best.level.difficulty + '; ' + ((Date.now() - t0)/1000).toFixed(1) + ' с');
 }
 
 // Один уровень на строку — удобно смотреть диффы в git.
@@ -200,9 +190,6 @@ for (let i = 0; i < levels.length; i += 10) {
     `${String(chunk[0].bowls.filter((b) => !b.length).length).padEnd(7)} ${avg((l) => l.minMoves).toFixed(1).padEnd(10)} ${avg((l) => l.difficulty).toFixed(2)}`,
   );
 }
-const puzzles = levels.filter((l) => l.puzzle);
-console.log('\nГоловоломки (1 пустая миска, в средних выше не учтены):');
-console.log(puzzles.map((l) => `${l.id}: ${Math.max(...l.bowls.flat()) + 1} цв, ${l.minMoves} х, ${l.difficulty}`).join(' | '));
 const withIce = levels.filter((l) => l.ice).map((l) => l.id);
 const withHidden = levels.filter((l) => l.hidden).map((l) => l.id);
 console.log(`

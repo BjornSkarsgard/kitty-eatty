@@ -5,6 +5,7 @@
 // - лёд — в пределах банок (решается с учётом льда), маска скрытого корма — по банкам, верхние порции видны.
 import { readFileSync } from 'node:fs';
 import { CONFIG } from '../src/config.js';
+import { hasEasyOpening } from './level-quality.mjs';
 import { Board } from '../src/core/Board.js';
 import { solve, keyOf, isComplete, isNearComplete, withHidden } from './lib.mjs';
 
@@ -14,6 +15,8 @@ const seen = new Set();
 
 for (const l of levels) {
   const err = (msg) => errors.push(`уровень ${l.id}: ${msg}`);
+  if (l.puzzle) err('короткий тип головоломки отменён');
+  if (l.id >= CONFIG.levelGen.noNearCompleteFrom && hasEasyOpening(l)) err('слишком много одинаковых верхушек на старте');
   const counts = new Map();
   for (const c of l.bowls.flat()) counts.set(c, (counts.get(c) || 0) + 1);
   for (const [c, n] of counts) if (n !== l.capacity) err(`цвет ${c}: ${n} порций вместо ${l.capacity}`);

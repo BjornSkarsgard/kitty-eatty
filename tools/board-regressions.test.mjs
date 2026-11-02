@@ -1,6 +1,25 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Board } from '../src/core/Board.js';
+import { hasEasyOpening } from './level-quality.mjs';
+
+test('Мейн-кун не выбирает скрытую порцию с любой стороны обмена (#18)', () => {
+  const b = new Board({ capacity: 3, bowls: [[0, 1, 2], [1, 0, 2], []], hidden: [[1, 1, 0], [1, 1, 0]] });
+  const before = b.snapshot();
+  assert.equal(b.swap([0, 0], [1, 2]), false);
+  assert.equal(b.swap([0, 2], [1, 0]), false);
+  assert.equal(b.swap([0, 0], [1, 0]), false);
+  assert.deepEqual(b.snapshot(), before);
+  assert.equal(b.history.length, 0);
+  assert.equal(b.swap([0, 2], [1, 2]), true);
+});
+
+test('Начальная банка из одинаковых верхушек отсеивается (#12)', () => {
+  assert.equal(hasEasyOpening({ capacity: 3, bowls: [[0, 1], [2, 1], [0, 1], []] }), true);
+  assert.equal(hasEasyOpening({ capacity: 3, bowls: [[0, 1], [2, 1], [0, 1], []], ice: [[0, 1]] }), true);
+  assert.equal(hasEasyOpening({ capacity: 5, bowls: [[0, 1], [2, 1], [0, 1], [3, 1], []] }), true);
+  assert.equal(hasEasyOpening({ capacity: 5, bowls: [[0, 1], [2, 1], [0, 1], [3, 2], []] }), false);
+});
 
 test('Перекус убирает весь выбранный цвет, включая лёд, и уровень остаётся проходимым (#7)', () => {
   const b = new Board({ capacity: 2, bowls: [[0, 1], [1, 2], [2, 0], []], ice: [[0, 1]] });

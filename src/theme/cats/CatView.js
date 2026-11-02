@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { CONFIG } from '../../config.js';
 import { sfx, sfxRandom } from '../../audio.js';
 import LAYOUT from './cat-layout.json';
+import { catArt } from './art.js';
 
 const C = CONFIG.cat;
 const P = C.pivots;
@@ -11,12 +12,12 @@ const U = C.unit;
 const loc = ([x, y]) => ({ x: (x - C.origin[0]) * U, y: (y - C.origin[1]) * U + C.origin[2] });
 
 // Кот из частей: хвост, туловище, две передние лапы, голова (с глазами и ртом). У каждого цвета свои
-// картинки cat_<name>_*.png, без перекраски tint'ом. Глаза open/happy и рот — общие для всех котов.
+// картинки cat_<name>_* или cat_<порода>_<name>_*, без перекраски tint'ом. Глаза open/happy и рот общие внутри набора.
 // Каждая часть — в своём контейнере, точка контейнера — ось вращения (основание хвоста, плечо лапы…).
 // Если картинок нет — временные фигуры.
 export class CatView extends Phaser.GameObjects.Container {
   // colorIndex — цвет кота на уровне (индекс в CONFIG.colors) или id рескина обычного кота (строка, CONFIG.skins).
-  constructor(scene, x, y, colorIndex, { headOnly = false } = {}) {
+  constructor(scene, x, y, colorIndex, { headOnly = false, breed = null } = {}) {
     super(scene, x, y);
     scene.add.existing(this);
     const skin = typeof colorIndex === 'string' ? CONFIG.skins.find((k) => k.id === colorIndex) : null;
@@ -27,7 +28,9 @@ export class CatView extends Phaser.GameObjects.Container {
     this.mood = 'open';
     this.actions = [];
     this.idle = [];
-    this.useArt = scene.textures.exists(`cat_${this.name}_head`);
+    this.art = catArt(scene.textures, this.name, breed);
+    this.layout = { ...LAYOUT, ...(this.art.shared ? C.breedLayouts?.[breed] : {}) };
+    this.useArt = scene.textures.exists(`${this.art.prefix}_head`);
 
     if (!headOnly) {
       this.tail = this.part('tail');
@@ -52,7 +55,7 @@ export class CatView extends Phaser.GameObjects.Container {
     const box = this.scene.add.container(p.x - o.x, p.y - o.y);
     parent.add(box);
     if (name === 'eyes' || name === 'mouth') return box; // заполняются в setMood / setMouth
-    if (!this.useArt || !this.image(box, name, `cat_${this.name}_${name}`)) {
+    if (!this.useArt || !this.image(box, name, `${this.art.prefix}_${name}`)) {
       const g = this.scene.add.graphics();
       drawFallback[name.startsWith('leg') ? 'leg' : name](g, this.fill);
       if (name === 'leg_r') g.setScale(-1, 1);
@@ -64,7 +67,7 @@ export class CatView extends Phaser.GameObjects.Container {
   // Картинка в контейнере части: левый верхний угол — из src/theme/cats/cat-layout.json (layoutKey).
   image(box, layoutKey, key, pivot = layoutKey) {
     if (!this.scene.textures.exists(key)) return null;
-    const [x0, y0] = LAYOUT[layoutKey];
+    const [x0, y0] = this.layout[layoutKey];
     const [px, py] = P[pivot];
     const img = this.scene.add.image((x0 - px) * U, (y0 - py) * U, key).setOrigin(0, 0).setScale(U / LAYOUT.scale);
     box.add(img);
@@ -104,12 +107,12 @@ export class CatView extends Phaser.GameObjects.Container {
 
   // Открытые и довольные глаза общие; у ворчливых и закрытых веко в цвет шерсти — свои у каждого кота.
   showEyes(kind) {
-    const key = kind === 'open' || kind === 'happy' ? `eyes_${kind}` : `cat_${this.name}_eyes_${kind}`;
+    const key = kind === 'open' || kind === 'happy' ? `${this.art.shared}eyes_${kind}` : `${this.art.prefix}_eyes_${kind}`;
     this.swapLayer(this.eyes, kind, 'eyes', key, 'eyes', (g) => drawEyes(g, kind));
   }
 
   setMouth(open) {
-    this.swapLayer(this.mouth, open ? 'open' : 'closed', open ? 'mouth_open' : 'mouth', open ? 'mouth_open' : 'mouth_closed', 'mouth', (g) => drawMouth(g, open));
+    this.swapLayer(this.mouth, open ? 'open' : 'closed', open ? 'mouth_open' : 'mouth', `${this.art.shared}mouth_${open ? 'open' : 'closed'}`, 'mouth', (g) => drawMouth(g, open));
     return this;
   }
 

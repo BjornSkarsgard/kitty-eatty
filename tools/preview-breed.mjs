@@ -14,7 +14,14 @@ const arg = key => args.find(a => a.startsWith(`--${key}=`))?.slice(key.length +
 if (!arg('assets') || !arg('out') || !/^[a-z][a-z0-9_]*$/.test(arg('breed') ?? '')) throw new Error('Нужны --breed, --assets и --out');
 const assets = resolve(arg('assets')), out = resolve(arg('out')), breed = arg('breed');
 const breedName = ULTRAS.find(u => u.id === breed)?.name ?? breed;
-const layout = JSON.parse(readFileSync(new URL('../src/theme/cats/cat-layout.json', import.meta.url), 'utf8'));
+const layout = {
+  ...JSON.parse(readFileSync(new URL('../src/theme/cats/cat-layout.json', import.meta.url), 'utf8')),
+  ...CONFIG.cat.breedLayouts?.[breed],
+  ...(arg('layout') ? JSON.parse(readFileSync(resolve(arg('layout')), 'utf8')) : {}),
+};
+const emotionSkin = arg('skin') ?? 'brown';
+const samples = (arg('samples') ?? 'brown,cream,gray,black').split(',');
+if (samples.length !== 4 || [emotionSkin, ...samples].some(id => !CONFIG.skins.some(s => s.id === id))) throw new Error('Нужны известный --skin и четыре окраса --samples');
 const cache = new Map();
 const get = key => {
   if (!cache.has(key)) cache.set(key, decodePNG(readFileSync(join(assets, `cat_${breed}_${key}.png`))));
@@ -71,14 +78,13 @@ function save(im, name, labels) {
 mkdirSync(out, { recursive: true });
 const sheet = canvas(1200, 1040, true);
 const labels = [{ x: 28, y: 20, text: `${breedName}: сборка из отдельных частей`, size: 30 }];
-const samples = ['brown', 'cream', 'gray', 'black'];
 samples.forEach((id, i) => {
   draw(sheet, assembled(id), i * 300 + 10, 65, 0.5);
   labels.push({ x: i * 300 + 85, y: 347, text: CONFIG.skins.find(s => s.id === id).name });
 });
 labels.push({ x: 28, y: 399, text: 'Четыре отдельных состояния глаз; закрытый и открытый рот', size: 25 });
 ['open', 'happy', 'grumpy', 'closed'].forEach((mood, i) => {
-  draw(sheet, assembled('brown', mood, true), i * 300 - 15, 435, 0.6);
+  draw(sheet, assembled(emotionSkin, mood, true), i * 300 - 15, 435, 0.6);
   labels.push({ x: i * 300 + 75, y: 650, text: ['Обычный', 'Довольный', 'Ворчливый', 'Моргание'][i] });
 });
 labels.push({ x: 28, y: 699, text: 'Слои: синий рабочий мастер + общие глаза и рот', size: 25 });

@@ -13,7 +13,7 @@ import { gameMusic, sfx } from '../audio.js';
 import { beatPhase } from '../beat.js';
 import {
   currentLevel, unlockedLevel, levelPassed, coins, catLevel, lives, livesRefillLeft, skinsOwned,
-  chestsPending, openChest, infiniteLeft, claimMilestones, catXp, catLook, claimUltraGift, takeUltraIntro, dailyAvailable, catName,
+  chestsPending, openChest, infiniteLeft, claimMilestones, catXp, catLook, claimUltraGift, takeUltraIntro, dailyAvailable, catName, selectedUltra,
 } from '../core/save.js';
 import { openCollection } from '../view/CollectionView.js';
 import { openBox, closedBox } from '../view/ChestView.js';
@@ -584,17 +584,19 @@ export class RoomScene extends Phaser.Scene {
 
   // Кот на главной — выбранного в коллекции окраса; при смене окраса пересоздаётся на том же месте.
   makeHomeCat() {
-    const s = HC.catScale;
-    const old = this.cat;
-    this.cat = new CatView(this, W / 2, HC.floorY - CONFIG.cat.origin[2] * s, catLook());
-    this.cat.setBaseScale(s).startIdle();
-    this.cat.home = { x: this.cat.x, y: this.cat.y };
-    this.cat.setInteractive(new Phaser.Geom.Rectangle(-55, -75, 110, 145), Phaser.Geom.Rectangle.Contains);
-    this.cat.on('pointerdown', () => this.cat.poke());
-    if (old) {
-      this.homeRoom.addAt(this.cat, this.homeRoom.getIndex(old));
-      old.destroy();
-    }
+    this.onMain(() => {
+      const s = HC.catScale;
+      const old = this.cat;
+      this.cat = new CatView(this, W / 2, HC.floorY - CONFIG.cat.origin[2] * s, catLook(), { breed: selectedUltra()?.id });
+      this.cat.setBaseScale(s).startIdle();
+      this.cat.home = { x: this.cat.x, y: this.cat.y };
+      this.cat.setInteractive(new Phaser.Geom.Rectangle(-55, -75, 110, 145), Phaser.Geom.Rectangle.Contains);
+      this.cat.on('pointerdown', () => this.cat.poke());
+      if (old) {
+        this.homeRoom.addAt(this.cat, this.homeRoom.getIndex(old));
+        old.destroy();
+      }
+    });
   }
 
   // Карта висит в большой рамке на стене bg_room_map и сразу показывает, где сейчас кот.
@@ -673,8 +675,9 @@ export class RoomScene extends Phaser.Scene {
 
   // Создать объекты на основной камере, даже когда магазин открыт (перерисовка полок).
   onMain(fn) {
+    const previous = this.toMain;
     this.toMain = true;
-    try { fn(); } finally { this.toMain = false; }
+    try { fn(); } finally { this.toMain = previous; }
   }
 
   // Камера наезжает на полки (R.shop.view) — они занимают экран между верхней полосой и вкладками.

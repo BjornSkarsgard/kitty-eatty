@@ -10,6 +10,7 @@ import {
   ultrasOwned, selectedUltra, selectUltra, buyUltra, ultraPrice, breedSkin, catLook,
 } from '../core/save.js';
 import { ULTRAS, ULTS_READY } from '../theme/cats/ultras.js';
+import { catHeadKey } from '../theme/cats/art.js';
 import { openCoinPacks } from './ShopView.js';
 import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
@@ -90,7 +91,7 @@ export function openCollection(scene, { onChange, tab: startTab = 'breeds' } = {
       const cw = V.cellW - 14;
       const ch = V.cellH - 14;
       grid.add(cell(x, y, cw, ch, have ? PAL.panelLight : PAL.deep, 1, k.id === cur));
-      const head = scene.add.image(x, y - 14, `cat_${k.file}_head`);
+      const head = scene.add.image(x, y - 14, catHeadKey(scene.textures, k.file, selectedUltra()?.id));
       head.setScale(V.head / Math.max(head.width, head.height));
       if (!have) head.setTint(PAL.silhouette).setAlpha(0.75); // силуэт
       grid.add(head);
@@ -199,8 +200,8 @@ export function openCollection(scene, { onChange, tab: startTab = 'breeds' } = {
   };
 
   // ---------- породы ----------
-  // Первой — обычный кот «Найдёныш» (есть всегда), дальше ультракоты. Своего арта у пород пока нет — голова окраса
-  // породы. Купленная / подаренная — в цвете с названием, остальные — силуэт и подпись: цена, «Ур. 100» или «Скоро».
+  // Первой — обычный кот «Найдёныш» (есть всегда), дальше ультракоты. Готовый арт породы определяется по полному набору текстур.
+  // До его появления — голова обычного кота её родного окраса. Купленная / подаренная — в цвете с названием, остальные — силуэт и подпись: цена, «Ур. 100» или «Скоро».
   const REGULAR = { id: null, name: STR.breedRegular };
   const drawUltras = () => {
     const owned = ultrasOwned();
@@ -215,7 +216,7 @@ export function openCollection(scene, { onChange, tab: startTab = 'breeds' } = {
       const ch = V.cellH - 14;
       grid.add(cell(x, y, cw, ch, have ? PAL.panelLight : PAL.deep, 1, u.id === cur));
       const file = CONFIG.skins.find((k) => k.id === (have ? breedSkin(u.id) : u.look)).file;
-      const head = scene.add.image(x, y - 14, `cat_${file}_head`);
+      const head = scene.add.image(x, y - 14, catHeadKey(scene.textures, file, u.id));
       head.setScale(V.head / Math.max(head.width, head.height));
       if (!have) head.setTint(PAL.silhouette).setAlpha(0.75); // силуэт
       grid.add(head);

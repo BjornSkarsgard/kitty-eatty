@@ -6,6 +6,7 @@ import { EventEmitter } from 'node:events';
 import { CONFIG } from '../src/config.js';
 import { STR } from '../src/theme/cats/strings.ru.js';
 import { shakeObjects } from '../src/view/shake.js';
+import { onTap } from '../src/view/tap.js';
 
 test('Тряска сдвигает все части одинаково, сохраняет положение порций и не отменяет наматывание (#5/#6/#8)', () => {
   const objects = [{ x: 50, t: 0.3 }, { x: 50 }, { x: 43 }, { x: 57 }];
@@ -24,7 +25,7 @@ test('Тряска сдвигает все части одинаково, сох
 function load(relative, extras) {
   const source = readFileSync(new URL(relative, import.meta.url), 'utf8')
     .replace(/^import[\s\S]*?;\r?\n/gm, '').replace(/export /g, '');
-  return vm.runInNewContext(source + '\n;({RoomScene: typeof RoomScene === "undefined" ? null : RoomScene, adHomeButton: typeof adHomeButton === "undefined" ? null : adHomeButton})',
+  return vm.runInNewContext(source + '\n;({RoomScene: typeof RoomScene === "undefined" ? null : RoomScene, adHomeButton: typeof adHomeButton === "undefined" ? null : adHomeButton, stockShelves: typeof stockShelves === "undefined" ? null : stockShelves})',
     { CONFIG, STR, ...extras });
 }
 
@@ -37,6 +38,70 @@ test('Зум магазина получает актуальную раскла
     1, { onDone: () => order.push('zoom') });
   tween.onComplete();
   assert.deepEqual(order, ['layout', 'zoom']);
+});
+
+test('Создание и обновление полок не открывает магазин; товар активируется только полным тапом', () => {
+  const made = [];
+  const node = () => {
+    const o = Object.assign(new EventEmitter(), { list: [], width: 100, height: 100, scaleX: 1,
+      add(items) { this.list.push(...(Array.isArray(items) ? items : [items])); return this; },
+      getBounds() { return { x: 0, y: 0, width: 100, height: 100 }; },
+      setPosition(x, y) { this.x = x; this.y = y; return this; },
+      setScale(k) { this.scaleX = k; return this; },
+      destroy() { this.emit('destroy'); },
+    });
+    for (const method of ['setSize', 'setInteractive', 'setOrigin', 'setResolution', 'setY', 'setBaseScale', 'startIdle',
+      'fillStyle', 'fillEllipse', 'fillCircle', 'fillRoundedRect', 'lineStyle', 'strokeRoundedRect']) o[method] = () => o;
+    made.push(o);
+    return o;
+  };
+  const { stockShelves } = load('../src/view/ShopView.js', { PAL: {}, sfx() {}, onTap,
+    ultrasOwned: () => [], ultraPrice: () => 100, breedSkin: () => 'blue', ULTRAS: CONFIG.ultras,
+    CatView: class { constructor() { return node(); } }, makeIcon: node, plate: node });
+  const scene = { textures: { exists: () => true }, add: { container: node, text: node, image: node, graphics: node, zone: node } };
+  const chosen = [];
+  const room = node();
+  const shelves = stockShelves(scene, room, (x, y) => ({ x, y }), 1, (...args) => chosen.push(args));
+  assert.equal(chosen.length, 0);
+  const starter = made.find(o => o.listenerCount('pointerdown') > 0);
+  const finger = {};
+  starter.emit('pointerup', finger); // отпускание над товаром после другого окна
+  assert.equal(chosen.length, 0);
+  starter.emit('pointerdown', finger);
+  starter.emit('pointerup', finger);
+  assert.equal(chosen.length, 1);
+  assert.equal(chosen[0][0], 'starter');
+  shelves.refresh();
+  assert.equal(chosen.length, 1);
+});
+
+test('Подарочный кот создаётся в комнате даже поверх окна; вложенные обновления сохраняют камеру', () => {
+  let room;
+  const visible = [];
+  class Cat {
+    constructor() { visible.push(room.toMain); }
+    setBaseScale() { return this; } startIdle() { return this; } setInteractive() { return this; } on() { return this; }
+  }
+  const { RoomScene } = load('../src/scenes/RoomScene.js', { Phaser: { Scene: class {}, Geom: { Rectangle: class {} } },
+    CatView: Cat, catLook: () => 'brown', selectedUltra: () => ({ id: 'mainecoon' }) });
+  let destroyed = false, inserted = null;
+  const old = { destroy() { destroyed = true; } };
+  room = { cat: old, windows: new Set([{}]), shopOpen: true, toMain: false,
+    homeRoom: { getIndex: () => 2, addAt(cat, index) { inserted = [cat, index]; } },
+    onMain: RoomScene.prototype.onMain };
+  RoomScene.prototype.makeHomeCat.call(room);
+  assert.deepEqual(visible, [true]);
+  assert.equal(destroyed, true);
+  assert.equal(inserted[0], room.cat);
+  assert.equal(inserted[1], 2);
+  assert.equal(room.toMain, false);
+  room.onMain(() => {
+    room.onMain(() => assert.equal(room.toMain, true));
+    assert.equal(room.toMain, true);
+  });
+  assert.equal(room.toMain, false);
+  assert.throws(() => room.onMain(() => { throw Error('прерывание обновления'); }));
+  assert.equal(room.toMain, false);
 });
 
 test('Кнопка рекламы перестаёт пульсировать при исчерпании/неготовности ролика (#9)', () => {

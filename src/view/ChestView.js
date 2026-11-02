@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { CONFIG } from '../config.js';
+import { catHeadKey } from '../theme/cats/art.js';
 import { makeButton } from './Button.js';
 import { makeIcon, infinityMark, trackWindow } from './ui.js';
 import { sfx } from '../audio.js';
@@ -395,10 +396,10 @@ function rewardItem(scene, it, font) {
     }).setOrigin(0.5)]);
     return c;
   }
-  if (it.ultra) { // ультракот: голова (пока окраса-замены) и название породы
+  if (it.ultra) { // ультракот: голова породного набора (если готов) и название
     const u = CONFIG.ultras.find((x) => x.id === it.ultra);
     const file = CONFIG.skins.find((s) => s.id === u.look).file;
-    const head = scene.add.image(0, -6, `cat_${file}_head`);
+    const head = scene.add.image(0, -6, catHeadKey(scene.textures, file, u.id));
     head.setScale(150 / Math.max(head.width, head.height));
     c.add([head, scene.add.text(0, 84, u.name, {
       fontFamily: font, fontStyle: 'bold', fontSize: '36px', color: PAL.textGold, stroke: PAL.textStroke, strokeThickness: 8,

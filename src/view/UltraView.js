@@ -4,9 +4,10 @@ import { panel, plate, trackWindow, iconButton } from './ui.js';
 import { sfx } from '../audio.js';
 import { STR } from '../theme/cats/strings.ru.js';
 import { PALETTE as PAL } from '../theme/cats/palette.js';
+import { catHeadKey } from '../theme/cats/art.js';
 
 // Знакомство с ультракотом (после CONFIG.ultraIntroLevel): тёмный силуэт головы, название породы, ульта и умения,
-// «Будет доступен на N уровне», кнопка. Голова — пока окраса-замены (look), своего арта нет. onDone — после кнопки.
+// «Будет доступен на N уровне», кнопка. Голова — породного набора, если готов, иначе обычного кота. onDone — после кнопки.
 export function showUltraIntro(scene, u, onDone) {
   const W = CONFIG.width;
   const H = CONFIG.height;
@@ -29,7 +30,7 @@ export function showUltraIntro(scene, u, onDone) {
   box.add(plate(scene, 0, top + 4, STR.ultraIntroTitle, { depth: 0, color: PAL.plate }).setScale(1.1));
   const file = CONFIG.skins.find((k) => k.id === u.look).file;
   const hy = top + 60 + headH / 2;
-  const head = scene.add.image(0, hy, `cat_${file}_head`);
+  const head = scene.add.image(0, hy, catHeadKey(scene.textures, file, u.id));
   head.setScale(headH / Math.max(head.width, head.height)).setTint(PAL.silhouette);
   const q = scene.add.text(0, hy, '?', {
     fontFamily: font, fontStyle: 'bold', fontSize: '100px', color: PAL.text, stroke: PAL.textStroke, strokeThickness: 12,

@@ -58,9 +58,9 @@ function goodsIcon(scene, icon, size) {
 }
 
 // Ставит товары на полки комнаты room. place(x, y) — px картинки фона → координаты в контейнере комнаты.
-// onTap(what, data) — тап по товару; what: 'starter' | 'packs' | 'coins' | 'ultra' | 'ultras' | 'goods'.
+// onPick(what, data) — тап по товару; what: 'starter' | 'packs' | 'coins' | 'ultra' | 'ultras' | 'goods'.
 // Возвращает { refresh } — перерисовать (купили ультракота).
-export function stockShelves(scene, room, place, k, onTap) {
+export function stockShelves(scene, room, place, k, onPick) {
   const S = CONFIG.room.shop;
   let parts = [];
   const put = (o, x, y) => { const p = place(x, y); room.add(o.setPosition(p.x, p.y)); parts.push(o); return o; };
@@ -98,7 +98,7 @@ export function stockShelves(scene, room, place, k, onTap) {
     ];
     top.forEach(([what, o, tag], i) => {
       const x = S.topX[i];
-      put(tappable(o, S.topSize * k, S.topSize * k, () => onTap(what)), x, y1);
+      put(tappable(o, S.topSize * k, S.topSize * k, () => onPick(what)), x, y1);
       put(priceTag(scene, 0, 0, tag), x, y1 + S.tagDy);
     });
     // средняя полка: ультракоты (кроме подарочного), сначала не купленные
@@ -110,13 +110,13 @@ export function stockShelves(scene, room, place, k, onTap) {
     const fit = Math.min(1, S.catSlotW / Math.max(...names.map((t) => t.width)));
     shown.forEach((u, i) => {
       const x = S.catX[i];
-      const cat = new CatView(scene, 0, 0, breedSkin(u.id));
+      const cat = new CatView(scene, 0, 0, breedSkin(u.id), { breed: u.id });
       cat.setBaseScale(S.catScale * k);
       cat.startIdle();
       put(cat, x, y2 - CONFIG.cat.origin[2] * S.catScale);
       // зона тапа — прямоугольник вокруг кота (у контейнера кота нет своего размера)
       const zone = scene.add.zone(0, 0, 1, 1);
-      put(tappable(zone, S.catTapW * k, S.catTapH * k, () => onTap('ultra', u)), x, y2 - S.catTapH / 2);
+      put(tappable(zone, S.catTapW * k, S.catTapH * k, () => onPick('ultra', u)), x, y2 - S.catTapH / 2);
       const have = owned.includes(u.id);
       put(names[i].setScale(fit), x, y2 + S.catNameDy); // порода — на доске под котом
       put(priceTag(scene, 0, 0, have ? STR.shop.owned : STR.shop.short(ultraPrice(u)), { coin: !have }), x, y2 + S.catTagDy);
@@ -124,12 +124,12 @@ export function stockShelves(scene, room, place, k, onTap) {
     const more = plate(scene, 0, 0, STR.shop.more, { depth: 0 }).setScale(S.moreScale * k);
     more.list.forEach((o) => o.setResolution?.(SHARP));
     const mx = S.catX[S.catsOnShelf];
-    put(tappable(more, more.getBounds().width / more.scaleX, 72, () => onTap('ultras')), mx, y2 - S.moreDy);
+    put(tappable(more, more.getBounds().width / more.scaleX, 72, () => onPick('ultras')), mx, y2 - S.moreDy);
     // нижняя полка: умения и жизни
     CONFIG.shop.goods.forEach((g, i) => {
       const x = S.goodsX[i];
       const ic = goodsIcon(scene, g.icon, S.goodsSize * k);
-      put(tappable(ic, S.goodsSize * k, S.goodsSize * k, () => onTap('goods', g)), x, y3 - S.goodsSize * 0.55);
+      put(tappable(ic, S.goodsSize * k, S.goodsSize * k, () => onPick('goods', g)), x, y3 - S.goodsSize * 0.55);
       put(priceTag(scene, 0, 0, STR.shop.goods[g.icon]), x, y3 + S.tagDy);
     });
   };
@@ -375,7 +375,7 @@ export function openUltras(scene, onPick) {
       g.fillStyle(PAL.black, 0.25).fillRoundedRect(x - cw / 2 + 8, y - ch / 2 + 10, cw - 16, ch - 12, 20);
       g.fillStyle(have ? PAL.panelLight : PAL.deep, 1).fillRoundedRect(x - cw / 2 + 5, y - ch / 2 + 5, cw - 16, ch - 12, 20);
       box.add(g);
-      const head = new CatView(scene, x, y - 22, breedSkin(u.id), { headOnly: true });
+      const head = new CatView(scene, x, y - 22, breedSkin(u.id), { headOnly: true, breed: u.id });
       const b = head.getBounds();
       head.setScale(78 / Math.max(b.width, b.height));
       box.add(head);

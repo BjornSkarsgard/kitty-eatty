@@ -17,6 +17,7 @@ import { PALETTE as PAL } from '../theme/cats/palette.js';
 import { lives, coins, buyGoods, buyUltra, ultrasOwned, ultraPrice, breedSkin, adsState, adCoins, adGoods, adLife } from '../core/save.js';
 import { showRewardedAd } from '../rewarded.js';
 import { formatLeft } from './lives.js';
+import { onTap } from './tap.js';
 
 const font = () => `"${CONFIG.font}", sans-serif`;
 // подписи на полках смотрят через камеру с сильным приближением — текст рисуем с запасом по чёткости
@@ -65,7 +66,7 @@ export function stockShelves(scene, room, place, k, onTap) {
   const put = (o, x, y) => { const p = place(x, y); room.add(o.setPosition(p.x, p.y)); parts.push(o); return o; };
   const tappable = (o, w, h, fn) => {
     o.setSize(w, h).setInteractive({ useHandCursor: true });
-    o.on('pointerup', () => { sfx(scene, 'sfx_button'); fn(); });
+    onTap(o, () => { sfx(scene, 'sfx_button'); fn(); });
     return o;
   };
   const draw = () => {
@@ -386,7 +387,7 @@ export function openUltras(scene, onPick) {
         box.add([t, makeIcon(scene, 'coin', 26).setPosition(x + 12 - t.width / 2 - 16, y + 56)]);
       }
       const zone = scene.add.zone(x, y, cw - 16, ch - 12).setInteractive();
-      zone.on('pointerup', () => onPick(u, () => { close(); openUltras(scene, onPick); }));
+      onTap(zone, () => onPick(u, () => { close(); openUltras(scene, onPick); }));
       box.add(zone);
     });
   });

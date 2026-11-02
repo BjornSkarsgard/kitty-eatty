@@ -1,5 +1,6 @@
-// Семидневный расчёт потребности, НЕ предсказание поведения/удержания игроков.
-// node tools/economy-cohorts.mjs [--json]
+// Расчёт потребности, НЕ предсказание поведения/удержания игроков.
+// node tools/economy-cohorts.mjs [--json] [--month] [--bulk-floor]
+// --month: 30 дней × 10 побед, набор в дни 1/11/21 (1497 ₽), иначе 7 × 20.
 // Недостающие монеты учитываются как долг: график побед не останавливается.
 // Жизни/бусты покупаются по одной за монеты; пакеты и реклама — заданные сценарии.
 import { spawnSync } from 'node:child_process';
@@ -17,7 +18,8 @@ const worker = process.argv.indexOf('--worker');
 if (worker < 0) {
   const rows = [];
   for (const variant of ['current', 'soft', 'scarcity']) for (const demand of Object.keys(demands)) for (const cohort of cohorts) {
-    const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), '--worker', variant, demand, cohort], { encoding: 'utf8' });
+    const options = ['--month', '--bulk-floor'].filter(flag => process.argv.includes(flag));
+    const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), '--worker', variant, demand, cohort, ...options], { encoding: 'utf8' });
     if (r.status !== 0) throw new Error(r.stderr || r.stdout);
     rows.push(JSON.parse(r.stdout));
   }
@@ -28,6 +30,9 @@ if (worker < 0) {
 } else {
   const [variant, demand, cohort] = process.argv.slice(worker + 1);
   const bulkFloor = process.argv.includes('--bulk-floor');
+  const month = process.argv.includes('--month');
+  const dayCount = month ? 30 : 7;
+  const winsPerDay = month ? 10 : 20;
   if (variant === 'soft' || variant === 'scarcity') {
     C.economy.startCoins = 100;
     C.economy.winCoins = { normal: 15, hard: 25, nightmare: 35 };
@@ -103,11 +108,11 @@ if (worker < 0) {
   };
   const accumulator = { undos: 0, hints: 0, jars: 0, lives: 0 };
   const pack = C.shop.packs.find(p => p.id === 'pack1');
-  for (let day = 0; day < 7; day++) {
+  for (let day = 0; day < dayCount; day++) {
     now = origin + day * 86400000;
     refill();
     collect(() => S.claimDaily());
-    if (day === 0 && cohort.includes('paid')) {
+    if ((month ? day % 10 === 0 : day === 0) && cohort.includes('paid')) {
       // Гипотетическая покупка: платежи не вызываются и в игре выключены.
       rub += pack.price;
       stock.coins += pack.coins; income.coins += pack.coins;
@@ -123,8 +128,8 @@ if (worker < 0) {
       collect(() => { S.adCoins(); S.adCoins(); });
       ads += 2;
     }
-    for (let step = 0; step < 20; step++) {
-      now = origin + day * 86400000 + (step + 1) * 45000 * 3;
+    for (let step = 0; step < winsPerDay; step++) {
+      now = origin + day * 86400000 + (step + 1) * 45 * 60000 / winsPerDay;
       refill();
       for (const k of Object.keys(accumulator)) {
         if (k === 'hints' && S.catLevel() < C.boosters.hint.from) continue;
@@ -132,14 +137,14 @@ if (worker < 0) {
         accumulator[k] += demands[demand][k];
         while (accumulator[k] >= 1 - 1e-9) { spend(k); accumulator[k] -= 1; }
       }
-      const index = day * 20 + step;
+      const index = day * winsPerDay + step;
       collect(() => { S.recordWin(levels[index], index, levels[index].minMoves, levels.length); S.claimMilestones(); });
     }
     days.push({ day: day + 1, coins: stock.coins, ...Object.fromEntries(['undos', 'hints', 'jars', 'lives'].map(k => [k, stock[k]])) });
   }
   const expected = income.coins - Object.keys(bought).reduce((cost, k) => cost + bought[k] * prices[k], 0);
   if (Math.abs(expected - stock.coins) > 1e-6) throw new Error('Coin ledger mismatch');
-  console.log(JSON.stringify({ variant, demand, cohort, bulkFloor, assumptions: { days: 7, wins: 140, minutesPerDay: 45,
+  console.log(JSON.stringify({ variant, demand, cohort, bulkFloor, assumptions: { days: dayCount, wins: dayCount * winsPerDay, minutesPerDay: 45,
     needPerWin: demands[demand], debt: 'unmet coin requirement; wins continue for accounting only' },
     balance: stock.coins, peakDebt, daysInDebt: days.filter(d => d.coins < 0).length, stock, income, bought, ads, rub, days }));
 }
